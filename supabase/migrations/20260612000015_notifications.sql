@@ -88,7 +88,7 @@ CREATE EXTENSION IF NOT EXISTS pg_net SCHEMA extensions;
 --     $$
 --     SELECT extensions.http_post(
 --       url     := 'https://<AGENT_PUBLIC_URL>/jobs/process-notifications',
---       headers := jsonb_build_object('Authorization', 'Bearer <JOBS_BEARER_TOKEN>'),
+--       headers := jsonb_build_object('Authorization', 'Bearer <JOBS_BEARER_TOKEN>', 'Content-Type', 'application/json'),
 --       body    := '{}'
 --     );
 --     $$

@@ -227,7 +227,7 @@ SELECT cron.schedule(
   $$
   SELECT extensions.http_post(
     url     := 'https://ACTUAL_URL/jobs/process-notifications',
-    headers := jsonb_build_object('Authorization', 'Bearer ACTUAL_TOKEN'),
+    headers := jsonb_build_object('Authorization', 'Bearer ACTUAL_TOKEN', 'Content-Type', 'application/json'),
     body    := '{}'
   );
   $$
