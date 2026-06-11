@@ -9,6 +9,8 @@
  * and also scan tool_results/metadata for known operation signals.
  */
 
+export const VALID_CALL_CATEGORIES = new Set(["operation", "information"] as const);
+
 const OPERATION_TOOL_NAMES = new Set([
   "book-appointment",
   "book_appointment",

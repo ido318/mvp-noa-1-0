@@ -22,6 +22,7 @@ import {
   enqueueClientCancellationConfirmation,
 } from "./notifications.js";
 import { processNotifications } from "../services/notification.processor.js";
+import { VALID_CALL_CATEGORIES } from "./callClassifier.js";
 
 export type Pet = { name: string; species: string };
 
@@ -528,9 +529,8 @@ export async function saveVoiceCall(
   if (enrichment.transcript !== undefined)            row["transcript"]              = enrichment.transcript;
   if (enrichment.aiSummary !== undefined)             row["ai_summary"]              = enrichment.aiSummary;
   if (enrichment.callCategory !== undefined) {
-    const validCategories = new Set(["operation", "information"]);
     const cat = enrichment.callCategory;
-    row["call_category"] = cat !== null && validCategories.has(cat) ? cat : null;
+    row["call_category"] = cat !== null && VALID_CALL_CATEGORIES.has(cat) ? cat : null;
   }
   if (enrichment.recordingStoragePath !== undefined)  row["recording_storage_path"]  = enrichment.recordingStoragePath;
 

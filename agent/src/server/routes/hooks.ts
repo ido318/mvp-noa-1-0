@@ -72,7 +72,10 @@ hooksRoutes.post("/hooks/call-ended", async (c) => {
   const hasAudio = payload["has_audio"] === true;
   if (hasAudio) {
     void fetchAndStoreRecording(conversationId, env.ELEVENLABS_API_KEY, env.AGENT_CLINIC_ID).catch(
-      (err: unknown) => logger.error({ err, conversationId }, "hook: recording upload failed"),
+      (err: unknown) => logger.error(
+        { errMsg: err instanceof Error ? err.message : String(err), conversationId },
+        "hook: recording upload failed",
+      ),
     );
   }
 
@@ -102,7 +105,10 @@ async function fetchAndStoreRecording(
   try {
     audioBuffer = await audioRes.arrayBuffer();
   } catch (err) {
-    logger.warn({ conversationId, err }, "hook: failed to read audio response body");
+    logger.warn(
+      { conversationId, errMsg: err instanceof Error ? err.message : String(err) },
+      "hook: failed to read audio response body",
+    );
     return;
   }
   const storagePath = `${clinicId}/${conversationId}.mp3`;
