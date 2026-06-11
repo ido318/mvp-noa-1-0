@@ -24,6 +24,8 @@ import { VisitService } from "@/lib/services/visit.service";
 import { VisitSummaryAssistantService } from "@/lib/services/visit-summary-assistant.service";
 import { VoiceCallService } from "@/lib/services/voice-call.service";
 import { VoiceCallRepository } from "@/lib/repositories/voice-call.repository";
+import { EscalationService } from "@/lib/services/escalation.service";
+import { DashboardNotificationsService } from "@/lib/services/dashboard-notifications.service";
 
 export async function createServices() {
   const supabase = await createSupabaseServerClient();
@@ -50,11 +52,14 @@ export async function createServices() {
     aiEvent: new AIEventService(aiEventRepository),
     customer: new CustomerService(customerRepository, petRepository, auditService),
     pet: new PetService(petRepository, customerRepository, auditService),
+    escalation: new EscalationService(supabase),
+    dashboardNotifications: new DashboardNotificationsService(supabase),
     appointment: new AppointmentService(
       appointmentRepository,
       customerRepository,
       petRepository,
       auditService,
+      new DashboardNotificationsService(supabase),
     ),
     calendar: new CalendarService(appointmentRepository),
     visit: new VisitService(

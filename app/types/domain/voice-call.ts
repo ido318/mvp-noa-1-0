@@ -10,6 +10,12 @@ export type VoiceCallStatus =
   | "no_answer"
   | "canceled";
 
+export type TranscriptItem = {
+  role: "user" | "agent";
+  message?: string;
+  time_in_call_secs?: number;
+};
+
 export type VoiceCall = {
   id: string;
   clinicId: string;
@@ -18,12 +24,18 @@ export type VoiceCall = {
   status: VoiceCallStatus;
   fromNumber: string;
   toNumber: string;
-  twilioCallSid: string;
+  twilioCallSid: string | null;
   twilioParentCallSid: string | null;
+  elevenLabsConversationId: string | null;
+  agentName: string | null;
   startedAt: string;
   endedAt: string | null;
   durationSeconds: number | null;
   recordingUrl: string | null;
+  recordingStoragePath: string | null;
+  transcript: TranscriptItem[] | null;
+  aiSummary: string | null;
+  callCategory: "operation" | "information" | null;
   metadata: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;

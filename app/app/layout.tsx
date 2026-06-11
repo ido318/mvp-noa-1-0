@@ -9,9 +9,8 @@ const heebo = Heebo({
 });
 
 export const metadata: Metadata = {
-  title: "Maya · ניהול קליניקה וטרינרית",
-  description:
-    "מערכת ניהול קליניקה וטרינרית מבוססת AI — לקוחות, חיות, תורים, ביקורים וסיכומים אוטומטיים.",
+  title: "Get A Vet · דשבורד",
+  description: "לוח בקרה לניהול קליניקת Get A Vet — תורים, שיחות תומר, אסקלציות ולקוחות.",
 };
 
 export default function RootLayout({

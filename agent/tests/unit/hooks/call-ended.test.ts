@@ -3,9 +3,13 @@ import { createHmac } from "node:crypto";
 import { Hono } from "hono";
 import { hooksRoutes } from "../../../src/server/routes/hooks.js";
 
+const { mockSaveVoiceCall } = vi.hoisted(() => ({
+  mockSaveVoiceCall: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock("../../../src/lib/store.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../../src/lib/store.js")>();
-  return { ...actual, saveVoiceCall: vi.fn().mockResolvedValue(undefined) };
+  return { ...actual, saveVoiceCall: mockSaveVoiceCall };
 });
 
 // SECRET must match ELEVENLABS_WEBHOOK_SECRET set in tests/setup.ts
@@ -24,10 +28,19 @@ function makeApp() {
   return app;
 }
 
-const payload = JSON.stringify({ conversation_id: "conv_test123", duration_seconds: 45, success: true });
+const payload = JSON.stringify({
+  conversation_id: "conv_test123",
+  duration_seconds: 45,
+  success: true,
+  has_audio: false,
+});
 
 describe("POST /hooks/call-ended", () => {
-  it("returns 200 with valid signature", async () => {
+  beforeEach(() => {
+    mockSaveVoiceCall.mockClear();
+  });
+
+  it("returns 200 with valid signature and writes to DB", async () => {
     const res = await makeApp().request("/hooks/call-ended", {
       method: "POST",
       headers: {
@@ -39,9 +52,10 @@ describe("POST /hooks/call-ended", () => {
     expect(res.status).toBe(200);
     const json = await res.json() as { ok: boolean };
     expect(json.ok).toBe(true);
+    expect(mockSaveVoiceCall).toHaveBeenCalledOnce();
   });
 
-  it("returns 401 with wrong signature", async () => {
+  it("returns 401 with wrong signature — no DB write", async () => {
     const res = await makeApp().request("/hooks/call-ended", {
       method: "POST",
       headers: {
@@ -51,14 +65,32 @@ describe("POST /hooks/call-ended", () => {
       body: payload,
     });
     expect(res.status).toBe(401);
+    expect(mockSaveVoiceCall).not.toHaveBeenCalled();
   });
 
-  it("returns 401 with missing signature header", async () => {
+  it("returns 401 with missing signature header — no DB write", async () => {
     const res = await makeApp().request("/hooks/call-ended", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: payload,
     });
     expect(res.status).toBe(401);
+    expect(mockSaveVoiceCall).not.toHaveBeenCalled();
+  });
+
+  it("returns 401 with valid HMAC but stale timestamp (>5 min old) — no DB write", async () => {
+    // Timestamp 601 seconds in the past — outside the 300-second tolerance window
+    const staleTimestamp = String(Math.floor(Date.now() / 1000) - 601);
+    const staleSig = sign(payload, staleTimestamp);
+    const res = await makeApp().request("/hooks/call-ended", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "elevenlabs-signature": staleSig,
+      },
+      body: payload,
+    });
+    expect(res.status).toBe(401);
+    expect(mockSaveVoiceCall).not.toHaveBeenCalled();
   });
 });

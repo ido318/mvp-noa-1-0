@@ -3,6 +3,7 @@ import type { AppointmentRepository } from "@/lib/repositories/appointment.repos
 import type { CustomerRepository } from "@/lib/repositories/customer.repository";
 import type { PetRepository } from "@/lib/repositories/pet.repository";
 import type { AuditService } from "@/lib/services/audit.service";
+import type { DashboardNotificationsService } from "@/lib/services/dashboard-notifications.service";
 import type { ServiceActor } from "@/lib/services/service-context";
 import type {
   Appointment,
@@ -14,11 +15,13 @@ import type {
 } from "@/types/domain/appointment";
 
 const ALLOWED_STATUS_TRANSITIONS: Record<AppointmentStatus, AppointmentStatus[]> = {
-  scheduled: ["confirmed", "cancelled", "no_show"],
-  confirmed: ["completed", "cancelled", "no_show"],
-  completed: [],
-  cancelled: [],
-  no_show: [],
+  scheduled:        ["confirmed", "cancelled", "no_show"],
+  confirmed:        ["completed", "cancelled", "no_show"],
+  completed:        [],
+  cancelled:        [],
+  no_show:          [],
+  pending_approval: ["confirmed", "cancelled"],
+  late_cancellation:[],
 };
 
 export class AppointmentService {
@@ -27,6 +30,7 @@ export class AppointmentService {
     private readonly customerRepository: CustomerRepository,
     private readonly petRepository: PetRepository,
     private readonly auditService: AuditService,
+    private readonly dashboardNotifications?: DashboardNotificationsService,
   ) {}
 
   async listAppointments(
@@ -263,5 +267,107 @@ export class AppointmentService {
     });
 
     return ok(undefined);
+  }
+
+  /**
+   * Approve a pending_approval appointment (neutering/surgery):
+   * status → confirmed, changed_via='dashboard', enqueue booking_confirmation + reminders.
+   */
+  async approvePendingAppointment(
+    actor: ServiceActor,
+    appointmentId: string,
+    params: { phone: string; customerName: string; petName: string },
+  ): Promise<Result<Appointment>> {
+    const existing = await this.getAppointmentById(actor, appointmentId);
+    if (!existing.ok) return existing;
+    if (existing.value.status !== "pending_approval") {
+      return err(AppError.validation("Only pending_approval appointments can be approved"));
+    }
+
+    const updated = await this.appointmentRepository.updateVersioned(appointmentId, {
+      expectedVersion: existing.value.version,
+      data: { status: "confirmed", changed_via: "dashboard" },
+    });
+    if (!updated.ok) return updated;
+
+    if (this.dashboardNotifications) {
+      await this.dashboardNotifications.enqueueApprovalNotifications({
+        appointmentId,
+        scheduledAt: updated.value.scheduledAt,
+        durationMinutes: updated.value.durationMinutes,
+        visitType: updated.value.appointmentType,
+        clinicId: updated.value.clinicId,
+        customerId: updated.value.customerId,
+        phone: params.phone,
+        customerName: params.customerName,
+        petName: params.petName,
+      });
+    }
+
+    await this.auditService.logAction({
+      clinicId: updated.value.clinicId,
+      actorType: "user",
+      actorId: actor.userId,
+      action: "appointment.approve",
+      entityType: "appointment",
+      entityId: updated.value.id,
+      beforePayload: existing.value,
+      afterPayload: updated.value,
+    });
+
+    return updated;
+  }
+
+  /**
+   * Reject a pending_approval appointment:
+   * status → cancelled, changed_via='dashboard', enqueue cancellation_update SMS.
+   */
+  async rejectPendingAppointment(
+    actor: ServiceActor,
+    appointmentId: string,
+    params: { phone: string; customerName: string; petName: string },
+  ): Promise<Result<Appointment>> {
+    const existing = await this.getAppointmentById(actor, appointmentId);
+    if (!existing.ok) return existing;
+    if (existing.value.status !== "pending_approval") {
+      return err(AppError.validation("Only pending_approval appointments can be rejected"));
+    }
+
+    const updated = await this.appointmentRepository.updateVersioned(appointmentId, {
+      expectedVersion: existing.value.version,
+      data: {
+        status: "cancelled",
+        cancelled_at: new Date().toISOString(),
+        cancelled_by_user_id: actor.userId,
+        cancellation_reason: "rejected_by_vet",
+        changed_via: "dashboard",
+      },
+    });
+    if (!updated.ok) return updated;
+
+    if (this.dashboardNotifications) {
+      await this.dashboardNotifications.enqueueRejectionNotification({
+        appointmentId,
+        scheduledAt: existing.value.scheduledAt,
+        clinicId: updated.value.clinicId,
+        customerId: updated.value.customerId,
+        phone: params.phone,
+        customerName: params.customerName,
+        petName: params.petName,
+      });
+    }
+
+    await this.auditService.logAction({
+      clinicId: updated.value.clinicId,
+      actorType: "user",
+      actorId: actor.userId,
+      action: "appointment.reject",
+      entityType: "appointment",
+      entityId: updated.value.id,
+      beforePayload: existing.value,
+      afterPayload: updated.value,
+    });
+
+    return updated;
   }
 }

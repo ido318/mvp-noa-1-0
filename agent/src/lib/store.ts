@@ -285,8 +285,10 @@ export async function bookAppointment(params: BookAppointmentParams): Promise<st
   const slotLabel     = formatSlotLabel(scheduledAt);
   const dateLabel     = scheduledAt.slice(0, 10);
 
-  // Fire-and-forget SMS notifications
-  if (appointmentId) {
+  // Fire-and-forget SMS notifications — only for confirmed bookings.
+  // pending_approval (neutering) must NOT create notifications here;
+  // they are created by the dashboard approve flow instead.
+  if (appointmentId && !config.requiresApproval) {
     void scheduleBookingNotifications({
       appointmentId,
       scheduledAt,
@@ -488,11 +490,19 @@ export async function joinWaitlist(params: JoinWaitlistParams): Promise<string> 
 // Voice calls
 // ─────────────────────────────────────────────────────────────────────────────
 
+export type SaveVoiceCallEnrichment = {
+  transcript?: unknown[] | null;
+  aiSummary?: string | null;
+  callCategory?: "operation" | "information" | null;
+  recordingStoragePath?: string | null;
+};
+
 export async function saveVoiceCall(
   conversationId: string,
   durationSeconds: number | null,
   success: boolean | null,
   payload: Record<string, unknown>,
+  enrichment: SaveVoiceCallEnrichment = {},
 ): Promise<void> {
   const env = getEnv();
   const callerNumber =
@@ -503,22 +513,26 @@ export async function saveVoiceCall(
   const status =
     success === true ? "completed" : success === false ? "failed" : "in_progress";
 
+  const row: Record<string, unknown> = {
+    clinic_id:                    env.AGENT_CLINIC_ID,
+    elevenlabs_conversation_id:   conversationId,
+    direction:                    "inbound",
+    status,
+    duration_seconds:             durationSeconds,
+    from_number:                  callerNumber,
+    to_number:                    env.TWILIO_PHONE_NUMBER,
+    agent_name:                   "tomer",
+    metadata:                     payload,
+  };
+
+  if (enrichment.transcript !== undefined)            row["transcript"]              = enrichment.transcript;
+  if (enrichment.aiSummary !== undefined)             row["ai_summary"]              = enrichment.aiSummary;
+  if (enrichment.callCategory !== undefined)          row["call_category"]           = enrichment.callCategory;
+  if (enrichment.recordingStoragePath !== undefined)  row["recording_storage_path"]  = enrichment.recordingStoragePath;
+
   const { error } = await getSupabase()
     .from("voice_calls")
-    .upsert(
-      {
-        clinic_id:                    env.AGENT_CLINIC_ID,
-        elevenlabs_conversation_id:   conversationId,
-        direction:                    "inbound",
-        status,
-        duration_seconds:             durationSeconds,
-        from_number:                  callerNumber,
-        to_number:                    env.TWILIO_PHONE_NUMBER,
-        agent_name:                   "tomer",
-        metadata:                     payload,
-      },
-      { onConflict: "elevenlabs_conversation_id" },
-    );
+    .upsert(row, { onConflict: "elevenlabs_conversation_id" });
   if (error) throw new Error(`supabase voice_call upsert failed: ${error.message}`);
 }
 

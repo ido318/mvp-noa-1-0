@@ -22,7 +22,9 @@ import type {
   VoiceCall,
   VoiceCallDirection,
   VoiceCallStatus,
+  TranscriptItem,
 } from "@/types/domain/voice-call";
+import type { Escalation } from "@/types/domain/escalation";
 
 export function mapProfileRow(row: {
   id: string;
@@ -360,41 +362,58 @@ export function mapVaccinationRow(row: {
   };
 }
 
-export function mapVoiceCallRow(row: {
-  id: string;
-  clinic_id: string;
-  customer_id: string | null;
-  direction: VoiceCallDirection;
-  status: VoiceCallStatus;
-  from_number: string;
-  to_number: string;
-  twilio_call_sid: string;
-  twilio_parent_call_sid: string | null;
-  started_at: string;
-  ended_at: string | null;
-  duration_seconds: number | null;
-  recording_url: string | null;
-  metadata: Record<string, unknown> | null;
-  created_at: string;
-  updated_at: string;
-}): VoiceCall {
+export function mapVoiceCallRow(row: Record<string, unknown>): VoiceCall {
   return {
-    id: row.id,
-    clinicId: row.clinic_id,
-    customerId: row.customer_id,
-    direction: row.direction,
-    status: row.status,
-    fromNumber: row.from_number,
-    toNumber: row.to_number,
-    twilioCallSid: row.twilio_call_sid,
-    twilioParentCallSid: row.twilio_parent_call_sid,
-    startedAt: row.started_at,
-    endedAt: row.ended_at,
-    durationSeconds: row.duration_seconds,
-    recordingUrl: row.recording_url,
-    metadata: row.metadata ?? {},
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
+    id: row["id"] as string,
+    clinicId: row["clinic_id"] as string,
+    customerId: (row["customer_id"] as string | null) ?? null,
+    direction: row["direction"] as VoiceCallDirection,
+    status: row["status"] as VoiceCallStatus,
+    fromNumber: row["from_number"] as string,
+    toNumber: row["to_number"] as string,
+    twilioCallSid: (row["twilio_call_sid"] as string | null) ?? null,
+    twilioParentCallSid: (row["twilio_parent_call_sid"] as string | null) ?? null,
+    elevenLabsConversationId: (row["elevenlabs_conversation_id"] as string | null) ?? null,
+    agentName: (row["agent_name"] as string | null) ?? null,
+    startedAt: row["started_at"] as string,
+    endedAt: (row["ended_at"] as string | null) ?? null,
+    durationSeconds: (row["duration_seconds"] as number | null) ?? null,
+    recordingUrl: (row["recording_url"] as string | null) ?? null,
+    recordingStoragePath: (row["recording_storage_path"] as string | null) ?? null,
+    transcript: (row["transcript"] as TranscriptItem[] | null) ?? null,
+    aiSummary: (row["ai_summary"] as string | null) ?? null,
+    callCategory: (row["call_category"] as "operation" | "information" | null) ?? null,
+    metadata: (row["metadata"] as Record<string, unknown> | null) ?? {},
+    createdAt: row["created_at"] as string,
+    updatedAt: row["updated_at"] as string,
+  };
+}
+
+export function mapEscalationRow(row: Record<string, unknown>): Escalation {
+  let afterHours: boolean | undefined;
+  try {
+    const notes = row["notes"] as string | null;
+    if (notes) {
+      const parsed = JSON.parse(notes) as Record<string, unknown>;
+      afterHours = parsed["after_hours"] === true;
+    }
+  } catch {
+    // notes is plain text, not JSON
+  }
+
+  return {
+    id: row["id"] as string,
+    clinicId: row["clinic_id"] as string,
+    voiceCallId: (row["voice_call_id"] as string | null) ?? null,
+    elevenLabsConversationId: (row["elevenlabs_conversation_id"] as string | null) ?? null,
+    reason: row["reason"] as string,
+    urgency: row["urgency"] as number,
+    resolvedAt: (row["resolved_at"] as string | null) ?? null,
+    resolvedBy: (row["resolved_by"] as string | null) ?? null,
+    notes: (row["notes"] as string | null) ?? null,
+    createdAt: row["created_at"] as string,
+    updatedAt: row["updated_at"] as string,
+    afterHours,
   };
 }
 
