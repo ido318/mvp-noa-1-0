@@ -219,19 +219,20 @@ supabase db push --project-ref xpsuhtqfxqmnunppnyov
 **שלב 3 — אחרי Vercel deploy, הפעל את ה-cron job:**
 ```sql
 -- החלף ACTUAL_URL ו-ACTUAL_TOKEN עם הערכים האמיתיים
+-- (ACTUAL_TOKEN = ערך JOBS_BEARER_TOKEN מה-.env של ה-agent)
 SELECT cron.unschedule('process-sms-notifications');  -- אם כבר קיים
 SELECT cron.schedule(
   'process-sms-notifications',
   '*/15 * * * *',
   $$
-  SELECT net.http_post(
+  SELECT extensions.http_post(
     url     := 'https://ACTUAL_URL/jobs/process-notifications',
-    headers := '{"Authorization": "Bearer ACTUAL_TOKEN", "Content-Type": "application/json"}',
+    headers := jsonb_build_object('Authorization', 'Bearer ACTUAL_TOKEN'),
     body    := '{}'
   );
   $$
 );
--- ודא:
+-- ודא שהcron פעיל:
 SELECT jobname, schedule, active FROM cron.job;
 ```
 
