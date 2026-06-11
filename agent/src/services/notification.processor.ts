@@ -27,46 +27,51 @@ type NotificationRow = {
 export async function processNotifications(opts: ProcessOptions = {}): Promise<ProcessResult> {
   const result: ProcessResult = { processed: 0, sent: 0, failed: 0, deferred: 0 };
   const now = new Date();
+  const nowIso = now.toISOString();
 
-  let query = getSupabase()
+  // ── Quiet hours: defer all pending rows in one bulk UPDATE ──────────────
+  if (isQuietHours(now)) {
+    const deferUntil = nextSendableTime(now).toISOString();
+    let deferQuery = getSupabase()
+      .from("notifications_log")
+      .update({ scheduled_for: deferUntil, updated_at: nowIso })
+      .eq("status", "pending")
+      .lte("scheduled_for", nowIso);
+
+    if (opts.appointmentId) deferQuery = deferQuery.eq("appointment_id", opts.appointmentId);
+    if (opts.clinicId)      deferQuery = deferQuery.eq("clinic_id", opts.clinicId);
+
+    const { error } = await deferQuery;
+    if (error) logger.error({ error: error.message }, "Bulk defer failed");
+    return result; // deferred count not tracked for bulk path — zero is fine
+  }
+
+  // ── Atomic claim: UPDATE status='processing' … RETURNING * ─────────────
+  // Prevents two concurrent processor runs from sending the same SMS twice.
+  let claimQuery = getSupabase()
     .from("notifications_log")
-    .select("id, clinic_id, phone, body, type, appointment_id")
+    .update({ status: "processing", updated_at: nowIso })
     .eq("status", "pending")
-    .lte("scheduled_for", now.toISOString());
+    .lte("scheduled_for", nowIso)
+    .select("id, clinic_id, phone, body, type, appointment_id");
 
-  if (opts.appointmentId) query = query.eq("appointment_id", opts.appointmentId);
-  if (opts.clinicId) query = query.eq("clinic_id", opts.clinicId);
+  if (opts.appointmentId) claimQuery = claimQuery.eq("appointment_id", opts.appointmentId);
+  if (opts.clinicId)      claimQuery = claimQuery.eq("clinic_id", opts.clinicId);
 
-  const { data: rows, error } = await query.returns<NotificationRow[]>();
-  if (error) throw new Error(`processNotifications query failed: ${error.message}`);
+  const { data: rows, error: claimErr } = await claimQuery.returns<NotificationRow[]>();
+  if (claimErr) throw new Error(`processNotifications claim failed: ${claimErr.message}`);
   if (!rows || rows.length === 0) return result;
 
   for (const row of rows) {
     result.processed++;
-
-    if (isQuietHours(now)) {
-      const deferUntil = nextSendableTime(now);
-      const { error: deferErr } = await getSupabase()
-        .from("notifications_log")
-        .update({ scheduled_for: deferUntil.toISOString(), updated_at: now.toISOString() })
-        .eq("id", row.id);
-      if (deferErr) {
-        logger.error({ id: row.id, error: deferErr.message }, "Failed to defer notification");
-        result.failed++;
-      } else {
-        result.deferred++;
-      }
-      continue;
-    }
-
     try {
       await sendSms(row.phone, row.body);
       const { error: updateErr } = await getSupabase()
         .from("notifications_log")
-        .update({ status: "sent", sent_at: now.toISOString(), updated_at: now.toISOString() })
+        .update({ status: "sent", sent_at: nowIso, updated_at: nowIso })
         .eq("id", row.id);
       if (updateErr) {
-        logger.error({ id: row.id, error: updateErr.message }, "Notification sent but failed to update status");
+        logger.error({ id: row.id, error: updateErr.message }, "Notification sent but status update failed");
       }
       result.sent++;
     } catch (sendErr) {
@@ -74,7 +79,7 @@ export async function processNotifications(opts: ProcessOptions = {}): Promise<P
       logger.error({ id: row.id, type: row.type, error: message }, "Failed to send SMS");
       await getSupabase()
         .from("notifications_log")
-        .update({ status: "failed", error: message, updated_at: now.toISOString() })
+        .update({ status: "failed", error: message, updated_at: nowIso })
         .eq("id", row.id);
       result.failed++;
     }

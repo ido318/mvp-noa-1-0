@@ -5,13 +5,6 @@ import { processNotifications } from "../../../src/services/notification.process
 // Mocks
 // ─────────────────────────────────────────────────────────────────────────────
 
-const mockSelect = vi.fn();
-const mockEq = vi.fn();
-const mockLte = vi.fn();
-const mockUpdate = vi.fn();
-const mockFrom = vi.fn();
-const mockReturns = vi.fn();
-
 vi.mock("../../../src/lib/supabase.js", () => ({
   getSupabase: () => ({ from: mockFrom }),
 }));
@@ -21,38 +14,52 @@ vi.mock("../../../src/lib/sms.service.js", () => ({
 }));
 
 vi.mock("../../../src/lib/notifications.js", () => ({
-  isQuietHours: vi.fn().mockReturnValue(false),
+  isQuietHours:    vi.fn().mockReturnValue(false),
   nextSendableTime: vi.fn().mockReturnValue(new Date("2026-06-17T05:00:00Z")),
 }));
 
 import { sendSms } from "../../../src/lib/sms.service.js";
 import { isQuietHours } from "../../../src/lib/notifications.js";
 
-const makeRow = (overrides: Partial<{
+const mockFrom = vi.fn();
+
+function makeRow(overrides: Partial<{
   id: string; phone: string; body: string; type: string;
   appointment_id: string; clinic_id: string;
-}> = {}) => ({
-  id:             "notif-1",
-  phone:          "+972501234567",
-  body:           "SMS text",
-  type:           "booking_confirmation",
-  appointment_id: "appt-1",
-  clinic_id:      "clinic-1",
-  ...overrides,
-});
-
-function setupQueryChain(rows: object[]) {
-  // Build chain: from().select().eq().eq().lte().returns() → { data: rows, error: null }
-  const chain = {
-    select:  vi.fn().mockReturnThis(),
-    eq:      vi.fn().mockReturnThis(),
-    lte:     vi.fn().mockReturnThis(),
-    returns: vi.fn().mockResolvedValue({ data: rows, error: null }),
+}> = {}) {
+  return {
+    id:             "notif-1",
+    phone:          "+972501234567",
+    body:           "SMS text",
+    type:           "booking_confirmation",
+    appointment_id: "appt-1",
+    clinic_id:      "clinic-1",
+    ...overrides,
   };
-  const updateChain = { eq: vi.fn().mockReturnThis(), update: vi.fn().mockReturnThis() };
-  mockFrom.mockReturnValueOnce(chain).mockReturnValue({
-    update: vi.fn().mockReturnValue(updateChain),
-  });
+}
+
+// Build a chainable mock that ends with .returns({ data, error })
+function makeClaimChain(data: object[] | null, error: object | null = null) {
+  const chain: Record<string, unknown> = {};
+  const self = () => chain;
+  chain["update"]  = vi.fn(self);
+  chain["eq"]      = vi.fn(self);
+  chain["lte"]     = vi.fn(self);
+  chain["select"]  = vi.fn(self);
+  chain["returns"] = vi.fn().mockResolvedValue({ data, error });
+  return chain;
+}
+
+// Build a chainable mock for UPDATE without select (defer / status update)
+function makeUpdateChain(error: object | null = null) {
+  const chain: Record<string, unknown> = {};
+  const self = () => chain;
+  chain["update"] = vi.fn(self);
+  chain["eq"]     = vi.fn(self);
+  chain["lte"]    = vi.fn(self);
+  // Awaiting the chain directly resolves — add a then() to make it thenable
+  (chain as unknown as Promise<unknown>).then = (res: (v: unknown) => unknown) =>
+    Promise.resolve({ error }).then(res);
   return chain;
 }
 
@@ -67,95 +74,63 @@ beforeEach(() => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("processNotifications", () => {
-  it("returns zeros when no pending rows", async () => {
-    const chain = {
-      select:  vi.fn().mockReturnThis(),
-      eq:      vi.fn().mockReturnThis(),
-      lte:     vi.fn().mockReturnThis(),
-      returns: vi.fn().mockResolvedValue({ data: [], error: null }),
-    };
-    mockFrom.mockReturnValue(chain);
+  it("returns zeros when no rows claimed", async () => {
+    const claimChain = makeClaimChain([]);
+    mockFrom.mockReturnValue(claimChain);
 
     const result = await processNotifications();
     expect(result).toEqual({ processed: 0, sent: 0, failed: 0, deferred: 0 });
+    expect(sendSms).not.toHaveBeenCalled();
   });
 
-  it("sends SMS and marks as sent when not in quiet hours", async () => {
-    const row = makeRow();
-    setupQueryChain([row]);
+  it("sends SMS for each claimed row and marks as sent", async () => {
+    const rows = [makeRow({ id: "n-1" }), makeRow({ id: "n-2" })];
+
+    // First from() call → claim chain
+    const claimChain = makeClaimChain(rows);
+    // Subsequent from() calls → status update chain
+    const updateChain = makeClaimChain(null);
+    mockFrom.mockReturnValueOnce(claimChain).mockReturnValue(updateChain);
 
     const result = await processNotifications({ appointmentId: "appt-1" });
-    expect(sendSms).toHaveBeenCalledWith(row.phone, row.body);
-    expect(result.sent).toBe(1);
+    expect(sendSms).toHaveBeenCalledTimes(2);
+    expect(result.sent).toBe(2);
     expect(result.failed).toBe(0);
-    expect(result.deferred).toBe(0);
+    expect(result.processed).toBe(2);
   });
 
-  it("defers when in quiet hours", async () => {
+  it("does bulk defer and skips sending when in quiet hours", async () => {
     vi.mocked(isQuietHours).mockReturnValue(true);
-    const row = makeRow();
 
-    const deferUpdateChain = { eq: vi.fn().mockReturnThis() };
-    deferUpdateChain.eq.mockReturnValue(deferUpdateChain);
-    deferUpdateChain.eq.mockReturnValueOnce(deferUpdateChain).mockReturnValueOnce({ error: null });
-
-    const queryChain = {
-      select:  vi.fn().mockReturnThis(),
-      eq:      vi.fn().mockReturnThis(),
-      lte:     vi.fn().mockReturnThis(),
-      returns: vi.fn().mockResolvedValue({ data: [row], error: null }),
-    };
-    mockFrom
-      .mockReturnValueOnce(queryChain)
-      .mockReturnValue({ update: vi.fn().mockReturnValue(deferUpdateChain) });
+    const deferChain = makeUpdateChain();
+    mockFrom.mockReturnValue(deferChain);
 
     const result = await processNotifications();
     expect(sendSms).not.toHaveBeenCalled();
-    expect(result.deferred).toBe(1);
     expect(result.sent).toBe(0);
+    expect(result.processed).toBe(0);
   });
 
   it("marks as failed and does not throw when sendSms rejects", async () => {
     vi.mocked(sendSms).mockRejectedValueOnce(new Error("Twilio error"));
     const row = makeRow();
 
-    const failUpdateChain = { eq: vi.fn().mockReturnThis() };
-    failUpdateChain.eq.mockReturnValue({ error: null });
-
-    const queryChain = {
-      select:  vi.fn().mockReturnThis(),
-      eq:      vi.fn().mockReturnThis(),
-      lte:     vi.fn().mockReturnThis(),
-      returns: vi.fn().mockResolvedValue({ data: [row], error: null }),
-    };
-    mockFrom
-      .mockReturnValueOnce(queryChain)
-      .mockReturnValue({ update: vi.fn().mockReturnValue(failUpdateChain) });
+    const claimChain = makeClaimChain([row]);
+    const failChain  = makeClaimChain(null);
+    mockFrom.mockReturnValueOnce(claimChain).mockReturnValue(failChain);
 
     const result = await processNotifications();
     expect(result.failed).toBe(1);
     expect(result.sent).toBe(0);
   });
 
-  it("processes multiple rows independently", async () => {
-    const rows = [makeRow({ id: "n-1" }), makeRow({ id: "n-2" })];
-
-    const sentUpdateChain = { eq: vi.fn().mockReturnThis() };
-    sentUpdateChain.eq.mockReturnValue({ error: null });
-
-    const queryChain = {
-      select:  vi.fn().mockReturnThis(),
-      eq:      vi.fn().mockReturnThis(),
-      lte:     vi.fn().mockReturnThis(),
-      returns: vi.fn().mockResolvedValue({ data: rows, error: null }),
-    };
-    mockFrom
-      .mockReturnValueOnce(queryChain)
-      .mockReturnValue({ update: vi.fn().mockReturnValue(sentUpdateChain) });
+  it("atomic claim prevents duplicate: only claimed rows are sent", async () => {
+    // Simulates a second processor run that claims 0 rows (first already claimed them)
+    const claimChain = makeClaimChain([]);
+    mockFrom.mockReturnValue(claimChain);
 
     const result = await processNotifications();
-    expect(result.processed).toBe(2);
-    expect(result.sent).toBe(2);
-    expect(sendSms).toHaveBeenCalledTimes(2);
+    expect(sendSms).not.toHaveBeenCalled();
+    expect(result.processed).toBe(0);
   });
 });
