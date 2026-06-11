@@ -200,13 +200,43 @@ SELECT cron.schedule(
 ראה Backlog בדף הנושן: חיבור פרויקטי Vercel, שדרוג ל-`@elevenlabs/elevenlabs-js`, `npm audit`.
 
 ### ספרינט 2 — הושלם (2026-06-12) ✅
-- SMS pipeline: `notifications_log`, processor, trigger, 6 templates ✅
-- migration 20260612000015 הוחל על cloud ✅
+- SMS pipeline: `notifications_log`, atomic-claim processor, DB trigger, 6 templates ✅
 - 149 טסטים עוברים ✅
-- pg_cron: **ממתין להפעלה ידנית אחרי Vercel deploy** (ראה "הפעלת cron" למעלה)
+- migrations 15 + 16 **לא הוחלו על cloud** — להחיל לפני production (ראה למטה)
+
+### פתוח לפני production: migrations + cron
+
+**שלב 1 — החל migrations על cloud:**
+```bash
+supabase db push --project-ref xpsuhtqfxqmnunppnyov
+# מחיל: 20260612000015_notifications + 20260612000016_notifications_processing_status
+```
+
+**שלב 2 — וודא שpg_cron מופעל:**
+בדשבורד Supabase → Database → Extensions → חפש `pg_cron` → הפעל.
+(pg_net כבר מופעל v0.20.3 ✅)
+
+**שלב 3 — אחרי Vercel deploy, הפעל את ה-cron job:**
+```sql
+-- החלף ACTUAL_URL ו-ACTUAL_TOKEN עם הערכים האמיתיים
+SELECT cron.unschedule('process-sms-notifications');  -- אם כבר קיים
+SELECT cron.schedule(
+  'process-sms-notifications',
+  '*/15 * * * *',
+  $$
+  SELECT net.http_post(
+    url     := 'https://ACTUAL_URL/jobs/process-notifications',
+    headers := '{"Authorization": "Bearer ACTUAL_TOKEN", "Content-Type": "application/json"}',
+    body    := '{}'
+  );
+  $$
+);
+-- ודא:
+SELECT jobname, schedule, active FROM cron.job;
+```
 
 ### ספרינט 3 (עתידי)
 - דשבורד: תצוגת `pending_approval` ואישור/דחיה של תורי עיקור/סירוס
 - דשבורד: ניהול `calendar_blocks` (UI לחסימת חופשות)
 - דשבורד: תצוגת `waitlist`
-- Vercel deploy + הפעלת pg_cron עם URL אמיתי
+- SMS עדכון ללקוח כשנועה מזיזה תור (Twilio Messaging)
