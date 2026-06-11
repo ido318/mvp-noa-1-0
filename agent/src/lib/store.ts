@@ -37,6 +37,7 @@ export type EscalationEntry = {
   reason: string;
   urgency: number;
   conversation_id?: string | null;
+  notes?: string | null;
 };
 
 /** Normalise Israeli phone to E.164. 054... → +97254... */
@@ -87,6 +88,7 @@ export async function addEscalation(entry: EscalationEntry): Promise<void> {
     reason: entry.reason,
     urgency: entry.urgency,
     elevenlabs_conversation_id: entry.conversation_id ?? null,
+    notes: entry.notes ?? null,
   });
   if (error) throw new Error(`supabase escalation insert failed: ${error.message}`);
 }

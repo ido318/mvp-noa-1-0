@@ -13,6 +13,13 @@ import {
   joinWaitlist,
 } from "../../lib/store.js";
 import { triagePetCase } from "../../triage/triageDecision.js";
+import {
+  decideTriage,
+  EMERGENCY_SCRIPT,
+  URGENT_CALLBACK_SCRIPT,
+  AFTER_HOURS_SCRIPT,
+  ROUTINE_SCRIPT,
+} from "../../services/triage.service.js";
 
 export const toolsRoutes = new Hono();
 
@@ -108,13 +115,22 @@ toolsRoutes.post("/tools/escalate-to-noa", async (c) => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const triageSchema = z.object({
-  symptoms_he: z.string().min(1),
-  duration_he: z.string().optional(),
-  pet_type: z.enum(["כלב", "חתול", "אחר"]),
-  pet_age_years: z.number().positive().optional(),
-  pet_weight_kg: z.number().positive().optional(),
+  symptoms_he:        z.string().min(1),
+  duration_he:        z.string().optional(),
+  pet_type:           z.enum(["כלב", "חתול", "אחר"]),
+  pet_age_years:      z.number().positive().optional(),
+  pet_weight_kg:      z.number().positive().optional(),
   additional_signs_he: z.array(z.string()).optional(),
+  customer_id:        z.string().uuid().optional(),
+  pet_id:             z.string().uuid().optional(),
 });
+
+function todayIsraelIso(now: Date): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Jerusalem",
+    year: "numeric", month: "2-digit", day: "2-digit",
+  }).format(now);
+}
 
 toolsRoutes.post("/tools/triage-pet-case", async (c) => {
   const body = await c.req.json().catch(() => ({}));
@@ -125,20 +141,88 @@ toolsRoutes.post("/tools/triage-pet-case", async (c) => {
   }
 
   const input = parsed.data;
-  logger.info({ pet_type: input.pet_type }, "tool: triage-pet-case");
+  const now = new Date();
 
-  const result = triagePetCase(input);
+  // Combine symptoms + duration hint for richer text matching
+  const fullText = [
+    input.symptoms_he,
+    input.duration_he ?? "",
+    ...(input.additional_signs_he ?? []),
+  ].join(" ");
+
+  const triage = decideTriage({ text: fullText, now });
 
   logger.info(
     {
-      decision: result.decision,
-      urgency_score: result.urgency_score,
-      red_flags: result.red_flags_matched,
+      decision: triage.decision,
+      urgency: triage.urgency,
+      flags: triage.matchedFlags,
+      within_hours: triage.withinBusinessHours,
     },
-    "tool: triage-pet-case — result",
+    "tool: triage-pet-case",
   );
 
-  return c.json(result);
+  // ── Escalation (fire-and-forget) ──────────────────────────────────────────
+  const shouldEscalate =
+    triage.decision !== "routine" || triage.matchedFlags.length > 0;
+
+  if (shouldEscalate) {
+    const escalationUrgency =
+      triage.decision === "urgent_callback"
+        ? Math.max(4, triage.urgency)
+        : triage.decision === "after_hours_referral"
+          ? Math.min(triage.urgency, 5)  // low priority — info for morning
+          : triage.urgency;
+
+    void addEscalation({
+      reason: `triage: ${triage.decision} — flags: ${triage.matchedFlags.join(", ") || "none"} — "${input.symptoms_he.slice(0, 120)}"`,
+      urgency: escalationUrgency,
+      notes: JSON.stringify({
+        after_hours: !triage.withinBusinessHours,
+        matched_flags: triage.matchedFlags,
+        customer_id: input.customer_id ?? null,
+        pet_id: input.pet_id ?? null,
+      }),
+    }).catch((err: unknown) =>
+      logger.error({ err }, "triage-pet-case: escalation write failed"),
+    );
+  }
+
+  // ── Build script ──────────────────────────────────────────────────────────
+  let script: string;
+
+  switch (triage.decision) {
+    case "emergency_referral":
+      script = EMERGENCY_SCRIPT;
+      break;
+
+    case "urgent_callback": {
+      // Try to find a phone_consultation slot today
+      let slotSuffix = "";
+      try {
+        const todayIso = todayIsraelIso(now);
+        const availability = await checkAvailability(todayIso, "phone_consultation");
+        // If the response contains a time pattern (HH:MM), slots are available
+        const firstSlot = availability.match(/\b(\d{2}:\d{2})\b/)?.[1];
+        if (firstSlot) {
+          slotSuffix = ` מצאתי אפשרות לשיחה עם ד"ר נועה היום ב-${firstSlot} — לקבוע?`;
+        }
+      } catch {
+        // slot lookup is best-effort; don't fail the triage call
+      }
+      script = URGENT_CALLBACK_SCRIPT + slotSuffix;
+      break;
+    }
+
+    case "after_hours_referral":
+      script = AFTER_HOURS_SCRIPT;
+      break;
+
+    default:
+      script = ROUTINE_SCRIPT;
+  }
+
+  return c.json({ result: script });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

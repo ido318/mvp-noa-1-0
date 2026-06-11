@@ -1,9 +1,4 @@
-import { createRequire } from "module";
-import { fileURLToPath } from "url";
-import { dirname, join } from "path";
-import { readFileSync } from "fs";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
+import { RED_FLAGS } from "../knowledge/red-flags.js";
 
 export type RedFlag = {
   id: string;
@@ -13,29 +8,15 @@ export type RedFlag = {
   safe_question_he: string;
 };
 
-type RawRedFlag = RedFlag & {
-  triggers_he: string[];
-};
-
-let _flags: RawRedFlag[] | null = null;
-
-function loadFlags(): RawRedFlag[] {
-  if (_flags) return _flags;
-  const path = join(__dirname, "../knowledge/red_flags.json");
-  _flags = JSON.parse(readFileSync(path, "utf-8")) as RawRedFlag[];
-  return _flags;
-}
-
 export function matchRedFlags(
   symptoms: string,
   additionalSigns: string[] = [],
   petSpecies?: string,
 ): RedFlag[] {
-  const flags = loadFlags();
   const haystack = [symptoms, ...additionalSigns].join(" ").toLowerCase();
 
   const matched: RedFlag[] = [];
-  for (const flag of flags) {
+  for (const flag of RED_FLAGS) {
     if (petSpecies && !flag.applies_to.includes(petSpecies)) continue;
 
     const hit = flag.triggers_he.some((trigger) =>
@@ -46,7 +27,7 @@ export function matchRedFlags(
         id: flag.id,
         name_he: flag.name_he,
         urgency: flag.urgency,
-        applies_to: flag.applies_to,
+        applies_to: [...flag.applies_to],
         safe_question_he: flag.safe_question_he,
       });
     }

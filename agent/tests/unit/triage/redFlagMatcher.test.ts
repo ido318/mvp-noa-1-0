@@ -138,11 +138,59 @@ describe("matchRedFlags", () => {
     expect(flags.map((f) => f.id)).toContain("abdominal_swelling_gdv");
   });
 
+  // ── דגלים חדשים: eye_injury ──────────────────────────────────────────────
+
+  it("eye_injury — trigger: עין מדממת", () => {
+    const flags = matchRedFlags("יש לה עין מדממת");
+    expect(flags.map((f) => f.id)).toContain("eye_injury");
+  });
+
+  it("eye_injury — trigger: עיוור פתאום", () => {
+    const flags = matchRedFlags("הכלב עיוור פתאום לא רואה כלום");
+    expect(flags.map((f) => f.id)).toContain("eye_injury");
+  });
+
+  // ── דגלים חדשים: dystocia ────────────────────────────────────────────────
+
+  it("dystocia — trigger: לא יכולה ללדת", () => {
+    const flags = matchRedFlags("הכלבה לא יכולה ללדת כבר שעתיים");
+    expect(flags.map((f) => f.id)).toContain("dystocia");
+  });
+
+  it("dystocia — trigger: השליה לא יוצאת", () => {
+    const flags = matchRedFlags("השליה לא יוצאת אחרי הלידה");
+    expect(flags.map((f) => f.id)).toContain("dystocia");
+  });
+
+  // ── דגלים חדשים: animal_attack ──────────────────────────────────────────
+
+  it("animal_attack — trigger: כלב תקף", () => {
+    const flags = matchRedFlags("כלב תקף אותו בגינה");
+    expect(flags.map((f) => f.id)).toContain("animal_attack");
+  });
+
+  it("animal_attack — trigger: ננשך על ידי כלב", () => {
+    const flags = matchRedFlags("ננשך על ידי כלב גדול בפארק");
+    expect(flags.map((f) => f.id)).toContain("animal_attack");
+  });
+
+  // ── דגלים חדשים: snake_bite ─────────────────────────────────────────────
+
+  it("snake_bite — trigger: הכשת נחש", () => {
+    const flags = matchRedFlags("חשד להכשת נחש בשדה");
+    expect(flags.map((f) => f.id)).toContain("snake_bite");
+  });
+
+  it("snake_bite — trigger: נשך אותו נחש", () => {
+    const flags = matchRedFlags("נשך אותו נחש ליד הבית");
+    expect(flags.map((f) => f.id)).toContain("snake_bite");
+  });
+
   // ── urgency score ─────────────────────────────────────────────────────────
 
-  it("כל 12 דגלי החירום הם urgency >= 8", () => {
+  it("כל 16 הדגלים הם urgency >= 8", () => {
     const allFlags = matchRedFlags(
-      "לא נושם, התמוטט, פרכוסים, דם לא עוצר, בלע כדורים, נפגע ממכונית, בטן נפוחה, לא עשה פיפי, הקיא דם, צועק מכאב, מכת חום, פצע עמוק",
+      "לא נושם, התמוטט, פרכוסים, דם לא עוצר, בלע כדורים, נפגע ממכונית, בטן נפוחה, לא עשה פיפי, הקיא דם, צועק מכאב, מכת חום, פצע עמוק, עין מדממת, לא יכולה ללדת, כלב תקף, הכשת נחש",
       [],
     );
     for (const flag of allFlags) {

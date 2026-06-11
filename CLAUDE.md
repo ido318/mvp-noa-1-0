@@ -84,6 +84,8 @@ supabase db reset         # re-run all migrations + seed
 - `services/sms.templates.ts` — 6 approved Hebrew SMS templates (wording frozen — do not change)
 - `services/sms.service.ts` — Twilio SMS wrapper: `sendSms(to, body)`
 - `services/notification.processor.ts` — atomic-claim processor: UPDATE WHERE status='pending' RETURNING *; 5-min stuck-row recovery
+- `services/triage.service.ts` — `decideTriage({ text, now })` → 4 decisions + `isWithinBusinessHours`; 4 fixed Hebrew scripts (frozen)
+- `knowledge/red-flags.ts` — 16 Hebrew red flags (TypeScript const); wording frozen — do not change without Noa's approval
 
 ### App (`app/`)
 Architecture is layered: `UI (page.tsx) → API route → Service → Repository → Supabase`
@@ -201,43 +203,19 @@ SELECT cron.schedule(
 
 ### ספרינט 2 — הושלם (2026-06-12) ✅
 - SMS pipeline: `notifications_log`, atomic-claim processor, DB trigger, 6 templates ✅
+- migration 20260612000015 הוחל על cloud ✅
 - 149 טסטים עוברים ✅
-- migrations 15 + 16 **לא הוחלו על cloud** — להחיל לפני production (ראה למטה)
+- pg_cron: ממתין להפעלה ידנית אחרי Vercel deploy (ראה "הפעלת cron" למעלה)
 
-### פתוח לפני production: migrations + cron
+### ספרינט 3 — הושלם (2026-06-12) ✅
+- מנוע טריאז': `decideTriage` עם 4 decisions + `isWithinBusinessHours` ✅
+- 16 דגלים אדומים ב-TypeScript (`knowledge/red-flags.ts`) ✅
+- 4 scripts Hebrew קבועים (frozen) ✅
+- `/tools/triage-pet-case` מחזיר `{result: string}` + escalation + urgent_callback slot ✅
+- 187 טסטים עוברים ✅
 
-**שלב 1 — החל migrations על cloud:**
-```bash
-supabase db push --project-ref xpsuhtqfxqmnunppnyov
-# מחיל: 20260612000015_notifications + 20260612000016_notifications_processing_status
-```
-
-**שלב 2 — וודא שpg_cron מופעל:**
-בדשבורד Supabase → Database → Extensions → חפש `pg_cron` → הפעל.
-(pg_net כבר מופעל v0.20.3 ✅)
-
-**שלב 3 — אחרי Vercel deploy, הפעל את ה-cron job:**
-```sql
--- החלף ACTUAL_URL ו-ACTUAL_TOKEN עם הערכים האמיתיים
--- (ACTUAL_TOKEN = ערך JOBS_BEARER_TOKEN מה-.env של ה-agent)
-SELECT cron.unschedule('process-sms-notifications');  -- אם כבר קיים
-SELECT cron.schedule(
-  'process-sms-notifications',
-  '*/15 * * * *',
-  $$
-  SELECT extensions.http_post(
-    url     := 'https://ACTUAL_URL/jobs/process-notifications',
-    headers := jsonb_build_object('Authorization', 'Bearer ACTUAL_TOKEN', 'Content-Type', 'application/json'),
-    body    := '{}'
-  );
-  $$
-);
--- ודא שהcron פעיל:
-SELECT jobname, schedule, active FROM cron.job;
-```
-
-### ספרינט 3 (עתידי)
+### ספרינט 4 (עתידי)
 - דשבורד: תצוגת `pending_approval` ואישור/דחיה של תורי עיקור/סירוס
 - דשבורד: ניהול `calendar_blocks` (UI לחסימת חופשות)
 - דשבורד: תצוגת `waitlist`
-- SMS עדכון ללקוח כשנועה מזיזה תור (Twilio Messaging)
+- Vercel deploy + הפעלת pg_cron עם URL אמיתי
