@@ -79,17 +79,22 @@ CREATE EXTENSION IF NOT EXISTS pg_net SCHEMA extensions;
 --      SELECT cron.schedule(...) with real values.
 -- ─────────────────────────────────────────────────────────────
 
-SELECT cron.schedule(
-  'process-sms-notifications',
-  '*/15 * * * *',
-  $$
-  SELECT extensions.http_post(
-    url     := 'https://REPLACE_WITH_AGENT_PUBLIC_URL/jobs/process-notifications',
-    headers := jsonb_build_object('Authorization', 'Bearer REPLACE_WITH_JOBS_BEARER_TOKEN'),
-    body    := '{}'
-  );
-  $$
-);
+-- pg_cron job: activate AFTER Vercel deploy with real URL + JOBS_BEARER_TOKEN.
+-- Run manually in Supabase SQL editor once deployed:
+--
+--   SELECT cron.schedule(
+--     'process-sms-notifications',
+--     '*/15 * * * *',
+--     $$
+--     SELECT extensions.http_post(
+--       url     := 'https://<AGENT_PUBLIC_URL>/jobs/process-notifications',
+--       headers := jsonb_build_object('Authorization', 'Bearer <JOBS_BEARER_TOKEN>'),
+--       body    := '{}'
+--     );
+--     $$
+--   );
+--
+-- See CLAUDE.md § "הפעלת cron" for instructions.
 
 -- ─────────────────────────────────────────────────────────────
 -- 5. DB trigger: send SMS when Noa changes appointments

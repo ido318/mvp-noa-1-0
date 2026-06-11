@@ -76,9 +76,14 @@ supabase db reset         # re-run all migrations + seed
   - `/tools/join-waitlist` — write to `waitlist` table
   - `/tools/triage-pet-case` — local triage engine
 - `server/routes/hooks.ts` — `/hooks/call-ended` webhook from ElevenLabs; upserts to `voice_calls`
+- `server/routes/jobs.ts` — `POST /jobs/process-notifications` (Bearer token auth); triggers SMS processor
 - `lib/store.ts` — all Supabase data access for the agent
 - `lib/appointments.ts` — slot logic: `VISIT_TYPE_CONFIG`, `generateSlotsForVisitType`, `isWithin14Days`, `isTooLateToCancel`
+- `lib/notifications.ts` — enqueue/cancel/reschedule SMS notifications; DST-correct Jerusalem time helpers
 - `lib/env.ts` — typed env validation (throws on startup if vars are missing)
+- `services/sms.templates.ts` — 6 approved Hebrew SMS templates (wording frozen — do not change)
+- `services/sms.service.ts` — Twilio SMS wrapper: `sendSms(to, body)`
+- `services/notification.processor.ts` — atomic-claim processor: UPDATE WHERE status='pending' RETURNING *; 5-min stuck-row recovery
 
 ### App (`app/`)
 Architecture is layered: `UI (page.tsx) → API route → Service → Repository → Supabase`
@@ -94,7 +99,8 @@ Architecture is layered: `UI (page.tsx) → API route → Service → Repository
 ### Supabase
 - **Cloud project:** `xpsuhtqfxqmnunppnyov` (account: voxly ai, region: eu-central-1, Frankfurt) — `https://xpsuhtqfxqmnunppnyov.supabase.co`
   Old projects (deleted): `ssfkximqwyzqlsgwfbye` (Seoul), `voxly-tomer` (`grbgkjjtyfohzulssuga`).
-- Migrations in `supabase/migrations/` — run in timestamp order; 14 migrations total (through `20260612000014_sprint1_appointments.sql`)
+- Migrations in `supabase/migrations/` — run in timestamp order; 15 migrations total (through `20260612000015_notifications.sql`)
+- pg_cron **not yet active** — see "הפעלת cron" below; activate manually after Vercel deploy
 - RLS is enabled on all tables; the app uses the anon key + user session for data access, the service role key only for admin operations (audit logs, AI events, health checks)
 - Multi-tenant by `clinic_id` — every data table has a `clinic_id` column
 - Clinic seed: Get A Vet → `AGENT_CLINIC_ID=37681721-a59f-40d5-a041-ad15a49ecf29`
@@ -167,13 +173,40 @@ Shared (same Supabase project): `SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_URL`, `SU
 - תקשורת עם המשתמש בעברית. קוד והודעות commit באנגלית.
 - תיעוד מרכזי בנושן: דף Voxly-Tomer (`36f1354b584881b587c5c6f42a6bf6c7`).
 
+## הפעלת cron (אחרי Vercel deploy)
+
+לאחר ש-`PUBLIC_BASE_URL` ו-`JOBS_BEARER_TOKEN` ידועים, הרץ ב-SQL editor של Supabase:
+
+```sql
+SELECT cron.schedule(
+  'process-sms-notifications',
+  '*/15 * * * *',
+  $$
+  SELECT extensions.http_post(
+    url     := 'https://<AGENT_PUBLIC_URL>/jobs/process-notifications',
+    headers := jsonb_build_object('Authorization', 'Bearer <JOBS_BEARER_TOKEN>'),
+    body    := '{}'
+  );
+  $$
+);
+```
+
+לביטול: `SELECT cron.unschedule('process-sms-notifications');`
+
+---
+
 ## משימות פתוחות
 
 ראה Backlog בדף הנושן: חיבור פרויקטי Vercel, שדרוג ל-`@elevenlabs/elevenlabs-js`, `npm audit`.
 
-### ספרינט 2 (עתידי)
+### ספרינט 2 — הושלם (2026-06-12) ✅
+- SMS pipeline: `notifications_log`, processor, trigger, 6 templates ✅
+- migration 20260612000015 הוחל על cloud ✅
+- 149 טסטים עוברים ✅
+- pg_cron: **ממתין להפעלה ידנית אחרי Vercel deploy** (ראה "הפעלת cron" למעלה)
+
+### ספרינט 3 (עתידי)
 - דשבורד: תצוגת `pending_approval` ואישור/דחיה של תורי עיקור/סירוס
 - דשבורד: ניהול `calendar_blocks` (UI לחסימת חופשות)
 - דשבורד: תצוגת `waitlist`
-- SMS עדכון ללקוח כשנועה מזיזה תור (Twilio Messaging)
-- migrations 20260612000013 + 20260612000014 הוחלו על cloud (2026-06-11) ✅
+- Vercel deploy + הפעלת pg_cron עם URL אמיתי
