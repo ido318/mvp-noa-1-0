@@ -1,0 +1,23 @@
+{
+  "version": "1.0.0",
+  "scoring": {
+    "1-3": {
+      "label_he": "מנהלי / לא דחוף",
+      "default_action": "appointment_request"
+    },
+    "4-6": {
+      "label_he": "מצריך בדיקה השבוע",
+      "default_action": "notify_noa"
+    },
+    "7": {
+      "label_he": "דחוף — לבדוק היום",
+      "default_action": "notify_noa_urgent",
+      "fallback_if_noa_busy": "emergency_referral"
+    },
+    "8-10": {
+      "label_he": "חירום מיידי",
+      "default_action": "emergency_referral",
+      "overrides_noa_availability": true
+    }
+  }
+}

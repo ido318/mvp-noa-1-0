@@ -1,0 +1,42 @@
+{
+  "clinic_name": "Get A Vet",
+  "vet_name": "ד\"ר נועה כבשני",
+  "phone": "054-9581991",
+  "whatsapp": "+972549581991",
+  "email": "contact@getavett.com",
+  "address": "יצחק (זיקו) גרציאני 6, תל אביב-יפו 6713353",
+  "hours": {
+    "sunday_thursday": "08:00-20:00",
+    "friday": "08:30-13:00",
+    "saturday": "closed"
+  },
+  "appointment_duration_minutes": 30,
+  "appointment_policy": "בתיאום מראש בלבד",
+  "animals_treated": ["כלב", "חתול"],
+  "is_emergency_service": false,
+  "service_area": [
+    "תל אביב", "גבעתיים", "רמת גן", "יהוד",
+    "סביון", "מזור", "מגשימים", "ראש העין"
+  ],
+  "prices_ils": {
+    "home_visit_full_exam": 300,
+    "clinic_exam": 150,
+    "phone_consult_20min": 200,
+    "vaccine_arrival_fee": 150,
+    "combined_vaccine_dog_cat": 180,
+    "rabies_vaccine": 120,
+    "park_worm_injection": 90,
+    "annual_vaccine_package": 950
+  },
+  "services_available": [
+    "בדיקות שגרתיות", "חיסונים", "בדיקות דם",
+    "בדיקות עיניים ואוזניים", "עור ואלרגיות",
+    "מיקרוצ'יפינג", "תיעוד נסיעה לחו\"ל",
+    "ניתוחים", "המתת חסד"
+  ],
+  "unknown_or_needs_confirmation": [
+    "מדיניות ביטול תור",
+    "מרפאת חירום מומלצת באזור",
+    "רשימת שאלות נפוצות FAQ מאושרת"
+  ]
+}

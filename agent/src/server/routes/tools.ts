@@ -4,6 +4,7 @@ import { logger, maskPhone } from "../../lib/logger.js";
 import { getEnv } from "../../lib/env.js";
 import { verifyElevenLabsSignature } from "../../lib/elevenLabsAuth.js";
 import { findCustomerByPhone, addEscalation } from "../../lib/store.js";
+import { triagePetCase } from "../../triage/triageDecision.js";
 
 export const toolsRoutes = new Hono();
 
@@ -71,4 +72,39 @@ toolsRoutes.post("/tools/escalate-to-noa", async (c) => {
   await addEscalation({ reason, urgency });
 
   return c.json({ result: `הועברה לנועה (urgency: ${urgency}/10)` });
+});
+
+// POST /tools/triage-pet-case
+const triageSchema = z.object({
+  symptoms_he: z.string().min(1),
+  duration_he: z.string().optional(),
+  pet_type: z.enum(["כלב", "חתול", "אחר"]),
+  pet_age_years: z.number().positive().optional(),
+  pet_weight_kg: z.number().positive().optional(),
+  additional_signs_he: z.array(z.string()).optional(),
+});
+
+toolsRoutes.post("/tools/triage-pet-case", async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const parsed = triageSchema.safeParse(body);
+  if (!parsed.success) {
+    logger.warn({ errors: parsed.error.issues }, "tool: triage-pet-case — validation failed");
+    return c.json({ result: "פרמטרים חסרים: symptoms_he, pet_type." }, 400);
+  }
+
+  const input = parsed.data;
+  logger.info({ pet_type: input.pet_type }, "tool: triage-pet-case");
+
+  const result = triagePetCase(input);
+
+  logger.info(
+    {
+      decision: result.decision,
+      urgency_score: result.urgency_score,
+      red_flags: result.red_flags_matched,
+    },
+    "tool: triage-pet-case — result",
+  );
+
+  return c.json(result);
 });
