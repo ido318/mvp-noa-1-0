@@ -84,12 +84,12 @@ Architecture is layered: `UI (page.tsx) → API route → Service → Repository
 - `types/domain/` — shared domain types; `types/api/` — request/response shapes
 
 ### Supabase
-- **Cloud project:** `ssfkximqwyzqlsgwfbye` (account: voxly ai) — `https://ssfkximqwyzqlsgwfbye.supabase.co`
-  The old project `voxly-tomer` (`grbgkjjtyfohzulssuga`) is abandoned.
+- **Cloud project:** `xpsuhtqfxqmnunppnyov` (account: voxly ai, region: eu-central-1, Frankfurt) — `https://xpsuhtqfxqmnunppnyov.supabase.co`
+  Old projects (deleted): `ssfkximqwyzqlsgwfbye` (Seoul), `voxly-tomer` (`grbgkjjtyfohzulssuga`).
 - Migrations in `supabase/migrations/` — run in timestamp order; all 12 applied to cloud as of 2026-06-11
 - RLS is enabled on all tables; the app uses the anon key + user session for data access, the service role key only for admin operations (audit logs, AI events, health checks)
 - Multi-tenant by `clinic_id` — every data table has a `clinic_id` column
-- Clinic seed: Get A Vet → `AGENT_CLINIC_ID=3eff0a9c-8cb3-4763-9eb9-607d254c5b05`
+- Clinic seed: Get A Vet → `AGENT_CLINIC_ID=37681721-a59f-40d5-a041-ad15a49ecf29`
 
 ## Key Patterns
 
