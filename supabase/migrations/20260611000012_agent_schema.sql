@@ -7,19 +7,20 @@
 -- 1. voice_calls: support ElevenLabs-only records
 -- ─────────────────────────────────────────────────────────────
 
+-- Track ElevenLabs conversation ID (unique — one row per EL conversation)
+ALTER TABLE public.voice_calls
+  ADD COLUMN IF NOT EXISTS elevenlabs_conversation_id text,
+  ADD COLUMN IF NOT EXISTS agent_name text DEFAULT NULL;
+
 -- Relax NOT NULL so ElevenLabs-originated records don't need a Twilio SID
 ALTER TABLE public.voice_calls
   ALTER COLUMN twilio_call_sid DROP NOT NULL;
 
 -- Guard: every voice_calls row must have at least one identifier
+-- (elevenlabs_conversation_id column must exist first)
 ALTER TABLE public.voice_calls
   ADD CONSTRAINT voice_calls_has_identifier
   CHECK (twilio_call_sid IS NOT NULL OR elevenlabs_conversation_id IS NOT NULL);
-
--- Track ElevenLabs conversation ID (unique — one row per EL conversation)
-ALTER TABLE public.voice_calls
-  ADD COLUMN IF NOT EXISTS elevenlabs_conversation_id text,
-  ADD COLUMN IF NOT EXISTS agent_name text DEFAULT NULL;
 
 ALTER TABLE public.voice_calls
   ADD CONSTRAINT voice_calls_elevenlabs_conv_unique

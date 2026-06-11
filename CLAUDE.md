@@ -84,9 +84,12 @@ Architecture is layered: `UI (page.tsx) → API route → Service → Repository
 - `types/domain/` — shared domain types; `types/api/` — request/response shapes
 
 ### Supabase
-- Migrations in `supabase/migrations/` — run in timestamp order
+- **Cloud project:** `ssfkximqwyzqlsgwfbye` (account: voxly ai) — `https://ssfkximqwyzqlsgwfbye.supabase.co`
+  The old project `voxly-tomer` (`grbgkjjtyfohzulssuga`) is abandoned.
+- Migrations in `supabase/migrations/` — run in timestamp order; all 12 applied to cloud as of 2026-06-11
 - RLS is enabled on all tables; the app uses the anon key + user session for data access, the service role key only for admin operations (audit logs, AI events, health checks)
 - Multi-tenant by `clinic_id` — every data table has a `clinic_id` column
+- Clinic seed: Get A Vet → `AGENT_CLINIC_ID=3eff0a9c-8cb3-4763-9eb9-607d254c5b05`
 
 ## Key Patterns
 
@@ -136,5 +139,5 @@ Shared (same Supabase project): `SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_URL`, `SU
 
 ## משימות פתוחות
 
-ראה Backlog בדף הנושן: הרצת migration `20260611000012` על Supabase,
-חיבור פרויקטי Vercel, שדרוג ל-`@elevenlabs/elevenlabs-js`, `npm audit`.
+ראה Backlog בדף הנושן: חיבור פרויקטי Vercel, שדרוג ל-`@elevenlabs/elevenlabs-js`, `npm audit`.
+(migration `20260611000012` — הושלם 2026-06-11)

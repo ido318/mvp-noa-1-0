@@ -30,6 +30,9 @@ supabase/.branches/
 .idea/
 *.code-workspace
 
+# Claude Code local settings (may contain tokens)
+.claude/settings.local.json
+
 # Git worktrees (Claude Code)
 .worktrees/
 
