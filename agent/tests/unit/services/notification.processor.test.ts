@@ -5,6 +5,8 @@ import { processNotifications } from "../../../src/services/notification.process
 // Mocks
 // ─────────────────────────────────────────────────────────────────────────────
 
+const mockFrom = vi.fn();
+
 vi.mock("../../../src/lib/supabase.js", () => ({
   getSupabase: () => ({ from: mockFrom }),
 }));
@@ -14,14 +16,12 @@ vi.mock("../../../src/lib/sms.service.js", () => ({
 }));
 
 vi.mock("../../../src/lib/notifications.js", () => ({
-  isQuietHours:    vi.fn().mockReturnValue(false),
+  isQuietHours:     vi.fn().mockReturnValue(false),
   nextSendableTime: vi.fn().mockReturnValue(new Date("2026-06-17T05:00:00Z")),
 }));
 
 import { sendSms } from "../../../src/lib/sms.service.js";
 import { isQuietHours } from "../../../src/lib/notifications.js";
-
-const mockFrom = vi.fn();
 
 function makeRow(overrides: Partial<{
   id: string; phone: string; body: string; type: string;
@@ -38,28 +38,20 @@ function makeRow(overrides: Partial<{
   };
 }
 
-// Build a chainable mock that ends with .returns({ data, error })
-function makeClaimChain(data: object[] | null, error: object | null = null) {
+// A chainable mock that ends with .select().returns() or just resolves via .then()
+function chainOf(resolveValue: unknown = { error: null }) {
   const chain: Record<string, unknown> = {};
-  const self = () => chain;
-  chain["update"]  = vi.fn(self);
-  chain["eq"]      = vi.fn(self);
-  chain["lte"]     = vi.fn(self);
-  chain["select"]  = vi.fn(self);
-  chain["returns"] = vi.fn().mockResolvedValue({ data, error });
-  return chain;
-}
-
-// Build a chainable mock for UPDATE without select (defer / status update)
-function makeUpdateChain(error: object | null = null) {
-  const chain: Record<string, unknown> = {};
-  const self = () => chain;
-  chain["update"] = vi.fn(self);
-  chain["eq"]     = vi.fn(self);
-  chain["lte"]    = vi.fn(self);
-  // Awaiting the chain directly resolves — add a then() to make it thenable
-  (chain as unknown as Promise<unknown>).then = (res: (v: unknown) => unknown) =>
-    Promise.resolve({ error }).then(res);
+  const fn = vi.fn().mockReturnValue(chain);
+  chain["update"]  = fn;
+  chain["eq"]      = fn;
+  chain["lte"]     = fn;
+  chain["lt"]      = fn;
+  chain["select"]  = fn;
+  chain["returns"] = vi.fn().mockResolvedValue(resolveValue);
+  // Make chain awaitable for queries that don't call .returns()
+  const originalThen = (res: (v: unknown) => unknown) =>
+    Promise.resolve(resolveValue).then(res);
+  (chain as { then?: unknown }).then = originalThen;
   return chain;
 }
 
@@ -74,60 +66,87 @@ beforeEach(() => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("processNotifications", () => {
-  it("returns zeros when no rows claimed", async () => {
-    const claimChain = makeClaimChain([]);
-    mockFrom.mockReturnValue(claimChain);
+  it("returns zeros when claim returns no rows", async () => {
+    // recovery call + claim call both succeed with no data
+    const recovery = chainOf({ error: null });
+    const claim    = chainOf({ data: [], error: null });
+    mockFrom.mockReturnValueOnce(recovery).mockReturnValueOnce(claim);
 
     const result = await processNotifications();
     expect(result).toEqual({ processed: 0, sent: 0, failed: 0, deferred: 0 });
     expect(sendSms).not.toHaveBeenCalled();
   });
 
-  it("sends SMS for each claimed row and marks as sent", async () => {
+  it("atomically claims and sends SMS for each row", async () => {
     const rows = [makeRow({ id: "n-1" }), makeRow({ id: "n-2" })];
 
-    // First from() call → claim chain
-    const claimChain = makeClaimChain(rows);
-    // Subsequent from() calls → status update chain
-    const updateChain = makeClaimChain(null);
-    mockFrom.mockReturnValueOnce(claimChain).mockReturnValue(updateChain);
+    const recovery   = chainOf({ error: null });
+    const claim      = chainOf({ data: rows, error: null });
+    const sentUpdate = chainOf({ error: null });
+    mockFrom
+      .mockReturnValueOnce(recovery)
+      .mockReturnValueOnce(claim)
+      .mockReturnValue(sentUpdate);
 
     const result = await processNotifications({ appointmentId: "appt-1" });
     expect(sendSms).toHaveBeenCalledTimes(2);
+    expect(sendSms).toHaveBeenCalledWith(rows[0]!.phone, rows[0]!.body);
     expect(result.sent).toBe(2);
     expect(result.failed).toBe(0);
     expect(result.processed).toBe(2);
   });
 
-  it("does bulk defer and skips sending when in quiet hours", async () => {
+  it("bulk defers and tracks deferred count when in quiet hours", async () => {
     vi.mocked(isQuietHours).mockReturnValue(true);
 
-    const deferChain = makeUpdateChain();
-    mockFrom.mockReturnValue(deferChain);
+    const recovery   = chainOf({ error: null });
+    const deferChain = chainOf({ data: [{ id: "n-1" }, { id: "n-2" }], error: null });
+    mockFrom.mockReturnValueOnce(recovery).mockReturnValueOnce(deferChain);
 
     const result = await processNotifications();
     expect(sendSms).not.toHaveBeenCalled();
+    expect(result.deferred).toBe(2);
     expect(result.sent).toBe(0);
-    expect(result.processed).toBe(0);
   });
 
-  it("marks as failed and does not throw when sendSms rejects", async () => {
+  it("marks row as failed and does not throw when sendSms rejects", async () => {
     vi.mocked(sendSms).mockRejectedValueOnce(new Error("Twilio error"));
     const row = makeRow();
 
-    const claimChain = makeClaimChain([row]);
-    const failChain  = makeClaimChain(null);
-    mockFrom.mockReturnValueOnce(claimChain).mockReturnValue(failChain);
+    const recovery    = chainOf({ error: null });
+    const claim       = chainOf({ data: [row], error: null });
+    const failedUpdate = chainOf({ error: null });
+    mockFrom
+      .mockReturnValueOnce(recovery)
+      .mockReturnValueOnce(claim)
+      .mockReturnValue(failedUpdate);
 
     const result = await processNotifications();
     expect(result.failed).toBe(1);
     expect(result.sent).toBe(0);
   });
 
-  it("atomic claim prevents duplicate: only claimed rows are sent", async () => {
-    // Simulates a second processor run that claims 0 rows (first already claimed them)
-    const claimChain = makeClaimChain([]);
-    mockFrom.mockReturnValue(claimChain);
+  it("logs error but still counts sent when post-send status update fails", async () => {
+    const row = makeRow();
+    const recovery   = chainOf({ error: null });
+    const claim      = chainOf({ data: [row], error: null });
+    const failUpdate = chainOf({ error: { message: "DB error" } });
+    mockFrom
+      .mockReturnValueOnce(recovery)
+      .mockReturnValueOnce(claim)
+      .mockReturnValue(failUpdate);
+
+    // Should not throw; SMS was delivered
+    const result = await processNotifications();
+    expect(result.sent).toBe(1);
+    expect(result.failed).toBe(0);
+  });
+
+  it("second concurrent processor claims 0 rows (atomic guarantee)", async () => {
+    // Simulates a second concurrent processor run: claim returns empty
+    const recovery = chainOf({ error: null });
+    const claim    = chainOf({ data: [], error: null });
+    mockFrom.mockReturnValueOnce(recovery).mockReturnValueOnce(claim);
 
     const result = await processNotifications();
     expect(sendSms).not.toHaveBeenCalled();

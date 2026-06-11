@@ -24,30 +24,48 @@ type NotificationRow = {
   appointment_id: string;
 };
 
+// Rows stuck in 'processing' for longer than this are considered crashed and reset.
+const PROCESSING_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
+
 export async function processNotifications(opts: ProcessOptions = {}): Promise<ProcessResult> {
   const result: ProcessResult = { processed: 0, sent: 0, failed: 0, deferred: 0 };
   const now = new Date();
   const nowIso = now.toISOString();
 
-  // ── Quiet hours: defer all pending rows in one bulk UPDATE ──────────────
+  // ── Recovery: reset rows stuck in 'processing' (crashed processor) ─────
+  const staleThreshold = new Date(now.getTime() - PROCESSING_TIMEOUT_MS).toISOString();
+  await getSupabase()
+    .from("notifications_log")
+    .update({ status: "pending", updated_at: nowIso })
+    .eq("status", "processing")
+    .lt("updated_at", staleThreshold);
+  // Ignore recovery errors — don't block the main flow
+
+  // ── Quiet hours: bulk defer all pending rows ───────────────────────────
   if (isQuietHours(now)) {
     const deferUntil = nextSendableTime(now).toISOString();
     let deferQuery = getSupabase()
       .from("notifications_log")
       .update({ scheduled_for: deferUntil, updated_at: nowIso })
       .eq("status", "pending")
-      .lte("scheduled_for", nowIso);
+      .lte("scheduled_for", nowIso)
+      .select("id");
 
     if (opts.appointmentId) deferQuery = deferQuery.eq("appointment_id", opts.appointmentId);
     if (opts.clinicId)      deferQuery = deferQuery.eq("clinic_id", opts.clinicId);
 
-    const { error } = await deferQuery;
-    if (error) logger.error({ error: error.message }, "Bulk defer failed");
-    return result; // deferred count not tracked for bulk path — zero is fine
+    const { data: deferred, error: deferErr } = await deferQuery;
+    if (deferErr) {
+      logger.error({ error: deferErr.message }, "Bulk defer failed");
+    } else {
+      result.deferred = deferred?.length ?? 0;
+    }
+    return result;
   }
 
-  // ── Atomic claim: UPDATE status='processing' … RETURNING * ─────────────
-  // Prevents two concurrent processor runs from sending the same SMS twice.
+  // ── Atomic claim: UPDATE status='processing' RETURNING * ───────────────
+  // PostgreSQL evaluates the WHERE and UPDATE atomically; two concurrent
+  // processors will each claim a disjoint set of rows.
   let claimQuery = getSupabase()
     .from("notifications_log")
     .update({ status: "processing", updated_at: nowIso })
@@ -66,21 +84,37 @@ export async function processNotifications(opts: ProcessOptions = {}): Promise<P
     result.processed++;
     try {
       await sendSms(row.phone, row.body);
-      const { error: updateErr } = await getSupabase()
+
+      const { error: sentErr } = await getSupabase()
         .from("notifications_log")
         .update({ status: "sent", sent_at: nowIso, updated_at: nowIso })
         .eq("id", row.id);
-      if (updateErr) {
-        logger.error({ id: row.id, error: updateErr.message }, "Notification sent but status update failed");
+
+      if (sentErr) {
+        // SMS was delivered but we failed to record it. The 10-min recovery
+        // will reset this row to 'pending', risking a duplicate send. Log at
+        // error level so on-call can investigate.
+        logger.error(
+          { id: row.id, error: sentErr.message },
+          "SMS delivered but status update to 'sent' failed — row will recover in 10 min",
+        );
       }
       result.sent++;
     } catch (sendErr) {
       const message = sendErr instanceof Error ? sendErr.message : String(sendErr);
       logger.error({ id: row.id, type: row.type, error: message }, "Failed to send SMS");
-      await getSupabase()
+
+      const { error: failedErr } = await getSupabase()
         .from("notifications_log")
         .update({ status: "failed", error: message, updated_at: nowIso })
         .eq("id", row.id);
+
+      if (failedErr) {
+        logger.error(
+          { id: row.id, error: failedErr.message },
+          "Failed to mark notification as failed — row will recover in 10 min",
+        );
+      }
       result.failed++;
     }
   }
