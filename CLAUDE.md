@@ -214,8 +214,32 @@ SELECT cron.schedule(
 - `/tools/triage-pet-case` מחזיר `{result: string}` + escalation + urgent_callback slot ✅
 - 187 טסטים עוברים ✅
 
-### ספרינט 4 (עתידי)
-- דשבורד: תצוגת `pending_approval` ואישור/דחיה של תורי עיקור/סירוס
+### ספרינט 4 — הושלם (2026-06-12) ✅
+
+**Stage 0 — תשתית + אבטחה:**
+- migration 20260612000017 הוחל על cloud ✅ (`transcript`, `ai_summary`, `call_category`, `recording_storage_path` ב-`voice_calls`)
+- bucket `call-recordings` (private, 50MB) קיים בענן + RLS policy ✅
+- תיקון SMS bug — תור `pending_approval` (עיקור/סירוס) לא שולח SMS בקביעה; רק בעת אישור ✅
+- `/hooks/call-ended` מועשר: transcript, ai_summary, call_category, הקלטה ל-Storage ✅
+- `verifyElevenLabsSignature` מאמת timestamp (חלון 300 שניות) נגד replay attacks ✅
+- `callClassifier.ts` + `VALID_CALL_CATEGORIES` (single source of truth) ✅
+- 199 agent + 55 app טסטים עוברים ✅
+
+**Stage 1 — דשבורד CRM:**
+- CSS design tokens (RTL, Heebo, `--brand-*`, keyframes) ✅
+- Shell: sidebar + header + ToastProvider ✅
+- 14 רכיבי UI: btn, badge, type-pill, call-status, urgency-meter, avatar, card, empty-state, skeleton, modal, drawer, toast ✅
+- 7 API routes: escalations CRUD, approve/reject appointments, recording signed URL, pets list ✅
+- 5 מסכים: היום (timeline 08:00–20:00 + pending_approval), יומן (week calendar RTL), שיחות (table + CallDrawer + audio), אסקלציות (resolve flow), לקוחות (profile drawer) ✅
+- Placeholders: pets, records, settings ✅
+
+**פתוח לשלב ה-deploy (לאחר ספרינט 5):**
+- Vercel deploy — `agent/` + `app/` (שני פרויקטים נפרדים)
+- הגדרת ElevenLabs post-call webhook: URL = `https://<AGENT_PUBLIC_URL>/hooks/call-ended`, Secret = `ELEVENLABS_WEBHOOK_SECRET`
+- הפעלת pg_cron (ראה "הפעלת cron" למעלה) — דורש `CREATE EXTENSION pg_cron` אם לא קיים, ואז הרצת ה-SQL עם ה-URL האמיתי
+
+### ספרינט 5 (עתידי)
 - דשבורד: ניהול `calendar_blocks` (UI לחסימת חופשות)
 - דשבורד: תצוגת `waitlist`
-- Vercel deploy + הפעלת pg_cron עם URL אמיתי
+- שדרוג ל-`@elevenlabs/elevenlabs-js`
+- `npm audit` + dependency cleanup
