@@ -176,4 +176,4 @@ Shared (same Supabase project): `SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_URL`, `SU
 - דשבורד: ניהול `calendar_blocks` (UI לחסימת חופשות)
 - דשבורד: תצוגת `waitlist`
 - SMS עדכון ללקוח כשנועה מזיזה תור (Twilio Messaging)
-- migration `20260612000014` — להחיל על cloud (sprint 1 הושלם 2026-06-11)
+- migrations 20260612000013 + 20260612000014 הוחלו על cloud (2026-06-11) ✅

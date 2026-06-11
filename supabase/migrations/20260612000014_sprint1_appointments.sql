@@ -151,7 +151,10 @@ BEGIN
     v_old.customer_id,
     v_old.pet_id,
     v_old.appointment_type,
-    CASE WHEN v_old.status = 'pending_approval' THEN 'pending_approval' ELSE 'scheduled' END,
+    CASE WHEN v_old.status = 'pending_approval'
+         THEN 'pending_approval'::public.appointment_status
+         ELSE 'scheduled'::public.appointment_status
+    END,
     'phone',
     p_new_scheduled_at,
     p_new_scheduled_at + make_interval(mins => p_duration_minutes),
