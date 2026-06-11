@@ -34,12 +34,14 @@ export async function processNotifications(opts: ProcessOptions = {}): Promise<P
 
   // ── Recovery: reset rows stuck in 'processing' (crashed processor) ─────
   const staleThreshold = new Date(now.getTime() - PROCESSING_TIMEOUT_MS).toISOString();
-  await getSupabase()
+  const { error: recoveryErr } = await getSupabase()
     .from("notifications_log")
     .update({ status: "pending", updated_at: nowIso })
     .eq("status", "processing")
     .lt("updated_at", staleThreshold);
-  // Ignore recovery errors — don't block the main flow
+  if (recoveryErr) {
+    logger.error({ error: recoveryErr.message }, "Stuck-row recovery failed — processing rows may remain stuck");
+  }
 
   // ── Quiet hours: bulk defer all pending rows ───────────────────────────
   if (isQuietHours(now)) {
@@ -112,7 +114,7 @@ export async function processNotifications(opts: ProcessOptions = {}): Promise<P
       if (failedErr) {
         logger.error(
           { id: row.id, error: failedErr.message },
-          "Failed to mark notification as failed — row will recover in 10 min",
+          "SMS failed but status update to 'failed' failed — row will recover in 10 min",
         );
       }
       result.failed++;
