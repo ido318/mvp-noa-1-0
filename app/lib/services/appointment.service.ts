@@ -152,6 +152,7 @@ export class AppointmentService {
         duration_minutes: input.durationMinutes,
         reason: input.reason,
         notes: input.notes,
+        changed_via: "dashboard",
       },
     });
     if (!updated.ok) return updated;
@@ -209,6 +210,7 @@ export class AppointmentService {
           input.status === "cancelled"
             ? (input.cancellationReason ?? null)
             : existing.value.cancellationReason,
+        changed_via: "dashboard",
       },
     });
     if (!updated.ok) return updated;

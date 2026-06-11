@@ -12,3 +12,4 @@ process.env["ELEVENLABS_WEBHOOK_SECRET"] = "test-secret";
 process.env["SUPABASE_URL"] = "https://test.supabase.co";
 process.env["SUPABASE_SERVICE_ROLE_KEY"] = "test_service_role_key";
 process.env["AGENT_CLINIC_ID"] = "00000000-0000-4000-8000-000000000001";
+process.env["JOBS_BEARER_TOKEN"] = "test-bearer-token-1234567";

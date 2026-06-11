@@ -4,6 +4,7 @@ import { healthRoutes } from "./routes/health.js";
 import { twilioRoutes } from "./routes/twilio.js";
 import { toolsRoutes } from "./routes/tools.js";
 import { hooksRoutes } from "./routes/hooks.js";
+import { jobsRoutes } from "./routes/jobs.js";
 
 export function createApp(): Hono {
   const app = new Hono();
@@ -28,6 +29,7 @@ export function createApp(): Hono {
   app.route("/", twilioRoutes);
   app.route("/", toolsRoutes);
   app.route("/", hooksRoutes);
+  app.route("/jobs", jobsRoutes);
 
   // Fallback 404 with structured body.
   app.notFound((c) =>

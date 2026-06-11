@@ -21,6 +21,7 @@ type VersionedUpdatePayload = {
     cancelled_by_user_id: string | null;
     cancellation_reason: string | null;
     deleted_at: string | null;
+    changed_via: "agent" | "dashboard";
   }>;
 };
 

@@ -1,5 +1,6 @@
 import { getSupabase } from "./supabase.js";
 import { getEnv } from "./env.js";
+import { logger } from "./logger.js";
 import {
   VisitType,
   getVisitConfig,
@@ -15,6 +16,12 @@ import {
   toIso,
   ISRAEL_TZ_OFFSET,
 } from "./appointments.js";
+import {
+  scheduleBookingNotifications,
+  cancelFutureNotifications,
+  enqueueClientCancellationConfirmation,
+} from "./notifications.js";
+import { processNotifications } from "../services/notification.processor.js";
 
 export type Pet = { name: string; species: string };
 
@@ -89,7 +96,15 @@ export async function addEscalation(entry: EscalationEntry): Promise<void> {
 // ─────────────────────────────────────────────────────────────────────────────
 
 type CustomerRow = { id: string };
-type AppointmentRow = { id: string; scheduled_at: string; appointment_type: string; duration_minutes: number };
+type AppointmentRow = {
+  id: string;
+  scheduled_at: string;
+  appointment_type: string;
+  duration_minutes: number;
+  customer_name: string;
+  pet_name: string;
+  customer_id: string;
+};
 
 function extractId(row: unknown): string | null {
   if (row !== null && typeof row === "object") {
@@ -111,6 +126,17 @@ function extractNumber(row: unknown, key: string): number | null {
   if (row !== null && typeof row === "object") {
     const val = (row as Record<string, unknown>)[key];
     if (typeof val === "number") return val;
+  }
+  return null;
+}
+
+function extractNestedString(row: unknown, parent: string, key: string): string | null {
+  if (row !== null && typeof row === "object") {
+    const nested = (row as Record<string, unknown>)[parent];
+    if (nested !== null && typeof nested === "object") {
+      const val = (nested as Record<string, unknown>)[key];
+      if (typeof val === "string") return val;
+    }
   }
   return null;
 }
@@ -240,6 +266,7 @@ export async function bookAppointment(params: BookAppointmentParams): Promise<st
       scheduled_at:     params.scheduled_at,
       duration_minutes: durMin,
       reason:           params.reason ?? null,
+      changed_via:      "agent",
     })
     .select("id, scheduled_at")
     .single();
@@ -251,9 +278,27 @@ export async function bookAppointment(params: BookAppointmentParams): Promise<st
     throw new Error(`bookAppointment failed: ${error.message}`);
   }
 
-  const scheduledAt = typeof data.scheduled_at === "string" ? data.scheduled_at : params.scheduled_at;
-  const slotLabel  = formatSlotLabel(scheduledAt);
-  const dateLabel  = scheduledAt.slice(0, 10);
+  const appointmentId = extractId(data);
+  const scheduledAt   = typeof data.scheduled_at === "string" ? data.scheduled_at : params.scheduled_at;
+  const slotLabel     = formatSlotLabel(scheduledAt);
+  const dateLabel     = scheduledAt.slice(0, 10);
+
+  // Fire-and-forget SMS notifications
+  if (appointmentId) {
+    void scheduleBookingNotifications({
+      appointmentId,
+      scheduledAt,
+      durationMinutes: durMin,
+      visitType:       params.visit_type,
+      clinicId:        env.AGENT_CLINIC_ID,
+      customerId,
+      phone,
+      customerName:    params.customer_name,
+      petName:         params.pet_name,
+    })
+      .then(() => processNotifications({ appointmentId }))
+      .catch((err: unknown) => logger.error({ err, appointmentId }, "SMS book fire-and-forget failed"));
+  }
 
   if (config.requiresApproval) {
     return (
@@ -290,10 +335,24 @@ export async function cancelAppointment(phone: string, scheduledAt: string): Pro
     .update({
       status:       newStatus,
       cancelled_at: new Date().toISOString(),
+      changed_via:  "agent",
     })
     .eq("id", appt.id);
 
   if (cancelErr) throw new Error(`cancelAppointment update failed: ${cancelErr.message}`);
+
+  // Fire-and-forget: cancel future notifications + send client confirmation SMS
+  void enqueueClientCancellationConfirmation({
+    appointmentId: appt.id,
+    scheduledAt:   appt.scheduled_at,
+    clinicId:      env.AGENT_CLINIC_ID,
+    customerId:    appt.customer_id,
+    phone:         normalised,
+    customerName:  appt.customer_name,
+    petName:       appt.pet_name,
+  })
+    .then(() => processNotifications({ appointmentId: appt.id }))
+    .catch((err: unknown) => logger.error({ err, appointmentId: appt.id }, "SMS cancel fire-and-forget failed"));
 
   const slotLabel = formatSlotLabel(appt.scheduled_at);
 
@@ -330,7 +389,7 @@ export async function rescheduleAppointment(
   const resolvedType = (visitType ?? oldAppt.appointment_type) as VisitType;
   const durMin = effectiveDuration(resolvedType);
 
-  const { error: rpcErr } = await getSupabase().rpc("reschedule_appointment", {
+  const { data: rpcData, error: rpcErr } = await getSupabase().rpc("reschedule_appointment", {
     p_clinic_id:          env.AGENT_CLINIC_ID,
     p_old_appointment_id: oldAppt.id,
     p_new_scheduled_at:   newScheduledAt,
@@ -342,6 +401,36 @@ export async function rescheduleAppointment(
       return "השעה החדשה כבר תפוסה. בחר/י שעה אחרת.";
     }
     throw new Error(`rescheduleAppointment rpc failed: ${rpcErr.message}`);
+  }
+
+  const newAppointmentId = typeof rpcData === "string" ? rpcData : null;
+
+  // Set changed_via on the new appointment and fire SMS notifications
+  if (newAppointmentId) {
+    void (async () => {
+      try {
+        await getSupabase()
+          .from("appointments")
+          .update({ changed_via: "agent" })
+          .eq("id", newAppointmentId);
+
+        await cancelFutureNotifications(oldAppt.id, env.AGENT_CLINIC_ID);
+        await scheduleBookingNotifications({
+          appointmentId:   newAppointmentId,
+          scheduledAt:     newScheduledAt,
+          durationMinutes: durMin,
+          visitType:       resolvedType,
+          clinicId:        env.AGENT_CLINIC_ID,
+          customerId:      oldAppt.customer_id,
+          phone:           normalised,
+          customerName:    oldAppt.customer_name,
+          petName:         oldAppt.pet_name,
+        });
+        await processNotifications({ appointmentId: newAppointmentId });
+      } catch (err) {
+        logger.error({ err, newAppointmentId }, "SMS reschedule fire-and-forget failed");
+      }
+    })();
   }
 
   const oldLabel = formatSlotLabel(oldAppt.scheduled_at);
@@ -448,7 +537,7 @@ async function findActiveAppointmentNear(
 
   const { data, error } = await getSupabase()
     .from("appointments")
-    .select("id, scheduled_at, appointment_type, duration_minutes")
+    .select("id, customer_id, scheduled_at, appointment_type, duration_minutes, customers(full_name), pets(name)")
     .eq("clinic_id", clinicId)
     .eq("customer_id", customerId)
     .in("status", ["scheduled", "confirmed", "pending_approval"])
@@ -462,12 +551,15 @@ async function findActiveAppointmentNear(
 
   const row = data[0];
   const id               = extractId(row);
+  const customer_id      = extractString(row, "customer_id") ?? customerId;
   const scheduled_at     = extractString(row, "scheduled_at");
   const appointment_type = extractString(row, "appointment_type") ?? "other";
   const duration_minutes = extractNumber(row, "duration_minutes") ?? 40;
+  const customer_name    = extractNestedString(row, "customers", "full_name") ?? "";
+  const pet_name         = extractNestedString(row, "pets", "name") ?? "";
 
   if (!id || !scheduled_at) return null;
-  return { id, scheduled_at, appointment_type, duration_minutes };
+  return { id, customer_id, scheduled_at, appointment_type, duration_minutes, customer_name, pet_name };
 }
 
 async function createOrFindCustomer(

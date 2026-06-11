@@ -32,6 +32,9 @@ const schema = z.object({
     .enum(["true", "false"])
     .default("true")
     .transform((v) => v === "true"),
+
+  // Bearer token securing POST /jobs/process-notifications (called by pg_cron)
+  JOBS_BEARER_TOKEN: z.string().min(16),
 });
 
 export type Env = z.infer<typeof schema>;
