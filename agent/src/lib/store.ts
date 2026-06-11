@@ -84,6 +84,29 @@ export async function addEscalation(entry: EscalationEntry): Promise<void> {
 
 export type AppointmentSlot = string; // ISO8601 with +03:00
 
+type CustomerRow = { id: string };
+type AppointmentRow = { id: string; scheduled_at: string };
+
+function extractId(row: unknown): string | null {
+  if (row !== null && typeof row === "object" && "id" in row && typeof (row as Record<string, unknown>).id === "string") {
+    return (row as CustomerRow).id;
+  }
+  return null;
+}
+
+async function findCustomerIdByPhone(phone: string): Promise<string | null> {
+  const env = getEnv();
+  const { data, error } = await getSupabase()
+    .from("customers")
+    .select("id")
+    .eq("clinic_id", env.AGENT_CLINIC_ID)
+    .eq("phone", phone)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (error) throw new Error(`findCustomerIdByPhone failed: ${error.message}`);
+  return extractId(data);
+}
+
 export async function checkAvailability(dateIso: string): Promise<string> {
   const hours = getClinicHours(dateIso);
   if (!hours) {
@@ -158,8 +181,9 @@ export async function bookAppointment(params: BookAppointmentParams): Promise<st
     throw new Error(`bookAppointment failed: ${error.message}`);
   }
 
-  const slotLabel = formatSlotLabel(data.scheduled_at as string);
-  const dateLabel = (data.scheduled_at as string).slice(0, 10);
+  const scheduledAt = typeof data.scheduled_at === "string" ? data.scheduled_at : params.scheduled_at;
+  const slotLabel = formatSlotLabel(scheduledAt);
+  const dateLabel = scheduledAt.slice(0, 10);
   return (
     `✅ תור נקבע: ${formatDateHe(dateLabel)} בשעה ${slotLabel} ` +
     `עבור ${params.pet_name}. אשלח תזכורת SMS 24 שעות לפני.`
@@ -170,42 +194,11 @@ export async function cancelAppointment(phone: string, scheduledAt: string): Pro
   const env = getEnv();
   const normalised = normalisePhone(phone);
 
-  const customerRow = await findCustomerByPhone(normalised);
-  if (!customerRow) return "לא מצאנו לקוח עם מספר הטלפון הזה.";
+  const customerId = await findCustomerIdByPhone(normalised);
+  if (!customerId) return "לא מצאנו לקוח עם מספר הטלפון הזה.";
 
-  const { data: customerData } = await getSupabase()
-    .from("customers")
-    .select("id")
-    .eq("clinic_id", env.AGENT_CLINIC_ID)
-    .eq("phone", normalised)
-    .is("deleted_at", null)
-    .single();
-
-  if (!customerData) return "לא מצאנו לקוח עם מספר הטלפון הזה.";
-
-  // Find appointment within ±2 minutes of given time
-  const target = new Date(scheduledAt);
-  const rangeStart = new Date(target.getTime() - 2 * 60 * 1000).toISOString();
-  const rangeEnd = new Date(target.getTime() + 2 * 60 * 1000).toISOString();
-
-  const { data: appts, error: findErr } = await getSupabase()
-    .from("appointments")
-    .select("id, scheduled_at")
-    .eq("clinic_id", env.AGENT_CLINIC_ID)
-    .eq("customer_id", (customerData as { id: string }).id)
-    .in("status", ["scheduled", "confirmed"])
-    .is("deleted_at", null)
-    .gte("scheduled_at", rangeStart)
-    .lte("scheduled_at", rangeEnd)
-    .limit(1);
-
-  if (findErr) throw new Error(`cancelAppointment query failed: ${findErr.message}`);
-  if (!appts || appts.length === 0) {
-    return "לא מצאנו תור פעיל בשעה הזו. ייתכן שכבר בוטל.";
-  }
-
-  const appt = appts[0] as { id: string; scheduled_at: string };
-  const slotLabel = formatSlotLabel(appt.scheduled_at);
+  const appt = await findActiveAppointmentNear(env.AGENT_CLINIC_ID, customerId, scheduledAt);
+  if (!appt) return "לא מצאנו תור פעיל בשעה הזו. ייתכן שכבר בוטל.";
 
   const { error: cancelErr } = await getSupabase()
     .from("appointments")
@@ -214,7 +207,7 @@ export async function cancelAppointment(phone: string, scheduledAt: string): Pro
 
   if (cancelErr) throw new Error(`cancelAppointment update failed: ${cancelErr.message}`);
 
-  return `✅ התור בשעה ${slotLabel} בוטל בהצלחה.`;
+  return `✅ התור בשעה ${formatSlotLabel(appt.scheduled_at)} בוטל בהצלחה.`;
 }
 
 export async function rescheduleAppointment(
@@ -225,41 +218,13 @@ export async function rescheduleAppointment(
   const env = getEnv();
   const normalised = normalisePhone(phone);
 
-  const { data: customerData } = await getSupabase()
-    .from("customers")
-    .select("id")
-    .eq("clinic_id", env.AGENT_CLINIC_ID)
-    .eq("phone", normalised)
-    .is("deleted_at", null)
-    .single();
+  const customerId = await findCustomerIdByPhone(normalised);
+  if (!customerId) return "לא מצאנו לקוח עם מספר הטלפון הזה.";
 
-  if (!customerData) return "לא מצאנו לקוח עם מספר הטלפון הזה.";
+  const oldAppt = await findActiveAppointmentNear(env.AGENT_CLINIC_ID, customerId, currentScheduledAt);
+  if (!oldAppt) return "לא מצאנו תור פעיל בשעה הזו. ייתכן שכבר בוטל.";
 
-  const customerId = (customerData as { id: string }).id;
-
-  const target = new Date(currentScheduledAt);
-  const rangeStart = new Date(target.getTime() - 2 * 60 * 1000).toISOString();
-  const rangeEnd = new Date(target.getTime() + 2 * 60 * 1000).toISOString();
-
-  const { data: appts, error: findErr } = await getSupabase()
-    .from("appointments")
-    .select("id, scheduled_at")
-    .eq("clinic_id", env.AGENT_CLINIC_ID)
-    .eq("customer_id", customerId)
-    .in("status", ["scheduled", "confirmed"])
-    .is("deleted_at", null)
-    .gte("scheduled_at", rangeStart)
-    .lte("scheduled_at", rangeEnd)
-    .limit(1);
-
-  if (findErr) throw new Error(`rescheduleAppointment find failed: ${findErr.message}`);
-  if (!appts || appts.length === 0) {
-    return "לא מצאנו תור פעיל בשעה הזו. ייתכן שכבר בוטל.";
-  }
-
-  const oldAppt = appts[0] as { id: string; scheduled_at: string };
-
-  const { error: rpcErr, data: newId } = await getSupabase().rpc("reschedule_appointment", {
+  const { error: rpcErr } = await getSupabase().rpc("reschedule_appointment", {
     p_clinic_id: env.AGENT_CLINIC_ID,
     p_old_appointment_id: oldAppt.id,
     p_new_scheduled_at: newScheduledAt,
@@ -279,35 +244,59 @@ export async function rescheduleAppointment(
   return `✅ התור הוזז בהצלחה מ-${oldLabel} ל-${formatDateHe(newDate)} בשעה ${newLabel}.`;
 }
 
+async function findActiveAppointmentNear(
+  clinicId: string,
+  customerId: string,
+  scheduledAt: string,
+): Promise<AppointmentRow | null> {
+  const target = new Date(scheduledAt);
+  if (isNaN(target.getTime())) return null;
+
+  const rangeStart = new Date(target.getTime() - 2 * 60 * 1000).toISOString();
+  const rangeEnd = new Date(target.getTime() + 2 * 60 * 1000).toISOString();
+
+  const { data, error } = await getSupabase()
+    .from("appointments")
+    .select("id, scheduled_at")
+    .eq("clinic_id", clinicId)
+    .eq("customer_id", customerId)
+    .in("status", ["scheduled", "confirmed"])
+    .is("deleted_at", null)
+    .gte("scheduled_at", rangeStart)
+    .lte("scheduled_at", rangeEnd)
+    .limit(1);
+
+  if (error) throw new Error(`findActiveAppointmentNear failed: ${error.message}`);
+  if (!data || data.length === 0) return null;
+
+  const row = data[0];
+  const id = extractId(row);
+  const scheduled_at = typeof (row as Record<string, unknown>)["scheduled_at"] === "string"
+    ? (row as Record<string, unknown>)["scheduled_at"] as string
+    : null;
+
+  if (!id || !scheduled_at) return null;
+  return { id, scheduled_at };
+}
+
 async function createOrFindCustomer(
   phone: string,
   name: string,
 ): Promise<{ customerId: string }> {
+  const existingId = await findCustomerIdByPhone(phone);
+  if (existingId) return { customerId: existingId };
+
   const env = getEnv();
-
-  const { data: existing } = await getSupabase()
-    .from("customers")
-    .select("id")
-    .eq("clinic_id", env.AGENT_CLINIC_ID)
-    .eq("phone", phone)
-    .is("deleted_at", null)
-    .maybeSingle();
-
-  if (existing) return { customerId: (existing as { id: string }).id };
-
   const { data: inserted, error } = await getSupabase()
     .from("customers")
-    .insert({
-      clinic_id: env.AGENT_CLINIC_ID,
-      full_name: name,
-      phone,
-      status: "active",
-    })
+    .insert({ clinic_id: env.AGENT_CLINIC_ID, full_name: name, phone, status: "active" })
     .select("id")
     .single();
 
   if (error) throw new Error(`createOrFindCustomer failed: ${error.message}`);
-  return { customerId: (inserted as { id: string }).id };
+  const id = extractId(inserted);
+  if (!id) throw new Error("createOrFindCustomer: no id returned");
+  return { customerId: id };
 }
 
 async function createOrFindPet(
@@ -317,7 +306,7 @@ async function createOrFindPet(
 ): Promise<{ petId: string }> {
   const env = getEnv();
 
-  const { data: existing } = await getSupabase()
+  const { data: existing, error: findErr } = await getSupabase()
     .from("pets")
     .select("id")
     .eq("clinic_id", env.AGENT_CLINIC_ID)
@@ -326,22 +315,21 @@ async function createOrFindPet(
     .is("deleted_at", null)
     .maybeSingle();
 
-  if (existing) return { petId: (existing as { id: string }).id };
+  if (findErr) throw new Error(`createOrFindPet lookup failed: ${findErr.message}`);
 
-  const { data: inserted, error } = await getSupabase()
+  const existingId = extractId(existing);
+  if (existingId) return { petId: existingId };
+
+  const { data: inserted, error: insertErr } = await getSupabase()
     .from("pets")
-    .insert({
-      clinic_id: env.AGENT_CLINIC_ID,
-      customer_id: customerId,
-      name: petName,
-      species,
-      status: "active",
-    })
+    .insert({ clinic_id: env.AGENT_CLINIC_ID, customer_id: customerId, name: petName, species, status: "active" })
     .select("id")
     .single();
 
-  if (error) throw new Error(`createOrFindPet failed: ${error.message}`);
-  return { petId: (inserted as { id: string }).id };
+  if (insertErr) throw new Error(`createOrFindPet insert failed: ${insertErr.message}`);
+  const id = extractId(inserted);
+  if (!id) throw new Error("createOrFindPet: no id returned");
+  return { petId: id };
 }
 
 export async function saveVoiceCall(

@@ -116,6 +116,9 @@ toolsRoutes.post("/tools/triage-pet-case", async (c) => {
   return c.json(result);
 });
 
+// ISO8601 datetime — accepts "2026-06-15T10:00:00+03:00" and similar
+const ISO_DATETIME_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/;
+
 // POST /tools/check-availability
 const availabilitySchema = z.object({
   date_iso: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Expected YYYY-MM-DD"),
@@ -128,9 +131,14 @@ toolsRoutes.post("/tools/check-availability", async (c) => {
     return c.json({ result: "נדרש תאריך בפורמט YYYY-MM-DD." }, 400);
   }
 
-  logger.info({ date: parsed.data.date_iso }, "tool: check-availability");
-  const result = await checkAvailability(parsed.data.date_iso);
-  return c.json({ result });
+  try {
+    logger.info({ date: parsed.data.date_iso }, "tool: check-availability");
+    const result = await checkAvailability(parsed.data.date_iso);
+    return c.json({ result });
+  } catch (err) {
+    logger.error({ err }, "tool: check-availability — internal error");
+    return c.json({ result: "שגיאה פנימית בבדיקת זמינות. נסה שוב." }, 500);
+  }
 });
 
 // POST /tools/book-appointment
@@ -139,7 +147,7 @@ const bookSchema = z.object({
   customer_name: z.string().min(1),
   pet_name: z.string().min(1),
   pet_species: z.string().min(1),
-  scheduled_at: z.string().min(1),
+  scheduled_at: z.string().regex(ISO_DATETIME_RE, "Expected ISO8601 datetime"),
   visit_type: z.enum(["checkup", "vaccination", "consultation", "urgent", "follow_up", "other"]),
   reason: z.string().optional(),
 });
@@ -148,41 +156,51 @@ toolsRoutes.post("/tools/book-appointment", async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const parsed = bookSchema.safeParse(body);
   if (!parsed.success) {
-    return c.json({ result: "פרמטרים חסרים: phone, customer_name, pet_name, pet_species, scheduled_at, visit_type." }, 400);
+    return c.json({ result: "פרמטרים חסרים: phone, customer_name, pet_name, pet_species, scheduled_at (ISO8601), visit_type." }, 400);
   }
 
-  logger.info({ phone: maskPhone(parsed.data.phone) }, "tool: book-appointment");
-  const result = await bookAppointment(parsed.data);
-  return c.json({ result });
+  try {
+    logger.info({ phone: maskPhone(parsed.data.phone) }, "tool: book-appointment");
+    const result = await bookAppointment(parsed.data);
+    return c.json({ result });
+  } catch (err) {
+    logger.error({ err }, "tool: book-appointment — internal error");
+    return c.json({ result: "שגיאה פנימית בקביעת תור. נסה שוב." }, 500);
+  }
 });
 
 // POST /tools/cancel-or-reschedule
 const cancelRescheduleSchema = z.object({
   phone: z.string().min(5),
   action: z.enum(["cancel", "reschedule"]),
-  current_scheduled_at: z.string().min(1),
-  new_scheduled_at: z.string().optional(),
+  current_scheduled_at: z.string().regex(ISO_DATETIME_RE, "Expected ISO8601 datetime"),
+  new_scheduled_at: z.string().regex(ISO_DATETIME_RE, "Expected ISO8601 datetime").optional(),
 });
 
 toolsRoutes.post("/tools/cancel-or-reschedule", async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const parsed = cancelRescheduleSchema.safeParse(body);
   if (!parsed.success) {
-    return c.json({ result: "פרמטרים חסרים: phone, action, current_scheduled_at." }, 400);
+    return c.json({ result: "פרמטרים חסרים: phone, action, current_scheduled_at (ISO8601)." }, 400);
   }
 
   const { phone, action, current_scheduled_at, new_scheduled_at } = parsed.data;
   logger.info({ phone: maskPhone(phone), action }, "tool: cancel-or-reschedule");
 
-  if (action === "cancel") {
-    const result = await cancelAppointment(phone, current_scheduled_at);
+  try {
+    if (action === "cancel") {
+      const result = await cancelAppointment(phone, current_scheduled_at);
+      return c.json({ result });
+    }
+
+    if (!new_scheduled_at) {
+      return c.json({ result: "לביצוע הזזה נדרש גם new_scheduled_at." }, 400);
+    }
+
+    const result = await rescheduleAppointment(phone, current_scheduled_at, new_scheduled_at);
     return c.json({ result });
+  } catch (err) {
+    logger.error({ err, action }, "tool: cancel-or-reschedule — internal error");
+    return c.json({ result: "שגיאה פנימית. נסה שוב." }, 500);
   }
-
-  if (!new_scheduled_at) {
-    return c.json({ result: "לביצוע הזזה נדרש גם new_scheduled_at." }, 400);
-  }
-
-  const result = await rescheduleAppointment(phone, current_scheduled_at, new_scheduled_at);
-  return c.json({ result });
 });

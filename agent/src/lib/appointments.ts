@@ -55,9 +55,6 @@ export function filterFreeSlots(
 }
 
 export function formatSlotLabel(iso: string): string {
-  const d = new Date(iso);
-  const h = String(d.getUTCHours() - 3 + (d.getTimezoneOffset() === 0 ? 0 : 0)).padStart(2, "0");
-  // Extract HH:MM from ISO directly (handles +03:00 offset)
   const match = iso.match(/T(\d{2}):(\d{2})/);
   if (!match) return iso;
   return `${match[1]}:${match[2]}`;
