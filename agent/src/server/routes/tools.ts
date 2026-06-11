@@ -10,6 +10,7 @@ import {
   bookAppointment,
   cancelAppointment,
   rescheduleAppointment,
+  joinWaitlist,
 } from "../../lib/store.js";
 import { triagePetCase } from "../../triage/triageDecision.js";
 
@@ -30,7 +31,26 @@ toolsRoutes.use("/tools/*", async (c, next) => {
   return next();
 });
 
+// Shared visit type enum — mirrors public.appointment_type (Sprint 1 values)
+const VISIT_TYPE_VALUES = [
+  "checkup",
+  "home_visit",
+  "vaccination",
+  "phone_consultation",
+  "neutering",
+  "consultation",
+  "urgent",
+  "follow_up",
+  "other",
+] as const;
+
+// ISO8601 datetime — requires timezone (Z or ±HH:MM) to avoid ambiguous local times
+const ISO_DATETIME_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?(Z|[+-]\d{2}:\d{2})$/;
+
+// ─────────────────────────────────────────────────────────────────────────────
 // POST /tools/lookup-customer
+// ─────────────────────────────────────────────────────────────────────────────
+
 const lookupSchema = z.object({ phone: z.string().min(5) });
 
 toolsRoutes.post("/tools/lookup-customer", async (c) => {
@@ -50,12 +70,14 @@ toolsRoutes.post("/tools/lookup-customer", async (c) => {
 
   const petList = customer.pets.map((p) => p.name).join(", ");
   return c.json({
-    // TODO: add last_visit once it is derived from the appointments table
     result: `שם: ${customer.full_name}, חיות: ${petList}`,
   });
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
 // POST /tools/escalate-to-noa
+// ─────────────────────────────────────────────────────────────────────────────
+
 const escalateSchema = z.object({
   reason: z.string().min(1),
   urgency: z.number().int().min(1).max(10),
@@ -81,7 +103,10 @@ toolsRoutes.post("/tools/escalate-to-noa", async (c) => {
   return c.json({ result: `הועברה לנועה (urgency: ${urgency}/10)` });
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
 // POST /tools/triage-pet-case
+// ─────────────────────────────────────────────────────────────────────────────
+
 const triageSchema = z.object({
   symptoms_he: z.string().min(1),
   duration_he: z.string().optional(),
@@ -116,24 +141,25 @@ toolsRoutes.post("/tools/triage-pet-case", async (c) => {
   return c.json(result);
 });
 
-// ISO8601 datetime — requires timezone (Z or ±HH:MM) to avoid ambiguous local times
-const ISO_DATETIME_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?(Z|[+-]\d{2}:\d{2})$/;
-
+// ─────────────────────────────────────────────────────────────────────────────
 // POST /tools/check-availability
+// ─────────────────────────────────────────────────────────────────────────────
+
 const availabilitySchema = z.object({
-  date_iso: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Expected YYYY-MM-DD"),
+  date_iso:   z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Expected YYYY-MM-DD"),
+  visit_type: z.enum(VISIT_TYPE_VALUES),
 });
 
 toolsRoutes.post("/tools/check-availability", async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const parsed = availabilitySchema.safeParse(body);
   if (!parsed.success) {
-    return c.json({ result: "נדרש תאריך בפורמט YYYY-MM-DD." }, 400);
+    return c.json({ result: "נדרש תאריך בפורמט YYYY-MM-DD וסוג ביקור (visit_type)." }, 400);
   }
 
   try {
-    logger.info({ date: parsed.data.date_iso }, "tool: check-availability");
-    const result = await checkAvailability(parsed.data.date_iso);
+    logger.info({ date: parsed.data.date_iso, visit_type: parsed.data.visit_type }, "tool: check-availability");
+    const result = await checkAvailability(parsed.data.date_iso, parsed.data.visit_type);
     return c.json({ result });
   } catch (err) {
     logger.error({ err }, "tool: check-availability — internal error");
@@ -141,26 +167,31 @@ toolsRoutes.post("/tools/check-availability", async (c) => {
   }
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
 // POST /tools/book-appointment
+// ─────────────────────────────────────────────────────────────────────────────
+
 const bookSchema = z.object({
-  phone: z.string().min(5),
+  phone:         z.string().min(5),
   customer_name: z.string().min(1),
-  pet_name: z.string().min(1),
-  pet_species: z.string().min(1),
-  scheduled_at: z.string().regex(ISO_DATETIME_RE, "Expected ISO8601 datetime"),
-  visit_type: z.enum(["checkup", "vaccination", "consultation", "urgent", "follow_up", "other"]),
-  reason: z.string().optional(),
+  pet_name:      z.string().min(1),
+  pet_species:   z.string().min(1),
+  scheduled_at:  z.string().regex(ISO_DATETIME_RE, "Expected ISO8601 datetime"),
+  visit_type:    z.enum(VISIT_TYPE_VALUES),
+  reason:        z.string().optional(),
 });
 
 toolsRoutes.post("/tools/book-appointment", async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const parsed = bookSchema.safeParse(body);
   if (!parsed.success) {
-    return c.json({ result: "פרמטרים חסרים: phone, customer_name, pet_name, pet_species, scheduled_at (ISO8601), visit_type." }, 400);
+    return c.json({
+      result: "פרמטרים חסרים: phone, customer_name, pet_name, pet_species, scheduled_at (ISO8601), visit_type.",
+    }, 400);
   }
 
   try {
-    logger.info({ phone: maskPhone(parsed.data.phone) }, "tool: book-appointment");
+    logger.info({ phone: maskPhone(parsed.data.phone), visit_type: parsed.data.visit_type }, "tool: book-appointment");
     const result = await bookAppointment(parsed.data);
     return c.json({ result });
   } catch (err) {
@@ -169,12 +200,16 @@ toolsRoutes.post("/tools/book-appointment", async (c) => {
   }
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
 // POST /tools/cancel-or-reschedule
+// ─────────────────────────────────────────────────────────────────────────────
+
 const cancelRescheduleSchema = z.object({
-  phone: z.string().min(5),
-  action: z.enum(["cancel", "reschedule"]),
+  phone:                z.string().min(5),
+  action:               z.enum(["cancel", "reschedule"]),
   current_scheduled_at: z.string().regex(ISO_DATETIME_RE, "Expected ISO8601 datetime"),
-  new_scheduled_at: z.string().regex(ISO_DATETIME_RE, "Expected ISO8601 datetime").optional(),
+  new_scheduled_at:     z.string().regex(ISO_DATETIME_RE, "Expected ISO8601 datetime").optional(),
+  visit_type:           z.enum(VISIT_TYPE_VALUES).optional(),
 });
 
 toolsRoutes.post("/tools/cancel-or-reschedule", async (c) => {
@@ -184,7 +219,7 @@ toolsRoutes.post("/tools/cancel-or-reschedule", async (c) => {
     return c.json({ result: "פרמטרים חסרים: phone, action, current_scheduled_at (ISO8601)." }, 400);
   }
 
-  const { phone, action, current_scheduled_at, new_scheduled_at } = parsed.data;
+  const { phone, action, current_scheduled_at, new_scheduled_at, visit_type } = parsed.data;
   logger.info({ phone: maskPhone(phone), action }, "tool: cancel-or-reschedule");
 
   try {
@@ -197,10 +232,44 @@ toolsRoutes.post("/tools/cancel-or-reschedule", async (c) => {
       return c.json({ result: "לביצוע הזזה נדרש גם new_scheduled_at." }, 400);
     }
 
-    const result = await rescheduleAppointment(phone, current_scheduled_at, new_scheduled_at);
+    const result = await rescheduleAppointment(phone, current_scheduled_at, new_scheduled_at, visit_type);
     return c.json({ result });
   } catch (err) {
     logger.error({ err, action }, "tool: cancel-or-reschedule — internal error");
     return c.json({ result: "שגיאה פנימית. נסה שוב." }, 500);
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /tools/join-waitlist
+// ─────────────────────────────────────────────────────────────────────────────
+
+const waitlistSchema = z.object({
+  phone:           z.string().min(5),
+  customer_name:   z.string().min(1),
+  pet_name:        z.string().min(1),
+  pet_species:     z.string().min(1),
+  visit_type:      z.enum(VISIT_TYPE_VALUES),
+  preferred_start: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  preferred_end:   z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  notes:           z.string().optional(),
+});
+
+toolsRoutes.post("/tools/join-waitlist", async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const parsed = waitlistSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({
+      result: "פרמטרים חסרים: phone, customer_name, pet_name, pet_species, visit_type.",
+    }, 400);
+  }
+
+  try {
+    logger.info({ phone: maskPhone(parsed.data.phone), visit_type: parsed.data.visit_type }, "tool: join-waitlist");
+    const result = await joinWaitlist(parsed.data);
+    return c.json({ result });
+  } catch (err) {
+    logger.error({ err }, "tool: join-waitlist — internal error");
+    return c.json({ result: "שגיאה פנימית ברישום לרשימת ההמתנה. נסה שוב." }, 500);
   }
 });

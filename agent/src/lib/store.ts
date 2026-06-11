@@ -1,13 +1,19 @@
 import { getSupabase } from "./supabase.js";
 import { getEnv } from "./env.js";
 import {
+  VisitType,
+  getVisitConfig,
+  effectiveDuration,
   getClinicHours,
   getDayNameHe,
-  generateAllSlots,
-  filterFreeSlots,
+  generateSlotsForVisitType,
   formatSlotLabel,
   formatDateHe,
+  isWithin14Days,
+  isTooLateToCancel,
+  maxBookingDateIso,
   toIso,
+  ISRAEL_TZ_OFFSET,
 } from "./appointments.js";
 
 export type Pet = { name: string; species: string };
@@ -16,7 +22,7 @@ export type Customer = {
   phone: string;
   full_name: string;
   pets: Pet[];
-  // TODO: last_visit will be derived from the appointments table in a future phase
+  // last_visit will be derived from the appointments table in a future phase
   notes: string | null;
 };
 
@@ -79,13 +85,11 @@ export async function addEscalation(entry: EscalationEntry): Promise<void> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Appointments
+// Internal helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type AppointmentSlot = string; // ISO8601 with +03:00
-
 type CustomerRow = { id: string };
-type AppointmentRow = { id: string; scheduled_at: string };
+type AppointmentRow = { id: string; scheduled_at: string; appointment_type: string; duration_minutes: number };
 
 function extractId(row: unknown): string | null {
   if (row !== null && typeof row === "object") {
@@ -103,6 +107,14 @@ function extractString(row: unknown, key: string): string | null {
   return null;
 }
 
+function extractNumber(row: unknown, key: string): number | null {
+  if (row !== null && typeof row === "object") {
+    const val = (row as Record<string, unknown>)[key];
+    if (typeof val === "number") return val;
+  }
+  return null;
+}
+
 async function findCustomerIdByPhone(phone: string): Promise<string | null> {
   const env = getEnv();
   const { data, error } = await getSupabase()
@@ -116,41 +128,85 @@ async function findCustomerIdByPhone(phone: string): Promise<string | null> {
   return extractId(data);
 }
 
-export async function checkAvailability(dateIso: string): Promise<string> {
+// ─────────────────────────────────────────────────────────────────────────────
+// Availability
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function checkAvailability(
+  dateIso: string,
+  visitType: VisitType,
+): Promise<string> {
+  // 1. 14-day window
+  if (!isWithin14Days(dateIso)) {
+    const maxDate = maxBookingDateIso();
+    return `ניתן לקבוע תורים עד ${formatDateHe(maxDate)} בלבד (14 יום קדימה).`;
+  }
+
+  // 2. Closed day (Saturday)
   const hours = getClinicHours(dateIso);
   if (!hours) {
     return "המרפאה סגורה בשבת. אפשר לקבוע תור ביום ראשון עד חמישי 08:00-20:00 או ביום שישי 08:30-13:00.";
   }
 
   const env = getEnv();
-  const dayStart = toIso(dateIso, 0, 0);
-  const dayEnd = toIso(dateIso, 23, 59);
 
-  const { data, error } = await getSupabase()
-    .from("appointments")
-    .select("scheduled_at")
+  // 3. Calendar blocks — check if any block covers the requested date
+  const dayStart = `${dateIso}T00:00:00${ISRAEL_TZ_OFFSET}`;
+  const dayEnd   = `${dateIso}T23:59:59${ISRAEL_TZ_OFFSET}`;
+
+  const { data: blocks, error: blockErr } = await getSupabase()
+    .from("calendar_blocks")
+    .select("start_at, end_at, reason")
     .eq("clinic_id", env.AGENT_CLINIC_ID)
-    .in("status", ["scheduled", "confirmed"])
+    .lt("start_at", dayEnd)
+    .gt("end_at", dayStart)
+    .limit(1);
+
+  if (blockErr) throw new Error(`calendar_blocks query failed: ${blockErr.message}`);
+
+  if (blocks && blocks.length > 0) {
+    const block = blocks[0] as { start_at: string; end_at: string; reason: string | null };
+    // Compute first available day after the block
+    const blockEndDate = block.end_at.slice(0, 10);
+    const reason = block.reason ? ` (${block.reason})` : "";
+    return `נועה אינה זמינה בתאריך זה${reason}. ניתן לקבוע תור החל מ-${formatDateHe(blockEndDate)}.`;
+  }
+
+  // 4. Fetch existing appointments for the day (scheduled_at + end_at)
+  const { data: appts, error: apptErr } = await getSupabase()
+    .from("appointments")
+    .select("scheduled_at, end_at")
+    .eq("clinic_id", env.AGENT_CLINIC_ID)
+    .in("status", ["scheduled", "confirmed", "pending_approval"])
     .is("deleted_at", null)
     .gte("scheduled_at", dayStart)
     .lte("scheduled_at", dayEnd);
 
-  if (error) throw new Error(`checkAvailability query failed: ${error.message}`);
+  if (apptErr) throw new Error(`checkAvailability query failed: ${apptErr.message}`);
 
-  const takenIsos = (data ?? []).flatMap((r) => {
-    const v = extractString(r, "scheduled_at");
-    return v ? [v] : [];
+  const bookedRanges = (appts ?? []).flatMap((r) => {
+    const start = extractString(r, "scheduled_at");
+    const end   = extractString(r, "end_at");
+    return start && end ? [{ start, end }] : [];
   });
-  const allSlots = generateAllSlots(dateIso, hours);
-  const freeSlots = filterFreeSlots(allSlots, takenIsos);
+
+  // 5. Generate free slots for the requested visit type
+  const freeSlots = generateSlotsForVisitType(dateIso, hours, visitType, bookedRanges);
+
+  const config = getVisitConfig(visitType);
+  const typeLabelHe = config.labelHe;
 
   if (freeSlots.length === 0) {
-    return `אין חלונות פנויים ב-${formatDateHe(dateIso)} (${getDayNameHe(dateIso)}). נסה תאריך אחר.`;
+    return `אין חלונות פנויים ל${typeLabelHe} ב-${formatDateHe(dateIso)} (${getDayNameHe(dateIso)}). נסה תאריך אחר.`;
   }
 
   const labels = freeSlots.map(formatSlotLabel).join(", ");
-  return `חלונות פנויים ב-${formatDateHe(dateIso)} (יום ${getDayNameHe(dateIso)}): ${labels}`;
+  return `חלונות פנויים ל${typeLabelHe} ב-${formatDateHe(dateIso)} (יום ${getDayNameHe(dateIso)}): ${labels}`;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Book appointment
+// ─────────────────────────────────────────────────────────────────────────────
 
 export type BookAppointmentParams = {
   phone: string;
@@ -158,13 +214,16 @@ export type BookAppointmentParams = {
   pet_name: string;
   pet_species: string;
   scheduled_at: string;
-  visit_type: "checkup" | "vaccination" | "consultation" | "urgent" | "follow_up" | "other";
+  visit_type: VisitType;
   reason?: string;
 };
 
 export async function bookAppointment(params: BookAppointmentParams): Promise<string> {
   const env = getEnv();
   const phone = normalisePhone(params.phone);
+  const config = getVisitConfig(params.visit_type);
+  const durMin = effectiveDuration(params.visit_type);
+  const status = config.requiresApproval ? "pending_approval" : "scheduled";
 
   const { customerId } = await createOrFindCustomer(phone, params.customer_name);
   const { petId } = await createOrFindPet(customerId, params.pet_name, params.pet_species);
@@ -172,21 +231,20 @@ export async function bookAppointment(params: BookAppointmentParams): Promise<st
   const { data, error } = await getSupabase()
     .from("appointments")
     .insert({
-      clinic_id: env.AGENT_CLINIC_ID,
-      customer_id: customerId,
-      pet_id: petId,
+      clinic_id:        env.AGENT_CLINIC_ID,
+      customer_id:      customerId,
+      pet_id:           petId,
       appointment_type: params.visit_type,
-      status: "scheduled",
-      source: "phone",
-      scheduled_at: params.scheduled_at,
-      duration_minutes: 30,
-      reason: params.reason ?? null,
+      status,
+      source:           "phone",
+      scheduled_at:     params.scheduled_at,
+      duration_minutes: durMin,
+      reason:           params.reason ?? null,
     })
     .select("id, scheduled_at")
     .single();
 
   if (error) {
-    // GIST overlap violation
     if (error.code === "23P01" || error.message.includes("appointments_no_active_overlap")) {
       return "השעה הזו כבר תפוסה. בחר/י שעה אחרת מהחלונות הפנויים.";
     }
@@ -194,13 +252,25 @@ export async function bookAppointment(params: BookAppointmentParams): Promise<st
   }
 
   const scheduledAt = typeof data.scheduled_at === "string" ? data.scheduled_at : params.scheduled_at;
-  const slotLabel = formatSlotLabel(scheduledAt);
-  const dateLabel = scheduledAt.slice(0, 10);
+  const slotLabel  = formatSlotLabel(scheduledAt);
+  const dateLabel  = scheduledAt.slice(0, 10);
+
+  if (config.requiresApproval) {
+    return (
+      `✅ בקשת תור ל${config.labelHe} נרשמה: ${formatDateHe(dateLabel)} בשעה ${slotLabel} ` +
+      `עבור ${params.pet_name}. התור ממתין לאישור נועה — תקבל/י אישור SMS.`
+    );
+  }
+
   return (
     `✅ תור נקבע: ${formatDateHe(dateLabel)} בשעה ${slotLabel} ` +
     `עבור ${params.pet_name}. אשלח תזכורת SMS 24 שעות לפני.`
   );
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Cancel / reschedule
+// ─────────────────────────────────────────────────────────────────────────────
 
 export async function cancelAppointment(phone: string, scheduledAt: string): Promise<string> {
   const env = getEnv();
@@ -212,20 +282,36 @@ export async function cancelAppointment(phone: string, scheduledAt: string): Pro
   const appt = await findActiveAppointmentNear(env.AGENT_CLINIC_ID, customerId, scheduledAt);
   if (!appt) return "לא מצאנו תור פעיל בשעה הזו. ייתכן שכבר בוטל.";
 
+  const lateCancellation = isTooLateToCancel(appt.scheduled_at);
+  const newStatus = lateCancellation ? "late_cancellation" : "cancelled";
+
   const { error: cancelErr } = await getSupabase()
     .from("appointments")
-    .update({ status: "cancelled", cancelled_at: new Date().toISOString() })
+    .update({
+      status:       newStatus,
+      cancelled_at: new Date().toISOString(),
+    })
     .eq("id", appt.id);
 
   if (cancelErr) throw new Error(`cancelAppointment update failed: ${cancelErr.message}`);
 
-  return `✅ התור בשעה ${formatSlotLabel(appt.scheduled_at)} בוטל בהצלחה.`;
+  const slotLabel = formatSlotLabel(appt.scheduled_at);
+
+  if (lateCancellation) {
+    return (
+      `התור בשעה ${slotLabel} סומן כביטול מאוחר (פחות מ-4 שעות לפני). ` +
+      `לפי המדיניות יחויב במלואו.`
+    );
+  }
+
+  return `✅ התור בשעה ${slotLabel} בוטל בהצלחה.`;
 }
 
 export async function rescheduleAppointment(
   phone: string,
   currentScheduledAt: string,
   newScheduledAt: string,
+  visitType?: VisitType,
 ): Promise<string> {
   const env = getEnv();
   const normalised = normalisePhone(phone);
@@ -236,11 +322,19 @@ export async function rescheduleAppointment(
   const oldAppt = await findActiveAppointmentNear(env.AGENT_CLINIC_ID, customerId, currentScheduledAt);
   if (!oldAppt) return "לא מצאנו תור פעיל בשעה הזו. ייתכן שכבר בוטל.";
 
+  if (isTooLateToCancel(oldAppt.scheduled_at)) {
+    return "לא ניתן להזיז תור פחות מ-4 שעות לפני מועדו. לסיוע נוסף — פנה ישירות לנועה.";
+  }
+
+  // Resolve effective duration: prefer explicit visitType, fallback to stored type
+  const resolvedType = (visitType ?? oldAppt.appointment_type) as VisitType;
+  const durMin = effectiveDuration(resolvedType);
+
   const { error: rpcErr } = await getSupabase().rpc("reschedule_appointment", {
-    p_clinic_id: env.AGENT_CLINIC_ID,
+    p_clinic_id:          env.AGENT_CLINIC_ID,
     p_old_appointment_id: oldAppt.id,
-    p_new_scheduled_at: newScheduledAt,
-    p_duration_minutes: 30,
+    p_new_scheduled_at:   newScheduledAt,
+    p_duration_minutes:   durMin,
   });
 
   if (rpcErr) {
@@ -252,9 +346,94 @@ export async function rescheduleAppointment(
 
   const oldLabel = formatSlotLabel(oldAppt.scheduled_at);
   const newLabel = formatSlotLabel(newScheduledAt);
-  const newDate = newScheduledAt.slice(0, 10);
+  const newDate  = newScheduledAt.slice(0, 10);
   return `✅ התור הוזז בהצלחה מ-${oldLabel} ל-${formatDateHe(newDate)} בשעה ${newLabel}.`;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Waitlist
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type JoinWaitlistParams = {
+  phone: string;
+  customer_name: string;
+  pet_name: string;
+  pet_species: string;
+  visit_type: VisitType;
+  preferred_start?: string; // YYYY-MM-DD
+  preferred_end?: string;   // YYYY-MM-DD
+  notes?: string;
+};
+
+export async function joinWaitlist(params: JoinWaitlistParams): Promise<string> {
+  const env = getEnv();
+  const phone = normalisePhone(params.phone);
+
+  const { customerId } = await createOrFindCustomer(phone, params.customer_name);
+  const { petId } = await createOrFindPet(customerId, params.pet_name, params.pet_species);
+
+  const { error } = await getSupabase().from("waitlist").insert({
+    clinic_id:       env.AGENT_CLINIC_ID,
+    customer_id:     customerId,
+    pet_id:          petId,
+    visit_type:      params.visit_type,
+    preferred_start: params.preferred_start ?? null,
+    preferred_end:   params.preferred_end   ?? null,
+    status:          "waiting",
+    notes:           params.notes ?? null,
+  });
+
+  if (error) throw new Error(`joinWaitlist insert failed: ${error.message}`);
+
+  const config = getVisitConfig(params.visit_type);
+  return (
+    `✅ ${params.pet_name} נרשמ/ה לרשימת ההמתנה ל${config.labelHe}. ` +
+    `נועה תצור קשר כשיפתח מקום. ` +
+    `אם מצב בעל החיים מחמיר — פנה/י לבית חולים וטרינרי.`
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Voice calls
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function saveVoiceCall(
+  conversationId: string,
+  durationSeconds: number | null,
+  success: boolean | null,
+  payload: Record<string, unknown>,
+): Promise<void> {
+  const env = getEnv();
+  const callerNumber =
+    typeof payload["caller_number"] === "string"
+      ? payload["caller_number"]
+      : "unknown";
+
+  const status =
+    success === true ? "completed" : success === false ? "failed" : "in_progress";
+
+  const { error } = await getSupabase()
+    .from("voice_calls")
+    .upsert(
+      {
+        clinic_id:                    env.AGENT_CLINIC_ID,
+        elevenlabs_conversation_id:   conversationId,
+        direction:                    "inbound",
+        status,
+        duration_seconds:             durationSeconds,
+        from_number:                  callerNumber,
+        to_number:                    env.TWILIO_PHONE_NUMBER,
+        agent_name:                   "tomer",
+        metadata:                     payload,
+      },
+      { onConflict: "elevenlabs_conversation_id" },
+    );
+  if (error) throw new Error(`supabase voice_call upsert failed: ${error.message}`);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Private helpers
+// ─────────────────────────────────────────────────────────────────────────────
 
 async function findActiveAppointmentNear(
   clinicId: string,
@@ -265,14 +444,14 @@ async function findActiveAppointmentNear(
   if (isNaN(target.getTime())) return null;
 
   const rangeStart = new Date(target.getTime() - 2 * 60 * 1000).toISOString();
-  const rangeEnd = new Date(target.getTime() + 2 * 60 * 1000).toISOString();
+  const rangeEnd   = new Date(target.getTime() + 2 * 60 * 1000).toISOString();
 
   const { data, error } = await getSupabase()
     .from("appointments")
-    .select("id, scheduled_at")
+    .select("id, scheduled_at, appointment_type, duration_minutes")
     .eq("clinic_id", clinicId)
     .eq("customer_id", customerId)
-    .in("status", ["scheduled", "confirmed"])
+    .in("status", ["scheduled", "confirmed", "pending_approval"])
     .is("deleted_at", null)
     .gte("scheduled_at", rangeStart)
     .lte("scheduled_at", rangeEnd)
@@ -282,11 +461,13 @@ async function findActiveAppointmentNear(
   if (!data || data.length === 0) return null;
 
   const row = data[0];
-  const id = extractId(row);
-  const scheduled_at = extractString(row, "scheduled_at");
+  const id               = extractId(row);
+  const scheduled_at     = extractString(row, "scheduled_at");
+  const appointment_type = extractString(row, "appointment_type") ?? "other";
+  const duration_minutes = extractNumber(row, "duration_minutes") ?? 40;
 
   if (!id || !scheduled_at) return null;
-  return { id, scheduled_at };
+  return { id, scheduled_at, appointment_type, duration_minutes };
 }
 
 async function createOrFindCustomer(
@@ -340,38 +521,4 @@ async function createOrFindPet(
   const id = extractId(inserted);
   if (!id) throw new Error("createOrFindPet: no id returned");
   return { petId: id };
-}
-
-export async function saveVoiceCall(
-  conversationId: string,
-  durationSeconds: number | null,
-  success: boolean | null,
-  payload: Record<string, unknown>,
-): Promise<void> {
-  const env = getEnv();
-  const callerNumber =
-    typeof payload["caller_number"] === "string"
-      ? payload["caller_number"]
-      : "unknown";
-
-  const status =
-    success === true ? "completed" : success === false ? "failed" : "in_progress";
-
-  const { error } = await getSupabase()
-    .from("voice_calls")
-    .upsert(
-      {
-        clinic_id: env.AGENT_CLINIC_ID,
-        elevenlabs_conversation_id: conversationId,
-        direction: "inbound",
-        status,
-        duration_seconds: durationSeconds,
-        from_number: callerNumber,
-        to_number: env.TWILIO_PHONE_NUMBER,
-        agent_name: "tomer",
-        metadata: payload,
-      },
-      { onConflict: "elevenlabs_conversation_id" },
-    );
-  if (error) throw new Error(`supabase voice_call upsert failed: ${error.message}`);
 }

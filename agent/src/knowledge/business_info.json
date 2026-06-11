@@ -10,8 +10,46 @@
     "friday": "08:30-13:00",
     "saturday": "closed"
   },
-  "appointment_duration_minutes": 30,
-  "appointment_policy": "בתיאום מראש בלבד",
+  "booking_window_days": 14,
+  "appointment_policy": "בתיאום מראש בלבד. ביטול חינם עד 4 שעות לפני — ביטול מאוחר יותר מחויב במלואו.",
+  "visit_types": {
+    "checkup": {
+      "label_he": "בדיקה בקליניקה",
+      "duration_min": 30,
+      "buffer_min": 10,
+      "effective_min": 40,
+      "requires_approval": false
+    },
+    "home_visit": {
+      "label_he": "ביקור בית",
+      "duration_min": 60,
+      "buffer_min": 30,
+      "effective_min": 90,
+      "requires_approval": false
+    },
+    "vaccination": {
+      "label_he": "חיסונים",
+      "duration_min": 20,
+      "buffer_min": 10,
+      "effective_min": 30,
+      "requires_approval": false
+    },
+    "phone_consultation": {
+      "label_he": "ייעוץ טלפוני",
+      "duration_min": 20,
+      "buffer_min": 0,
+      "effective_min": 20,
+      "requires_approval": false
+    },
+    "neutering": {
+      "label_he": "עיקור/סירוס",
+      "duration_min": 30,
+      "buffer_min": 10,
+      "effective_min": 40,
+      "requires_approval": true,
+      "approval_note": "תור ממתין לאישור נועה — יישלח SMS לאישור"
+    }
+  },
   "animals_treated": ["כלב", "חתול"],
   "is_emergency_service": false,
   "service_area": [
@@ -35,7 +73,6 @@
     "ניתוחים", "המתת חסד"
   ],
   "unknown_or_needs_confirmation": [
-    "מדיניות ביטול תור",
     "מרפאת חירום מומלצת באזור",
     "רשימת שאלות נפוצות FAQ מאושרת"
   ]

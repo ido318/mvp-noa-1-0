@@ -67,9 +67,17 @@ supabase db reset         # re-run all migrations + seed
 ### Agent (`agent/src/`)
 - `server/app.ts` — Hono app factory, mounts all route groups
 - `server/routes/twilio.ts` — Twilio webhook, validates signature, returns ElevenLabs signed URL via TwiML `<Stream>`
-- `server/routes/tools.ts` — ElevenLabs tool endpoints (`/tools/lookup-customer`, `/tools/escalate-to-noa`); all protected by `verifyElevenLabsSignature`
+- `server/routes/tools.ts` — ElevenLabs tool endpoints (all protected by `verifyElevenLabsSignature`):
+  - `/tools/lookup-customer` — find customer + pets by phone
+  - `/tools/escalate-to-noa` — create escalation record
+  - `/tools/check-availability` — free slots by visit type + date (14-day window, calendar_blocks aware)
+  - `/tools/book-appointment` — atomic booking; neutering → `pending_approval`
+  - `/tools/cancel-or-reschedule` — 4-hour rule enforced; late = `late_cancellation`
+  - `/tools/join-waitlist` — write to `waitlist` table
+  - `/tools/triage-pet-case` — local triage engine
 - `server/routes/hooks.ts` — `/hooks/call-ended` webhook from ElevenLabs; upserts to `voice_calls`
-- `lib/store.ts` — all Supabase data access for the agent (customers lookup, escalation insert, voice call upsert)
+- `lib/store.ts` — all Supabase data access for the agent
+- `lib/appointments.ts` — slot logic: `VISIT_TYPE_CONFIG`, `generateSlotsForVisitType`, `isWithin14Days`, `isTooLateToCancel`
 - `lib/env.ts` — typed env validation (throws on startup if vars are missing)
 
 ### App (`app/`)
@@ -86,7 +94,7 @@ Architecture is layered: `UI (page.tsx) → API route → Service → Repository
 ### Supabase
 - **Cloud project:** `xpsuhtqfxqmnunppnyov` (account: voxly ai, region: eu-central-1, Frankfurt) — `https://xpsuhtqfxqmnunppnyov.supabase.co`
   Old projects (deleted): `ssfkximqwyzqlsgwfbye` (Seoul), `voxly-tomer` (`grbgkjjtyfohzulssuga`).
-- Migrations in `supabase/migrations/` — run in timestamp order; all 12 applied to cloud as of 2026-06-11
+- Migrations in `supabase/migrations/` — run in timestamp order; 14 migrations total (through `20260612000014_sprint1_appointments.sql`)
 - RLS is enabled on all tables; the app uses the anon key + user session for data access, the service role key only for admin operations (audit logs, AI events, health checks)
 - Multi-tenant by `clinic_id` — every data table has a `clinic_id` column
 - Clinic seed: Get A Vet → `AGENT_CLINIC_ID=37681721-a59f-40d5-a041-ad15a49ecf29`
@@ -104,7 +112,7 @@ const actor = await requireAuth(auth);
 
 **Phone normalisation** — Israeli numbers are normalised to E.164 (`054...` → `+97254...`) in `agent/lib/store.ts:normalisePhone`.
 
-**Tests** — `app/tests/unit/` tests are pure unit tests with mocked services. `app/tests/integration/` hit a real local Supabase (set `RUN_INTEGRATION_TESTS=true`). Agent tests live in `agent/src/tests/` (or alongside source).
+**Tests** — `app/tests/unit/` tests are pure unit tests with mocked services. `app/tests/integration/` hit a real local Supabase (set `RUN_INTEGRATION_TESTS=true`). Agent tests live in `agent/tests/unit/`.
 
 ## Environment Variables
 
@@ -120,12 +128,34 @@ Shared (same Supabase project): `SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_URL`, `SU
 
 ## החלטות מחייבות — אל תשנה בלי אישור מפורש
 
+### ארכיטקטורה
 - נתיב הקול היחיד: Twilio → ElevenLabs (הסוכן "תומר").
   ה-DTMF service בארכיון (`docs/archive/`) — לא מחזירים אותו לנתיב הריצה.
 - סכמת Supabase אחת. אסור ליצור טבלאות `voxly_*` — בוטלו.
-  הסוכן כותב ל: `customers`, `escalations`, `voice_calls` (תמיד עם `clinic_id`).
+  הסוכן כותב ל: `customers`, `escalations`, `voice_calls`, `appointments`, `waitlist` (תמיד עם `clinic_id`).
 - שתי סכמות env נפרדות (`agent/src/lib/env.ts`, `app/lib/env.ts`) — לא מאחדים.
 - `last_visit` הוסר מה-MVP — בעתיד ייגזר מטבלת `appointments`.
+
+### יומן ותורים (הוחלט בפגישה 2026-06-11)
+1. **יומן פנימי בלבד** — אין אינטגרציה ל-Google Calendar/Waze בפיילוט. טבלת `appointments` בלבד.
+2. **תומר קובע תורים סופית** — חריג: עיקור/סירוס (`neutering`) → סטטוס `pending_approval`, ממתין לאישור נועה בדשבורד.
+3. **חלון קביעה: 14 יום קדימה בלבד** — `isWithin14Days()` ב-`appointments.ts`.
+4. **ביטול/הזזה — כלל 4 שעות:**
+   - ≥ 4 שעות לפני → ביטול חינם (`cancelled`)
+   - < 4 שעות → `late_cancellation` (חיוב מלא — סימון בלבד, אין סליקה בפיילוט)
+5. **משכי ביקורים (effective = visit + buffer, מאוחסן ב-`duration_minutes`):**
+   | סוג | ביקור | באפר | effective |
+   |---|---|---|---|
+   | `checkup` | 30 דק' | 10 דק' | 40 דק' |
+   | `home_visit` | 60 דק' | 30 דק' | 90 דק' |
+   | `vaccination` | 20 דק' | 10 דק' | 30 דק' |
+   | `phone_consultation` | 20 דק' | 0 | 20 דק' |
+   | `neutering` | 30 דק' | 10 דק' | 40 דק' |
+6. **שעות פעילות:** א'-ה' 08:00-20:00, ו' 08:30-13:00, שבת סגור.
+7. **חסימות יומן:** טבלת `calendar_blocks` — נועה חוסמת חופשות, תומר מציע תורים רק אחרי החזרה.
+8. **אין תור פנוי:** רישום ל-`waitlist` + "אם המצב מחמיר — פנה לבית חולים וטרינרי".
+9. **שינוי תור ע"י נועה בדשבורד → SMS עדכון ללקוח** (שיחה יוצאת = פאזה 2, לא עכשיו).
+10. **תשלומים/חשבוניות = פאזה 2** — לא לבנות עכשיו.
 
 ## כללי עבודה
 
@@ -140,4 +170,10 @@ Shared (same Supabase project): `SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_URL`, `SU
 ## משימות פתוחות
 
 ראה Backlog בדף הנושן: חיבור פרויקטי Vercel, שדרוג ל-`@elevenlabs/elevenlabs-js`, `npm audit`.
-(migration `20260611000012` — הושלם 2026-06-11)
+
+### ספרינט 2 (עתידי)
+- דשבורד: תצוגת `pending_approval` ואישור/דחיה של תורי עיקור/סירוס
+- דשבורד: ניהול `calendar_blocks` (UI לחסימת חופשות)
+- דשבורד: תצוגת `waitlist`
+- SMS עדכון ללקוח כשנועה מזיזה תור (Twilio Messaging)
+- migration `20260612000014` — להחיל על cloud (sprint 1 הושלם 2026-06-11)

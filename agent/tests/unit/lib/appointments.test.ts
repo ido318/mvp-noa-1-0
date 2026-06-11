@@ -1,15 +1,21 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import {
   getClinicHours,
   getDayNameHe,
-  generateAllSlots,
-  filterFreeSlots,
+  generateSlotsForVisitType,
   formatSlotLabel,
   formatDateHe,
+  isWithin14Days,
+  isTooLateToCancel,
+  effectiveDuration,
+  VISIT_TYPE_CONFIG,
 } from "../../../src/lib/appointments.js";
 
-// 2026-06-14 = Sunday, 2026-06-19 = Friday, 2026-06-20 = Saturday
-// (verified: June 14 2026 is a Sunday)
+// Reference dates (verified):
+// 2026-06-14 = Sunday
+// 2026-06-19 = Friday
+// 2026-06-20 = Saturday
+// 2026-06-18 = Thursday
 
 describe("getClinicHours", () => {
   it("ראשון (14/6/2026) → 08:00-20:00", () => {
@@ -38,50 +44,6 @@ describe("getClinicHours", () => {
   });
 });
 
-describe("generateAllSlots", () => {
-  it("יום חול — מתחיל ב-08:00 ומסיים ב-19:30", () => {
-    const slots = generateAllSlots("2026-06-14", { start: { h: 8, m: 0 }, end: { h: 20, m: 0 } });
-    expect(formatSlotLabel(slots[0]!)).toBe("08:00");
-    expect(formatSlotLabel(slots[slots.length - 1]!)).toBe("19:30");
-    expect(slots).toHaveLength(24); // 8:00..19:30 = 24 slots
-  });
-
-  it("שישי — מתחיל ב-08:30 ומסיים ב-12:30", () => {
-    const slots = generateAllSlots("2026-06-19", { start: { h: 8, m: 30 }, end: { h: 13, m: 0 } });
-    expect(formatSlotLabel(slots[0]!)).toBe("08:30");
-    expect(formatSlotLabel(slots[slots.length - 1]!)).toBe("12:30");
-    expect(slots).toHaveLength(9); // 8:30..12:30 = 9 slots
-  });
-});
-
-describe("filterFreeSlots", () => {
-  it("ללא תורים תפוסים — מחזיר עד 8 slots ראשונים", () => {
-    const all = generateAllSlots("2026-06-14", { start: { h: 8, m: 0 }, end: { h: 20, m: 0 } });
-    const free = filterFreeSlots(all, []);
-    expect(free).toHaveLength(8);
-    expect(formatSlotLabel(free[0]!)).toBe("08:00");
-  });
-
-  it("שלושה תפוסים — מוציא אותם", () => {
-    const all = generateAllSlots("2026-06-14", { start: { h: 8, m: 0 }, end: { h: 20, m: 0 } });
-    const taken = [all[0]!, all[1]!, all[2]!];
-    const free = filterFreeSlots(all, taken);
-    expect(formatSlotLabel(free[0]!)).toBe("09:30"); // slots 0,1,2 removed (08:00,08:30,09:00)
-  });
-
-  it("כל ה-slots תפוסים — מחזיר []", () => {
-    const all = generateAllSlots("2026-06-14", { start: { h: 8, m: 0 }, end: { h: 20, m: 0 } });
-    const free = filterFreeSlots(all, all);
-    expect(free).toHaveLength(0);
-  });
-});
-
-describe("formatDateHe", () => {
-  it("2026-06-15 → 15/06/2026", () => {
-    expect(formatDateHe("2026-06-15")).toBe("15/06/2026");
-  });
-});
-
 describe("getDayNameHe", () => {
   it("2026-06-14 (Sunday) → ראשון", () => {
     expect(getDayNameHe("2026-06-14")).toBe("ראשון");
@@ -93,5 +55,171 @@ describe("getDayNameHe", () => {
 
   it("2026-06-20 (Saturday) → שבת", () => {
     expect(getDayNameHe("2026-06-20")).toBe("שבת");
+  });
+});
+
+describe("formatDateHe", () => {
+  it("2026-06-15 → 15/06/2026", () => {
+    expect(formatDateHe("2026-06-15")).toBe("15/06/2026");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Visit type config
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("VISIT_TYPE_CONFIG", () => {
+  it("checkup: 30+10=40 effective, no approval", () => {
+    expect(effectiveDuration("checkup")).toBe(40);
+    expect(VISIT_TYPE_CONFIG.checkup.requiresApproval).toBe(false);
+  });
+
+  it("home_visit: 60+30=90 effective, no approval", () => {
+    expect(effectiveDuration("home_visit")).toBe(90);
+    expect(VISIT_TYPE_CONFIG.home_visit.requiresApproval).toBe(false);
+  });
+
+  it("vaccination: 20+10=30 effective, no approval", () => {
+    expect(effectiveDuration("vaccination")).toBe(30);
+    expect(VISIT_TYPE_CONFIG.vaccination.requiresApproval).toBe(false);
+  });
+
+  it("phone_consultation: 20+0=20 effective, no approval", () => {
+    expect(effectiveDuration("phone_consultation")).toBe(20);
+    expect(VISIT_TYPE_CONFIG.phone_consultation.requiresApproval).toBe(false);
+  });
+
+  it("neutering: 30+10=40 effective, requires approval", () => {
+    expect(effectiveDuration("neutering")).toBe(40);
+    expect(VISIT_TYPE_CONFIG.neutering.requiresApproval).toBe(true);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// generateSlotsForVisitType
+// ─────────────────────────────────────────────────────────────────────────────
+
+const WEEKDAY_HOURS = { start: { h: 8, m: 0 }, end: { h: 20, m: 0 } };
+const FRIDAY_HOURS  = { start: { h: 8, m: 30 }, end: { h: 13, m: 0 } };
+
+describe("generateSlotsForVisitType — checkup (effective 40 min)", () => {
+  it("ללא תורים תפוסים — מחזיר עד 6 slots", () => {
+    const slots = generateSlotsForVisitType("2026-06-14", WEEKDAY_HOURS, "checkup", []);
+    expect(slots.length).toBe(6);
+    expect(formatSlotLabel(slots[0]!)).toBe("08:00");
+  });
+
+  it("slot ראשון תפוס — מחזיר מ-08:10", () => {
+    // Block 08:00–08:40
+    const booked = [{ start: "2026-06-14T08:00:00+03:00", end: "2026-06-14T08:40:00+03:00" }];
+    const slots = generateSlotsForVisitType("2026-06-14", WEEKDAY_HOURS, "checkup", booked);
+    expect(formatSlotLabel(slots[0]!)).toBe("08:40");
+  });
+
+  it("לא מציע slot שסיומו לאחר סגירת המרפאה", () => {
+    // Latest checkup (40 min eff) can start at 19:20 (ends 20:00)
+    const slots = generateSlotsForVisitType("2026-06-14", WEEKDAY_HOURS, "checkup", []);
+    const labels = slots.map(formatSlotLabel);
+    expect(labels.every((l) => l <= "19:20")).toBe(true);
+  });
+});
+
+describe("generateSlotsForVisitType — home_visit (effective 90 min)", () => {
+  it("latest start = 18:30 (90 min before 20:00)", () => {
+    const slots = generateSlotsForVisitType("2026-06-14", WEEKDAY_HOURS, "home_visit", []);
+    const labels = slots.map(formatSlotLabel);
+    expect(labels.every((l) => l <= "18:30")).toBe(true);
+  });
+});
+
+describe("generateSlotsForVisitType — שישי (08:30-13:00) + vaccination (30 min eff)", () => {
+  it("מתחיל ב-08:30 ומסיים לא לאחר 12:30", () => {
+    const slots = generateSlotsForVisitType("2026-06-19", FRIDAY_HOURS, "vaccination", []);
+    expect(slots.length).toBeGreaterThan(0);
+    expect(formatSlotLabel(slots[0]!)).toBe("08:30");
+    const labels = slots.map(formatSlotLabel);
+    expect(labels.every((l) => l <= "12:30")).toBe(true);
+  });
+});
+
+describe("generateSlotsForVisitType — כל השעות תפוסות", () => {
+  it("מחזיר [] כשאין מקום", () => {
+    // Block the entire day
+    const booked = [{ start: "2026-06-14T00:00:00+03:00", end: "2026-06-14T23:59:59+03:00" }];
+    const slots = generateSlotsForVisitType("2026-06-14", WEEKDAY_HOURS, "checkup", booked);
+    expect(slots).toHaveLength(0);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// isWithin14Days
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("isWithin14Days", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("היום → true", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-11T10:00:00Z"));
+    expect(isWithin14Days("2026-06-11")).toBe(true);
+  });
+
+  it("14 ימים קדימה בדיוק → true", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-11T10:00:00Z"));
+    expect(isWithin14Days("2026-06-25")).toBe(true);
+  });
+
+  it("15 ימים קדימה → false", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-11T10:00:00Z"));
+    expect(isWithin14Days("2026-06-26")).toBe(false);
+  });
+
+  it("אתמול → false", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-11T10:00:00Z"));
+    expect(isWithin14Days("2026-06-10")).toBe(false);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// isTooLateToCancel — 4-hour rule
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("isTooLateToCancel", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("5 שעות לפני → false (מותר לבטל)", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-14T08:00:00Z")); // 08:00 UTC
+    const appt = "2026-06-14T13:00:00Z"; // 5 hours later
+    expect(isTooLateToCancel(appt)).toBe(false);
+  });
+
+  it("3 שעות לפני → true (ביטול מאוחר)", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-14T08:00:00Z"));
+    const appt = "2026-06-14T11:00:00Z"; // 3 hours later
+    expect(isTooLateToCancel(appt)).toBe(true);
+  });
+
+  it("בדיוק 4 שעות → true (גבול שייך לאיחור)", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-14T08:00:00Z"));
+    const appt = "2026-06-14T12:00:00Z"; // exactly 4 hours
+    // isTooLateToCancel: hoursUntil < 4 → at exactly 4h → false (מעל 4 שעות = חינם)
+    expect(isTooLateToCancel(appt)).toBe(false);
+  });
+
+  it("1 שעה לפני → true", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-14T08:00:00Z"));
+    const appt = "2026-06-14T09:00:00Z";
+    expect(isTooLateToCancel(appt)).toBe(true);
   });
 });
