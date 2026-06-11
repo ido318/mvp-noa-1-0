@@ -88,8 +88,17 @@ type CustomerRow = { id: string };
 type AppointmentRow = { id: string; scheduled_at: string };
 
 function extractId(row: unknown): string | null {
-  if (row !== null && typeof row === "object" && "id" in row && typeof (row as Record<string, unknown>).id === "string") {
-    return (row as CustomerRow).id;
+  if (row !== null && typeof row === "object") {
+    const val = (row as Record<string, unknown>)["id"];
+    if (typeof val === "string") return val;
+  }
+  return null;
+}
+
+function extractString(row: unknown, key: string): string | null {
+  if (row !== null && typeof row === "object") {
+    const val = (row as Record<string, unknown>)[key];
+    if (typeof val === "string") return val;
   }
   return null;
 }
@@ -128,7 +137,10 @@ export async function checkAvailability(dateIso: string): Promise<string> {
 
   if (error) throw new Error(`checkAvailability query failed: ${error.message}`);
 
-  const takenIsos = (data ?? []).map((r) => r.scheduled_at as string);
+  const takenIsos = (data ?? []).flatMap((r) => {
+    const v = extractString(r, "scheduled_at");
+    return v ? [v] : [];
+  });
   const allSlots = generateAllSlots(dateIso, hours);
   const freeSlots = filterFreeSlots(allSlots, takenIsos);
 
@@ -271,9 +283,7 @@ async function findActiveAppointmentNear(
 
   const row = data[0];
   const id = extractId(row);
-  const scheduled_at = typeof (row as Record<string, unknown>)["scheduled_at"] === "string"
-    ? (row as Record<string, unknown>)["scheduled_at"] as string
-    : null;
+  const scheduled_at = extractString(row, "scheduled_at");
 
   if (!id || !scheduled_at) return null;
   return { id, scheduled_at };

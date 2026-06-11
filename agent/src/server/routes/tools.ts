@@ -116,8 +116,8 @@ toolsRoutes.post("/tools/triage-pet-case", async (c) => {
   return c.json(result);
 });
 
-// ISO8601 datetime — accepts "2026-06-15T10:00:00+03:00" and similar
-const ISO_DATETIME_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/;
+// ISO8601 datetime — requires timezone (Z or ±HH:MM) to avoid ambiguous local times
+const ISO_DATETIME_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?(Z|[+-]\d{2}:\d{2})$/;
 
 // POST /tools/check-availability
 const availabilitySchema = z.object({
