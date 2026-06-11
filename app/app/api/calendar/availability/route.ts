@@ -1,0 +1,33 @@
+import { getActorAndServices } from "@/lib/api/actor";
+import { createRequestId } from "@/lib/api/request-id";
+import { handleRouteError, jsonSuccess } from "@/lib/api/response";
+import { parseOrThrow } from "@/lib/api/validation";
+import { availabilitySchema } from "@/lib/validators/appointment";
+import { AppError } from "@/lib/errors/app-error";
+
+export async function GET(request: Request) {
+  const requestId = createRequestId();
+
+  try {
+    const { actor, calendar } = await getActorAndServices();
+    const { searchParams } = new URL(request.url);
+    const parsed = parseOrThrow(availabilitySchema, {
+      clinicId: searchParams.get("clinicId"),
+      date: searchParams.get("date"),
+    });
+    if (!actor.clinicIds.includes(parsed.clinicId)) {
+      throw AppError.forbidden("Cannot access requested clinic");
+    }
+
+    const result = await calendar.availabilityByDate(
+      actor,
+      parsed.clinicId,
+      parsed.date,
+      "Asia/Jerusalem",
+    );
+    if (!result.ok) return handleRouteError(result.error, requestId);
+    return jsonSuccess(result.value, 200, requestId);
+  } catch (error) {
+    return handleRouteError(error, requestId);
+  }
+}

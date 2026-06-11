@@ -1,0 +1,46 @@
+{
+  "name": "@mvp-noa-1-0/app",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:integration": "RUN_INTEGRATION_TESTS=true vitest run tests/integration",
+    "db:reset": "supabase db reset",
+    "db:start": "supabase start",
+    "seed:dev-user": "bash scripts/with-supabase-env.sh node scripts/seed-dev-user.mjs",
+    "seed:demo": "bash scripts/with-supabase-env.sh node scripts/seed-demo-data.mjs",
+    "seed:all": "npm run seed:dev-user && npm run seed:demo"
+  },
+  "dependencies": {
+    "@ai-sdk/openai": "^3.0.66",
+    "@supabase/ssr": "^0.10.3",
+    "@supabase/supabase-js": "^2.106.2",
+    "ai": "^6.0.193",
+    "next": "16.2.6",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "twilio": "^6.0.2",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^6.0.2",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.6",
+    "jsdom": "^29.1.1",
+    "tailwindcss": "^4",
+    "typescript": "^5",
+    "vitest": "^4.1.7"
+  }
+}

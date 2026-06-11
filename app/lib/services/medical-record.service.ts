@@ -1,0 +1,387 @@
+import { AppError, err, ok, type Result } from "@/lib/errors/app-error";
+import type { MedicalNoteRepository } from "@/lib/repositories/medical-note.repository";
+import type { PetRepository } from "@/lib/repositories/pet.repository";
+import type { PrescriptionRepository } from "@/lib/repositories/prescription.repository";
+import type { VaccinationRepository } from "@/lib/repositories/vaccination.repository";
+import type { VisitRepository } from "@/lib/repositories/visit.repository";
+import { assertMedicalDeleteAuthorized } from "@/lib/services/medical-authorization";
+import type { AuditService } from "@/lib/services/audit.service";
+import type { ServiceActor } from "@/lib/services/service-context";
+import type {
+  CreateMedicalNoteInput,
+  MedicalNote,
+  UpdateMedicalNoteInput,
+} from "@/types/domain/medical-note";
+import type {
+  CreatePrescriptionInput,
+  Prescription,
+  UpdatePrescriptionInput,
+} from "@/types/domain/prescription";
+import type {
+  CreateVaccinationInput,
+  UpdateVaccinationInput,
+  Vaccination,
+} from "@/types/domain/vaccination";
+import type { Visit } from "@/types/domain/visit";
+
+export class MedicalRecordService {
+  constructor(
+    private readonly visitRepository: VisitRepository,
+    private readonly medicalNoteRepository: MedicalNoteRepository,
+    private readonly vaccinationRepository: VaccinationRepository,
+    private readonly prescriptionRepository: PrescriptionRepository,
+    private readonly petRepository: PetRepository,
+    private readonly auditService: AuditService,
+  ) {}
+
+  async listNotes(actor: ServiceActor, visitId: string): Promise<Result<MedicalNote[]>> {
+    const visit = await this.assertVisitAccessible(actor, visitId);
+    if (!visit.ok) return visit;
+    return this.medicalNoteRepository.listByVisit(visitId);
+  }
+
+  async addNote(
+    actor: ServiceActor,
+    visitId: string,
+    input: CreateMedicalNoteInput,
+  ): Promise<Result<MedicalNote>> {
+    const visit = await this.assertVisitAccessible(actor, visitId);
+    if (!visit.ok) return visit;
+
+    const created = await this.medicalNoteRepository.create(
+      visit.value.clinicId,
+      visitId,
+      input,
+      actor.userId,
+    );
+    if (!created.ok) return created;
+
+    await this.auditService.logAction({
+      clinicId: visit.value.clinicId,
+      actorType: "user",
+      actorId: actor.userId,
+      action: "medical_note.create",
+      entityType: "medical_note",
+      entityId: created.value.id,
+      afterPayload: created.value,
+    });
+
+    return created;
+  }
+
+  async updateNote(
+    actor: ServiceActor,
+    noteId: string,
+    input: UpdateMedicalNoteInput,
+  ): Promise<Result<MedicalNote>> {
+    const existing = await this.medicalNoteRepository.findById(noteId);
+    if (!existing.ok) return existing;
+    if (!existing.value) return err(AppError.notFound("Medical note not found"));
+
+    const visit = await this.assertVisitAccessible(actor, existing.value.visitId);
+    if (!visit.ok) return visit;
+
+    const updated = await this.medicalNoteRepository.update(noteId, input);
+    if (!updated.ok) return updated;
+
+    await this.auditService.logAction({
+      clinicId: existing.value.clinicId,
+      actorType: "user",
+      actorId: actor.userId,
+      action: "medical_note.update",
+      entityType: "medical_note",
+      entityId: updated.value.id,
+      beforePayload: existing.value,
+      afterPayload: updated.value,
+    });
+
+    return updated;
+  }
+
+  async softDeleteNote(actor: ServiceActor, noteId: string): Promise<Result<void>> {
+    const existing = await this.medicalNoteRepository.findById(noteId);
+    if (!existing.ok) return err(existing.error);
+    if (!existing.value) return err(AppError.notFound("Medical note not found"));
+
+    const visit = await this.assertVisitAccessible(actor, existing.value.visitId);
+    if (!visit.ok) return visit;
+
+    const deleteAuth = assertMedicalDeleteAuthorized(actor, existing.value.clinicId);
+    if (!deleteAuth.ok) return deleteAuth;
+
+    const deleted = await this.medicalNoteRepository.softDelete(noteId);
+    if (!deleted.ok) return err(deleted.error);
+
+    await this.auditService.logAction({
+      clinicId: existing.value.clinicId,
+      actorType: "user",
+      actorId: actor.userId,
+      action: "medical_note.delete",
+      entityType: "medical_note",
+      entityId: existing.value.id,
+      beforePayload: existing.value,
+    });
+
+    return ok(undefined);
+  }
+
+  async listPetVaccinations(
+    actor: ServiceActor,
+    petId: string,
+    clinicId: string,
+  ): Promise<Result<Vaccination[]>> {
+    if (!actor.clinicIds.includes(clinicId)) {
+      return err(AppError.forbidden("Cannot list vaccinations for requested clinic"));
+    }
+    const pet = await this.petRepository.findById(petId);
+    if (!pet.ok) return err(pet.error);
+    if (!pet.value) return err(AppError.notFound("Pet not found"));
+    if (pet.value.clinicId !== clinicId) {
+      return err(AppError.validation("Pet clinic mismatch"));
+    }
+    return this.vaccinationRepository.listByPet(petId, clinicId);
+  }
+
+  async recordVaccination(
+    actor: ServiceActor,
+    petId: string,
+    input: CreateVaccinationInput,
+  ): Promise<Result<Vaccination>> {
+    if (!actor.clinicIds.includes(input.clinicId)) {
+      return err(AppError.forbidden("Cannot record vaccination in this clinic"));
+    }
+
+    const pet = await this.petRepository.findById(petId);
+    if (!pet.ok) return err(pet.error);
+    if (!pet.value) return err(AppError.notFound("Pet not found"));
+    if (pet.value.clinicId !== input.clinicId || pet.value.customerId !== input.customerId) {
+      return err(AppError.validation("Pet/customer/clinic mismatch"));
+    }
+
+    if (input.visitId) {
+      const visit = await this.assertVisitAccessible(actor, input.visitId);
+      if (!visit.ok) return visit;
+      if (visit.value.petId !== petId) {
+        return err(AppError.validation("Visit pet mismatch"));
+      }
+    }
+
+    const created = await this.vaccinationRepository.create(input, actor.userId, petId);
+    if (!created.ok) return created;
+
+    await this.auditService.logAction({
+      clinicId: created.value.clinicId,
+      actorType: "user",
+      actorId: actor.userId,
+      action: "vaccination.create",
+      entityType: "vaccination",
+      entityId: created.value.id,
+      afterPayload: created.value,
+    });
+
+    return created;
+  }
+
+  async updateVaccination(
+    actor: ServiceActor,
+    vaccinationId: string,
+    input: UpdateVaccinationInput,
+  ): Promise<Result<Vaccination>> {
+    const existing = await this.vaccinationRepository.findById(vaccinationId);
+    if (!existing.ok) return existing;
+    if (!existing.value) return err(AppError.notFound("Vaccination not found"));
+    if (!actor.clinicIds.includes(existing.value.clinicId)) {
+      return err(AppError.forbidden("Vaccination outside actor clinics"));
+    }
+
+    if (input.visitId) {
+      const visit = await this.assertVisitAccessible(actor, input.visitId);
+      if (!visit.ok) return visit;
+      if (visit.value.petId !== existing.value.petId) {
+        return err(AppError.validation("Visit pet mismatch"));
+      }
+    }
+
+    const updated = await this.vaccinationRepository.update(vaccinationId, input);
+    if (!updated.ok) return updated;
+
+    await this.auditService.logAction({
+      clinicId: existing.value.clinicId,
+      actorType: "user",
+      actorId: actor.userId,
+      action: "vaccination.update",
+      entityType: "vaccination",
+      entityId: updated.value.id,
+      beforePayload: existing.value,
+      afterPayload: updated.value,
+    });
+
+    return updated;
+  }
+
+  async softDeleteVaccination(
+    actor: ServiceActor,
+    vaccinationId: string,
+  ): Promise<Result<void>> {
+    const existing = await this.vaccinationRepository.findById(vaccinationId);
+    if (!existing.ok) return err(existing.error);
+    if (!existing.value) return err(AppError.notFound("Vaccination not found"));
+    if (!actor.clinicIds.includes(existing.value.clinicId)) {
+      return err(AppError.forbidden("Vaccination outside actor clinics"));
+    }
+
+    const deleteAuth = assertMedicalDeleteAuthorized(actor, existing.value.clinicId);
+    if (!deleteAuth.ok) return deleteAuth;
+
+    const deleted = await this.vaccinationRepository.softDelete(vaccinationId);
+    if (!deleted.ok) return err(deleted.error);
+
+    await this.auditService.logAction({
+      clinicId: existing.value.clinicId,
+      actorType: "user",
+      actorId: actor.userId,
+      action: "vaccination.delete",
+      entityType: "vaccination",
+      entityId: existing.value.id,
+      beforePayload: existing.value,
+    });
+
+    return ok(undefined);
+  }
+
+  async listVisitPrescriptions(
+    actor: ServiceActor,
+    visitId: string,
+  ): Promise<Result<Prescription[]>> {
+    const visit = await this.assertVisitAccessible(actor, visitId);
+    if (!visit.ok) return visit;
+    return this.prescriptionRepository.listByVisit(visitId);
+  }
+
+  async addPrescription(
+    actor: ServiceActor,
+    visitId: string,
+    input: CreatePrescriptionInput,
+  ): Promise<Result<Prescription>> {
+    const visit = await this.assertVisitAccessible(actor, visitId);
+    if (!visit.ok) return visit;
+
+    const created = await this.prescriptionRepository.create(
+      visit.value.clinicId,
+      visitId,
+      visit.value.petId,
+      input,
+      actor.userId,
+    );
+    if (!created.ok) return created;
+
+    await this.auditService.logAction({
+      clinicId: visit.value.clinicId,
+      actorType: "user",
+      actorId: actor.userId,
+      action: "prescription.create",
+      entityType: "prescription",
+      entityId: created.value.id,
+      afterPayload: created.value,
+    });
+
+    return created;
+  }
+
+  async updatePrescription(
+    actor: ServiceActor,
+    prescriptionId: string,
+    input: UpdatePrescriptionInput,
+  ): Promise<Result<Prescription>> {
+    const existing = await this.prescriptionRepository.findById(prescriptionId);
+    if (!existing.ok) return existing;
+    if (!existing.value) return err(AppError.notFound("Prescription not found"));
+    if (!actor.clinicIds.includes(existing.value.clinicId)) {
+      return err(AppError.forbidden("Prescription outside actor clinics"));
+    }
+
+    const patch = this.buildPrescriptionPatch(existing.value, input);
+    if (!patch.ok) return patch;
+
+    const updated = await this.prescriptionRepository.update(prescriptionId, patch.value);
+    if (!updated.ok) return updated;
+
+    await this.auditService.logAction({
+      clinicId: existing.value.clinicId,
+      actorType: "user",
+      actorId: actor.userId,
+      action: "prescription.update",
+      entityType: "prescription",
+      entityId: updated.value.id,
+      beforePayload: existing.value,
+      afterPayload: updated.value,
+    });
+
+    return updated;
+  }
+
+  async softDeletePrescription(
+    actor: ServiceActor,
+    prescriptionId: string,
+  ): Promise<Result<void>> {
+    const existing = await this.prescriptionRepository.findById(prescriptionId);
+    if (!existing.ok) return err(existing.error);
+    if (!existing.value) return err(AppError.notFound("Prescription not found"));
+    if (!actor.clinicIds.includes(existing.value.clinicId)) {
+      return err(AppError.forbidden("Prescription outside actor clinics"));
+    }
+
+    const deleteAuth = assertMedicalDeleteAuthorized(actor, existing.value.clinicId);
+    if (!deleteAuth.ok) return deleteAuth;
+
+    const deleted = await this.prescriptionRepository.softDelete(prescriptionId);
+    if (!deleted.ok) return err(deleted.error);
+
+    await this.auditService.logAction({
+      clinicId: existing.value.clinicId,
+      actorType: "user",
+      actorId: actor.userId,
+      action: "prescription.delete",
+      entityType: "prescription",
+      entityId: existing.value.id,
+      beforePayload: existing.value,
+    });
+
+    return ok(undefined);
+  }
+
+  private buildPrescriptionPatch(
+    existing: Prescription,
+    input: UpdatePrescriptionInput,
+  ): Result<UpdatePrescriptionInput & { discontinuedAt?: string | null }> {
+    const nextStatus = input.status ?? existing.status;
+    if (nextStatus === "discontinued") {
+      return ok({
+        ...input,
+        status: "discontinued",
+        discontinuedAt: new Date().toISOString(),
+      });
+    }
+    if (nextStatus === "active") {
+      return ok({
+        ...input,
+        status: "active",
+        discontinuedAt: null,
+      });
+    }
+    return ok(input);
+  }
+
+  private async assertVisitAccessible(
+    actor: ServiceActor,
+    visitId: string,
+  ): Promise<Result<Visit>> {
+    const visit = await this.visitRepository.findById(visitId);
+    if (!visit.ok) return err(visit.error);
+    if (!visit.value) return err(AppError.notFound("Visit not found"));
+    if (!actor.clinicIds.includes(visit.value.clinicId)) {
+      return err(AppError.forbidden("Visit outside actor clinics"));
+    }
+    return ok(visit.value);
+  }
+}
