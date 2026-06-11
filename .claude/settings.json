@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run test:*)",
+      "Bash(npm run dev)",
+      "Bash(npm run seed:*)",
+      "Bash(supabase status)",
+      "Bash(supabase start)",
+      "Bash(supabase stop)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push)"
+    ]
+  }
+}
