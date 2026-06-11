@@ -28,10 +28,6 @@ const schema = z.object({
   // Clinic routing — which clinic record the agent writes to in the unified schema
   AGENT_CLINIC_ID: z.string().uuid(),
 
-  // Optional — used if we ever call Cal.com from server-side
-  CAL_COM_API_KEY: z.string().min(1).optional(),
-  CAL_COM_EVENT_TYPE_ID: z.string().min(1).optional(),
-
   DEMO_MODE: z
     .enum(["true", "false"])
     .default("true")

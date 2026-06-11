@@ -3,7 +3,14 @@ import { z } from "zod";
 import { logger, maskPhone } from "../../lib/logger.js";
 import { getEnv } from "../../lib/env.js";
 import { verifyElevenLabsSignature } from "../../lib/elevenLabsAuth.js";
-import { findCustomerByPhone, addEscalation } from "../../lib/store.js";
+import {
+  findCustomerByPhone,
+  addEscalation,
+  checkAvailability,
+  bookAppointment,
+  cancelAppointment,
+  rescheduleAppointment,
+} from "../../lib/store.js";
 import { triagePetCase } from "../../triage/triageDecision.js";
 
 export const toolsRoutes = new Hono();
@@ -107,4 +114,75 @@ toolsRoutes.post("/tools/triage-pet-case", async (c) => {
   );
 
   return c.json(result);
+});
+
+// POST /tools/check-availability
+const availabilitySchema = z.object({
+  date_iso: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Expected YYYY-MM-DD"),
+});
+
+toolsRoutes.post("/tools/check-availability", async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const parsed = availabilitySchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ result: "נדרש תאריך בפורמט YYYY-MM-DD." }, 400);
+  }
+
+  logger.info({ date: parsed.data.date_iso }, "tool: check-availability");
+  const result = await checkAvailability(parsed.data.date_iso);
+  return c.json({ result });
+});
+
+// POST /tools/book-appointment
+const bookSchema = z.object({
+  phone: z.string().min(5),
+  customer_name: z.string().min(1),
+  pet_name: z.string().min(1),
+  pet_species: z.string().min(1),
+  scheduled_at: z.string().min(1),
+  visit_type: z.enum(["checkup", "vaccination", "consultation", "urgent", "follow_up", "other"]),
+  reason: z.string().optional(),
+});
+
+toolsRoutes.post("/tools/book-appointment", async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const parsed = bookSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ result: "פרמטרים חסרים: phone, customer_name, pet_name, pet_species, scheduled_at, visit_type." }, 400);
+  }
+
+  logger.info({ phone: maskPhone(parsed.data.phone) }, "tool: book-appointment");
+  const result = await bookAppointment(parsed.data);
+  return c.json({ result });
+});
+
+// POST /tools/cancel-or-reschedule
+const cancelRescheduleSchema = z.object({
+  phone: z.string().min(5),
+  action: z.enum(["cancel", "reschedule"]),
+  current_scheduled_at: z.string().min(1),
+  new_scheduled_at: z.string().optional(),
+});
+
+toolsRoutes.post("/tools/cancel-or-reschedule", async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const parsed = cancelRescheduleSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ result: "פרמטרים חסרים: phone, action, current_scheduled_at." }, 400);
+  }
+
+  const { phone, action, current_scheduled_at, new_scheduled_at } = parsed.data;
+  logger.info({ phone: maskPhone(phone), action }, "tool: cancel-or-reschedule");
+
+  if (action === "cancel") {
+    const result = await cancelAppointment(phone, current_scheduled_at);
+    return c.json({ result });
+  }
+
+  if (!new_scheduled_at) {
+    return c.json({ result: "לביצוע הזזה נדרש גם new_scheduled_at." }, 400);
+  }
+
+  const result = await rescheduleAppointment(phone, current_scheduled_at, new_scheduled_at);
+  return c.json({ result });
 });

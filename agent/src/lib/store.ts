@@ -1,5 +1,14 @@
 import { getSupabase } from "./supabase.js";
 import { getEnv } from "./env.js";
+import {
+  getClinicHours,
+  getDayNameHe,
+  generateAllSlots,
+  filterFreeSlots,
+  formatSlotLabel,
+  formatDateHe,
+  toIso,
+} from "./appointments.js";
 
 export type Pet = { name: string; species: string };
 
@@ -67,6 +76,272 @@ export async function addEscalation(entry: EscalationEntry): Promise<void> {
     elevenlabs_conversation_id: entry.conversation_id ?? null,
   });
   if (error) throw new Error(`supabase escalation insert failed: ${error.message}`);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Appointments
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type AppointmentSlot = string; // ISO8601 with +03:00
+
+export async function checkAvailability(dateIso: string): Promise<string> {
+  const hours = getClinicHours(dateIso);
+  if (!hours) {
+    return "המרפאה סגורה בשבת. אפשר לקבוע תור ביום ראשון עד חמישי 08:00-20:00 או ביום שישי 08:30-13:00.";
+  }
+
+  const env = getEnv();
+  const dayStart = toIso(dateIso, 0, 0);
+  const dayEnd = toIso(dateIso, 23, 59);
+
+  const { data, error } = await getSupabase()
+    .from("appointments")
+    .select("scheduled_at")
+    .eq("clinic_id", env.AGENT_CLINIC_ID)
+    .in("status", ["scheduled", "confirmed"])
+    .is("deleted_at", null)
+    .gte("scheduled_at", dayStart)
+    .lte("scheduled_at", dayEnd);
+
+  if (error) throw new Error(`checkAvailability query failed: ${error.message}`);
+
+  const takenIsos = (data ?? []).map((r) => r.scheduled_at as string);
+  const allSlots = generateAllSlots(dateIso, hours);
+  const freeSlots = filterFreeSlots(allSlots, takenIsos);
+
+  if (freeSlots.length === 0) {
+    return `אין חלונות פנויים ב-${formatDateHe(dateIso)} (${getDayNameHe(dateIso)}). נסה תאריך אחר.`;
+  }
+
+  const labels = freeSlots.map(formatSlotLabel).join(", ");
+  return `חלונות פנויים ב-${formatDateHe(dateIso)} (יום ${getDayNameHe(dateIso)}): ${labels}`;
+}
+
+export type BookAppointmentParams = {
+  phone: string;
+  customer_name: string;
+  pet_name: string;
+  pet_species: string;
+  scheduled_at: string;
+  visit_type: "checkup" | "vaccination" | "consultation" | "urgent" | "follow_up" | "other";
+  reason?: string;
+};
+
+export async function bookAppointment(params: BookAppointmentParams): Promise<string> {
+  const env = getEnv();
+  const phone = normalisePhone(params.phone);
+
+  const { customerId } = await createOrFindCustomer(phone, params.customer_name);
+  const { petId } = await createOrFindPet(customerId, params.pet_name, params.pet_species);
+
+  const { data, error } = await getSupabase()
+    .from("appointments")
+    .insert({
+      clinic_id: env.AGENT_CLINIC_ID,
+      customer_id: customerId,
+      pet_id: petId,
+      appointment_type: params.visit_type,
+      status: "scheduled",
+      source: "phone",
+      scheduled_at: params.scheduled_at,
+      duration_minutes: 30,
+      reason: params.reason ?? null,
+    })
+    .select("id, scheduled_at")
+    .single();
+
+  if (error) {
+    // GIST overlap violation
+    if (error.code === "23P01" || error.message.includes("appointments_no_active_overlap")) {
+      return "השעה הזו כבר תפוסה. בחר/י שעה אחרת מהחלונות הפנויים.";
+    }
+    throw new Error(`bookAppointment failed: ${error.message}`);
+  }
+
+  const slotLabel = formatSlotLabel(data.scheduled_at as string);
+  const dateLabel = (data.scheduled_at as string).slice(0, 10);
+  return (
+    `✅ תור נקבע: ${formatDateHe(dateLabel)} בשעה ${slotLabel} ` +
+    `עבור ${params.pet_name}. אשלח תזכורת SMS 24 שעות לפני.`
+  );
+}
+
+export async function cancelAppointment(phone: string, scheduledAt: string): Promise<string> {
+  const env = getEnv();
+  const normalised = normalisePhone(phone);
+
+  const customerRow = await findCustomerByPhone(normalised);
+  if (!customerRow) return "לא מצאנו לקוח עם מספר הטלפון הזה.";
+
+  const { data: customerData } = await getSupabase()
+    .from("customers")
+    .select("id")
+    .eq("clinic_id", env.AGENT_CLINIC_ID)
+    .eq("phone", normalised)
+    .is("deleted_at", null)
+    .single();
+
+  if (!customerData) return "לא מצאנו לקוח עם מספר הטלפון הזה.";
+
+  // Find appointment within ±2 minutes of given time
+  const target = new Date(scheduledAt);
+  const rangeStart = new Date(target.getTime() - 2 * 60 * 1000).toISOString();
+  const rangeEnd = new Date(target.getTime() + 2 * 60 * 1000).toISOString();
+
+  const { data: appts, error: findErr } = await getSupabase()
+    .from("appointments")
+    .select("id, scheduled_at")
+    .eq("clinic_id", env.AGENT_CLINIC_ID)
+    .eq("customer_id", (customerData as { id: string }).id)
+    .in("status", ["scheduled", "confirmed"])
+    .is("deleted_at", null)
+    .gte("scheduled_at", rangeStart)
+    .lte("scheduled_at", rangeEnd)
+    .limit(1);
+
+  if (findErr) throw new Error(`cancelAppointment query failed: ${findErr.message}`);
+  if (!appts || appts.length === 0) {
+    return "לא מצאנו תור פעיל בשעה הזו. ייתכן שכבר בוטל.";
+  }
+
+  const appt = appts[0] as { id: string; scheduled_at: string };
+  const slotLabel = formatSlotLabel(appt.scheduled_at);
+
+  const { error: cancelErr } = await getSupabase()
+    .from("appointments")
+    .update({ status: "cancelled", cancelled_at: new Date().toISOString() })
+    .eq("id", appt.id);
+
+  if (cancelErr) throw new Error(`cancelAppointment update failed: ${cancelErr.message}`);
+
+  return `✅ התור בשעה ${slotLabel} בוטל בהצלחה.`;
+}
+
+export async function rescheduleAppointment(
+  phone: string,
+  currentScheduledAt: string,
+  newScheduledAt: string,
+): Promise<string> {
+  const env = getEnv();
+  const normalised = normalisePhone(phone);
+
+  const { data: customerData } = await getSupabase()
+    .from("customers")
+    .select("id")
+    .eq("clinic_id", env.AGENT_CLINIC_ID)
+    .eq("phone", normalised)
+    .is("deleted_at", null)
+    .single();
+
+  if (!customerData) return "לא מצאנו לקוח עם מספר הטלפון הזה.";
+
+  const customerId = (customerData as { id: string }).id;
+
+  const target = new Date(currentScheduledAt);
+  const rangeStart = new Date(target.getTime() - 2 * 60 * 1000).toISOString();
+  const rangeEnd = new Date(target.getTime() + 2 * 60 * 1000).toISOString();
+
+  const { data: appts, error: findErr } = await getSupabase()
+    .from("appointments")
+    .select("id, scheduled_at")
+    .eq("clinic_id", env.AGENT_CLINIC_ID)
+    .eq("customer_id", customerId)
+    .in("status", ["scheduled", "confirmed"])
+    .is("deleted_at", null)
+    .gte("scheduled_at", rangeStart)
+    .lte("scheduled_at", rangeEnd)
+    .limit(1);
+
+  if (findErr) throw new Error(`rescheduleAppointment find failed: ${findErr.message}`);
+  if (!appts || appts.length === 0) {
+    return "לא מצאנו תור פעיל בשעה הזו. ייתכן שכבר בוטל.";
+  }
+
+  const oldAppt = appts[0] as { id: string; scheduled_at: string };
+
+  const { error: rpcErr, data: newId } = await getSupabase().rpc("reschedule_appointment", {
+    p_clinic_id: env.AGENT_CLINIC_ID,
+    p_old_appointment_id: oldAppt.id,
+    p_new_scheduled_at: newScheduledAt,
+    p_duration_minutes: 30,
+  });
+
+  if (rpcErr) {
+    if (rpcErr.message.includes("appointments_no_active_overlap") || rpcErr.code === "23P01") {
+      return "השעה החדשה כבר תפוסה. בחר/י שעה אחרת.";
+    }
+    throw new Error(`rescheduleAppointment rpc failed: ${rpcErr.message}`);
+  }
+
+  const oldLabel = formatSlotLabel(oldAppt.scheduled_at);
+  const newLabel = formatSlotLabel(newScheduledAt);
+  const newDate = newScheduledAt.slice(0, 10);
+  return `✅ התור הוזז בהצלחה מ-${oldLabel} ל-${formatDateHe(newDate)} בשעה ${newLabel}.`;
+}
+
+async function createOrFindCustomer(
+  phone: string,
+  name: string,
+): Promise<{ customerId: string }> {
+  const env = getEnv();
+
+  const { data: existing } = await getSupabase()
+    .from("customers")
+    .select("id")
+    .eq("clinic_id", env.AGENT_CLINIC_ID)
+    .eq("phone", phone)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (existing) return { customerId: (existing as { id: string }).id };
+
+  const { data: inserted, error } = await getSupabase()
+    .from("customers")
+    .insert({
+      clinic_id: env.AGENT_CLINIC_ID,
+      full_name: name,
+      phone,
+      status: "active",
+    })
+    .select("id")
+    .single();
+
+  if (error) throw new Error(`createOrFindCustomer failed: ${error.message}`);
+  return { customerId: (inserted as { id: string }).id };
+}
+
+async function createOrFindPet(
+  customerId: string,
+  petName: string,
+  species: string,
+): Promise<{ petId: string }> {
+  const env = getEnv();
+
+  const { data: existing } = await getSupabase()
+    .from("pets")
+    .select("id")
+    .eq("clinic_id", env.AGENT_CLINIC_ID)
+    .eq("customer_id", customerId)
+    .ilike("name", petName)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (existing) return { petId: (existing as { id: string }).id };
+
+  const { data: inserted, error } = await getSupabase()
+    .from("pets")
+    .insert({
+      clinic_id: env.AGENT_CLINIC_ID,
+      customer_id: customerId,
+      name: petName,
+      species,
+      status: "active",
+    })
+    .select("id")
+    .single();
+
+  if (error) throw new Error(`createOrFindPet failed: ${error.message}`);
+  return { petId: (inserted as { id: string }).id };
 }
 
 export async function saveVoiceCall(
