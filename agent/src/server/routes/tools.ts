@@ -42,7 +42,8 @@ toolsRoutes.post("/tools/lookup-customer", async (c) => {
 
   const petList = customer.pets.map((p) => p.name).join(", ");
   return c.json({
-    result: `שם: ${customer.full_name}, חיות: ${petList}, ביקור אחרון: ${customer.last_visit ?? "לא ידוע"}`,
+    // TODO: add last_visit once it is derived from the appointments table
+    result: `שם: ${customer.full_name}, חיות: ${petList}`,
   });
 });
 

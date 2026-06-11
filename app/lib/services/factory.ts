@@ -23,7 +23,6 @@ import { PetService } from "@/lib/services/pet.service";
 import { VisitService } from "@/lib/services/visit.service";
 import { VisitSummaryAssistantService } from "@/lib/services/visit-summary-assistant.service";
 import { VoiceCallService } from "@/lib/services/voice-call.service";
-import { TwilioVoiceWebhookService } from "@/lib/services/twilio-voice-webhook.service";
 import { VoiceCallRepository } from "@/lib/repositories/voice-call.repository";
 
 export async function createServices() {
@@ -82,25 +81,6 @@ export async function createServices() {
       new AIEventService(aiEventRepository),
     ),
     voiceCall: new VoiceCallService(voiceCallRepository),
-  };
-}
-
-export function createAdminVoiceServices() {
-  const admin = createSupabaseAdminClient();
-  const auditLogRepository = new AuditLogRepository(admin);
-  const aiEventRepository = new AIEventRepository(admin);
-  const auditService = new AuditService(auditLogRepository);
-  const aiEventService = new AIEventService(aiEventRepository);
-
-  return {
-    audit: auditService,
-    aiEvent: aiEventService,
-    twilioVoiceWebhook: new TwilioVoiceWebhookService(
-      new VoiceCallRepository(admin),
-      new CustomerRepository(admin),
-      auditService,
-      aiEventService,
-    ),
   };
 }
 
