@@ -98,7 +98,13 @@ async function fetchAndStoreRecording(
     return;
   }
 
-  const audioBuffer = await audioRes.arrayBuffer();
+  let audioBuffer: ArrayBuffer;
+  try {
+    audioBuffer = await audioRes.arrayBuffer();
+  } catch (err) {
+    logger.warn({ conversationId, err }, "hook: failed to read audio response body");
+    return;
+  }
   const storagePath = `${clinicId}/${conversationId}.mp3`;
 
   const { error } = await getSupabase()

@@ -527,7 +527,11 @@ export async function saveVoiceCall(
 
   if (enrichment.transcript !== undefined)            row["transcript"]              = enrichment.transcript;
   if (enrichment.aiSummary !== undefined)             row["ai_summary"]              = enrichment.aiSummary;
-  if (enrichment.callCategory !== undefined)          row["call_category"]           = enrichment.callCategory;
+  if (enrichment.callCategory !== undefined) {
+    const validCategories = new Set(["operation", "information"]);
+    const cat = enrichment.callCategory;
+    row["call_category"] = cat !== null && validCategories.has(cat) ? cat : null;
+  }
   if (enrichment.recordingStoragePath !== undefined)  row["recording_storage_path"]  = enrichment.recordingStoragePath;
 
   const { error } = await getSupabase()

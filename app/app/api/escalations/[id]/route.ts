@@ -25,6 +25,7 @@ export async function PATCH(
     }
 
     const { id } = await params;
+    if (!id) throw AppError.validation("Missing escalation id");
     const body = resolveSchema.parse(await request.json());
     const result = await escalation.resolve(id, body.notes, actor.userId);
     if (!result.ok) return handleRouteError(result.error, requestId);
