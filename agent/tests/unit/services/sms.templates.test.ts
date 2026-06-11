@@ -4,6 +4,7 @@ import {
   formatAppointmentDateTime,
   CLINIC_LOCATION,
   HOME_VISIT_LOCATION,
+  type BookingConfirmationData,
 } from "../../../src/services/sms.templates.js";
 
 const SAMPLE_CLINIC: Parameters<typeof smsTemplates.booking_confirmation>[0] = {
@@ -89,6 +90,41 @@ describe("smsTemplates snapshots", () => {
       נשמח לתאם מועד חדש — חייגו אלינו ונמצא זמן שנוח לכם.
       מתנצלים על אי הנוחות 🙏 תומר, Get A Vet"
     `);
+  });
+
+  it("client_cancellation_confirmation", () => {
+    expect(
+      smsTemplates.client_cancellation_confirmation({ customerName: "שרה לוי", petName: "ביסלי", oldDate: "17.6.2026" }),
+    ).toMatchInlineSnapshot(`
+      "שלום שרה לוי, מאשרים: התור של ביסלי מיום 17.6.2026 בוטל לבקשתכם.
+      נשמח לראותכם שוב — לקביעת תור חדש חייגו אלינו בכל עת.
+      תומר, Get A Vet 🐾"
+    `);
+  });
+});
+
+describe("requireFields runtime guard", () => {
+  it("booking_confirmation throws when required fields are missing", () => {
+    // Missing dayName, date, time, location, visitType, price — TypeScript would catch at compile time,
+    // but the runtime guard protects against unsafe casts (e.g. from dynamic data).
+    expect(() =>
+      smsTemplates.booking_confirmation({
+        customerName: "שרה",
+        petName: "ביסלי",
+      } as BookingConfirmationData),
+    ).toThrow("booking_confirmation: missing required fields");
+  });
+
+  it("reschedule_update throws when oldDate is missing", () => {
+    expect(() =>
+      smsTemplates.reschedule_update({
+        customerName: "שרה",
+        petName: "ביסלי",
+        newDate: "19.6.2026",
+        newTime: "11:00",
+        location: CLINIC_LOCATION,
+      } as any),
+    ).toThrow("reschedule_update: missing required fields: oldDate");
   });
 });
 
