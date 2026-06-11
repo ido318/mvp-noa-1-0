@@ -7,6 +7,8 @@ import {
   enqueueNotification,
   scheduleBookingNotifications,
   cancelFutureNotifications,
+  enqueueRescheduleNotification,
+  enqueueClientCancellationConfirmation,
 } from "../../../src/lib/notifications.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -186,13 +188,127 @@ describe("enqueueNotification", () => {
 
 describe("cancelFutureNotifications", () => {
   it("calls update with status=skipped for the given appointment", async () => {
-    // The chain: from().update().eq().eq().eq()
     const mockChain = { eq: vi.fn().mockReturnThis() };
     mockChain.eq.mockReturnValue(mockChain);
-    // Last .eq() returns { error: null }
-    mockChain.eq.mockReturnValueOnce(mockChain).mockReturnValueOnce(mockChain).mockReturnValueOnce({ error: null });
+    mockChain.eq
+      .mockReturnValueOnce(mockChain)
+      .mockReturnValueOnce(mockChain)
+      .mockReturnValueOnce({ error: null });
     mockFrom.mockReturnValue({ update: vi.fn().mockReturnValue(mockChain) });
 
     await expect(cancelFutureNotifications("appt-1", "clinic-1")).resolves.toBeUndefined();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// scheduleBookingNotifications — enqueues 3 rows
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("scheduleBookingNotifications", () => {
+  it("enqueues booking_confirmation, morning_reminder, and post_visit_followup", async () => {
+    await scheduleBookingNotifications({
+      appointmentId:   "appt-1",
+      scheduledAt:     "2026-07-20T08:00:00+03:00", // 08:00 Jerusalem (summer)
+      durationMinutes: 40,
+      visitType:       "checkup",
+      clinicId:        "clinic-1",
+      customerId:      "cust-1",
+      phone:           "+972501234567",
+      customerName:    "שרה",
+      petName:         "ביסלי",
+    });
+
+    // upsert called 3 times (one per notification type)
+    expect(mockUpsert).toHaveBeenCalledTimes(3);
+
+    const types = mockUpsert.mock.calls.map(
+      (call) => (call[0] as { type: string }).type,
+    );
+    expect(types).toContain("booking_confirmation");
+    expect(types).toContain("morning_reminder");
+    expect(types).toContain("post_visit_followup");
+  });
+
+  it("skips morning_reminder when appointment time is in the past (morning already passed)", async () => {
+    // Appointment was yesterday — morning_reminder time would be in the past
+    await scheduleBookingNotifications({
+      appointmentId:   "appt-2",
+      scheduledAt:     "2026-06-10T08:00:00+03:00", // past date
+      durationMinutes: 40,
+      visitType:       "checkup",
+      clinicId:        "clinic-1",
+      customerId:      "cust-1",
+      phone:           "+972501234567",
+      customerName:    "שרה",
+      petName:         "ביסלי",
+    });
+
+    const types = mockUpsert.mock.calls.map(
+      (call) => (call[0] as { type: string }).type,
+    );
+    expect(types).not.toContain("morning_reminder");
+    expect(types).toContain("booking_confirmation");
+    expect(types).toContain("post_visit_followup");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// enqueueRescheduleNotification
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("enqueueRescheduleNotification", () => {
+  it("enqueues reschedule_update with correct wording (not 'client cancellation')", async () => {
+    // cancelFutureNotifications chain
+    const mockChain = { eq: vi.fn().mockReturnThis() };
+    mockChain.eq.mockReturnValueOnce(mockChain).mockReturnValueOnce(mockChain).mockReturnValueOnce({ error: null });
+    mockFrom.mockReturnValue({ update: vi.fn().mockReturnValue(mockChain), upsert: mockUpsert });
+
+    await enqueueRescheduleNotification({
+      appointmentId:   "appt-1",
+      oldScheduledAt:  "2026-07-17T07:00:00Z",
+      newScheduledAt:  "2026-07-18T08:00:00Z",
+      durationMinutes: 40,
+      visitType:       "checkup",
+      clinicId:        "clinic-1",
+      customerId:      "cust-1",
+      phone:           "+972501234567",
+      customerName:    "שרה",
+      petName:         "ביסלי",
+    });
+
+    expect(mockUpsert).toHaveBeenCalledOnce();
+    const call = mockUpsert.mock.calls[0]![0] as { type: string; body: string };
+    expect(call.type).toBe("reschedule_update");
+    expect(call.body).toContain("עודכן");
+    expect(call.body).not.toContain("בוטל לבקשתכם");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// enqueueClientCancellationConfirmation — correct template, not cancellation_update
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("enqueueClientCancellationConfirmation", () => {
+  it("sends client_cancellation_confirmation (client-requested wording, not 'אילוץ רפואי')", async () => {
+    const mockChain = { eq: vi.fn().mockReturnThis() };
+    mockChain.eq.mockReturnValueOnce(mockChain).mockReturnValueOnce(mockChain).mockReturnValueOnce({ error: null });
+    mockFrom.mockReturnValue({ update: vi.fn().mockReturnValue(mockChain), upsert: mockUpsert });
+
+    await enqueueClientCancellationConfirmation({
+      appointmentId: "appt-1",
+      scheduledAt:   "2026-07-17T07:00:00Z",
+      clinicId:      "clinic-1",
+      customerId:    "cust-1",
+      phone:         "+972501234567",
+      customerName:  "שרה",
+      petName:       "ביסלי",
+    });
+
+    expect(mockUpsert).toHaveBeenCalledOnce();
+    const call = mockUpsert.mock.calls[0]![0] as { type: string; body: string };
+    expect(call.type).toBe("client_cancellation_confirmation");
+    // Uses client-requested wording, NOT the "אילוץ רפואי" dashboard wording
+    expect(call.body).toContain("בוטל לבקשתכם");
+    expect(call.body).not.toContain("אילוץ רפואי");
   });
 });

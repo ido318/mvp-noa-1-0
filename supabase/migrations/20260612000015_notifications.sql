@@ -33,7 +33,7 @@ CREATE TABLE public.notifications_log (
                                     'client_cancellation_confirmation'
                                   )),
   status              text        NOT NULL DEFAULT 'pending'
-                                  CHECK (status IN ('pending', 'sent', 'failed', 'skipped')),
+                                  CHECK (status IN ('pending', 'processing', 'sent', 'failed', 'skipped')),
   scheduled_for       timestamptz NOT NULL,
   sent_at             timestamptz,
   body                text        NOT NULL,

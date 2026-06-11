@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { processNotifications } from "../../../src/services/notification.processor.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -15,13 +15,18 @@ vi.mock("../../../src/lib/sms.service.js", () => ({
   sendSms: vi.fn().mockResolvedValue({ sid: "SM_test" }),
 }));
 
-vi.mock("../../../src/lib/notifications.js", () => ({
-  isQuietHours:     vi.fn().mockReturnValue(false),
-  nextSendableTime: vi.fn().mockReturnValue(new Date("2026-06-17T05:00:00Z")),
-}));
+// Use real implementations so DST tests exercise actual Intl logic
+vi.mock("../../../src/lib/notifications.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../src/lib/notifications.js")>();
+  return {
+    ...actual,
+    isQuietHours:     vi.fn(actual.isQuietHours),
+    nextSendableTime: vi.fn(actual.nextSendableTime),
+  };
+});
 
 import { sendSms } from "../../../src/lib/sms.service.js";
-import { isQuietHours } from "../../../src/lib/notifications.js";
+import { isQuietHours, nextSendableTime } from "../../../src/lib/notifications.js";
 
 function makeRow(overrides: Partial<{
   id: string; phone: string; body: string; type: string;
@@ -59,6 +64,10 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(isQuietHours).mockReturnValue(false);
   vi.mocked(sendSms).mockResolvedValue({ sid: "SM_test" });
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -153,3 +162,85 @@ describe("processNotifications", () => {
     expect(result.processed).toBe(0);
   });
 });
+
+// ── DST correctness: quiet-hours deferral target is nextSendableTime() ──────
+// Full DST correctness (morningReminderTime / nextSendableTime) is tested in
+// notifications.test.ts. Here we only verify the processor passes the result
+// through unchanged to scheduled_for.
+
+describe("quiet-hours deferral — deferred target comes from nextSendableTime", () => {
+  it("uses the value returned by nextSendableTime as scheduled_for", async () => {
+    vi.mocked(isQuietHours).mockReturnValue(true);
+    const target = new Date("2026-07-16T05:00:00Z"); // 08:00 Jerusalem July (UTC+3)
+    vi.mocked(nextSendableTime).mockReturnValue(target);
+
+    let capturedScheduledFor: string | null = null;
+    mockFrom.mockReturnValue({
+      update: vi.fn((fields: Record<string, string>) => {
+        if (fields.scheduled_for) capturedScheduledFor = fields.scheduled_for;
+        return chainOf({ data: [{ id: "n-1" }], error: null });
+      }),
+    } as any);
+
+    await processNotifications();
+
+    expect(capturedScheduledFor).toBe(target.toISOString());
+  });
+
+  it("January: nextSendableTime returns 06:00 UTC → that is what gets stored", async () => {
+    vi.mocked(isQuietHours).mockReturnValue(true);
+    const target = new Date("2026-01-16T06:00:00Z"); // 08:00 Jerusalem Jan (UTC+2)
+    vi.mocked(nextSendableTime).mockReturnValue(target);
+
+    let capturedScheduledFor: string | null = null;
+    mockFrom.mockReturnValue({
+      update: vi.fn((fields: Record<string, string>) => {
+        if (fields.scheduled_for) capturedScheduledFor = fields.scheduled_for;
+        return chainOf({ data: [{ id: "n-1" }], error: null });
+      }),
+    } as any);
+
+    await processNotifications();
+
+    expect(capturedScheduledFor).toBe("2026-01-16T06:00:00.000Z");
+  });
+});
+
+// ── Stuck-row recovery ────────────────────────────────────────────────────────
+
+describe("stuck-row recovery", () => {
+  it("resets rows stuck in 'processing' older than 5 min back to pending", async () => {
+    vi.useFakeTimers({ now: new Date("2026-06-12T10:00:00Z") });
+
+    let recoveryUpdate: Record<string, unknown> | null = null;
+    let recoveryLtThreshold: string | null = null;
+
+    mockFrom.mockReturnValue({
+      update: vi.fn((fields: Record<string, unknown>) => {
+        const b: Record<string, unknown> = {};
+        const self = () => b;
+        b.eq = vi.fn(self);
+        b.lt = vi.fn((_col: string, val: string) => {
+          recoveryLtThreshold = val;
+          return chainOf({ error: null });
+        });
+        b.lte    = vi.fn(self);
+        b.select = vi.fn(self);
+        b.returns = vi.fn(() => Promise.resolve({ data: [], error: null }));
+        (b as unknown as Promise<unknown>).then = (res: (v: unknown) => unknown) =>
+          Promise.resolve({ data: [], error: null }).then(res);
+        if (fields.status === "pending") recoveryUpdate = fields;
+        return b;
+      }),
+    } as any);
+
+    await processNotifications();
+
+    expect(recoveryUpdate).not.toBeNull();
+    expect(recoveryUpdate?.status).toBe("pending");
+
+    // Threshold should be now − 5 minutes = 09:55 UTC
+    expect(recoveryLtThreshold).toBe("2026-06-12T09:55:00.000Z");
+  });
+});
+

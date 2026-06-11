@@ -25,7 +25,7 @@ type NotificationRow = {
 };
 
 // Rows stuck in 'processing' for longer than this are considered crashed and reset.
-const PROCESSING_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
+const PROCESSING_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
 
 export async function processNotifications(opts: ProcessOptions = {}): Promise<ProcessResult> {
   const result: ProcessResult = { processed: 0, sent: 0, failed: 0, deferred: 0 };
@@ -85,20 +85,20 @@ export async function processNotifications(opts: ProcessOptions = {}): Promise<P
   for (const row of rows) {
     result.processed++;
     try {
-      await sendSms(row.phone, row.body);
+      const { sid } = await sendSms(row.phone, row.body);
 
       const { error: sentErr } = await getSupabase()
         .from("notifications_log")
-        .update({ status: "sent", sent_at: nowIso, updated_at: nowIso })
+        .update({ status: "sent", sent_at: nowIso, twilio_message_sid: sid, updated_at: nowIso })
         .eq("id", row.id);
 
       if (sentErr) {
-        // SMS was delivered but we failed to record it. The 10-min recovery
+        // SMS was delivered but we failed to record it. The 5-min recovery
         // will reset this row to 'pending', risking a duplicate send. Log at
         // error level so on-call can investigate.
         logger.error(
           { id: row.id, error: sentErr.message },
-          "SMS delivered but status update to 'sent' failed — row will recover in 10 min",
+          "SMS delivered but status update to 'sent' failed — row will recover in 5 min",
         );
       }
       result.sent++;
@@ -114,7 +114,7 @@ export async function processNotifications(opts: ProcessOptions = {}): Promise<P
       if (failedErr) {
         logger.error(
           { id: row.id, error: failedErr.message },
-          "SMS failed but status update to 'failed' failed — row will recover in 10 min",
+          "SMS failed but status update to 'failed' failed — row will recover in 5 min",
         );
       }
       result.failed++;

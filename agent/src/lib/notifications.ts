@@ -231,6 +231,49 @@ export type ClientCancellationParams = {
   petName: string;
 };
 
+export type RescheduleNotificationParams = {
+  appointmentId: string;
+  oldScheduledAt: string;
+  newScheduledAt: string;
+  durationMinutes: number;
+  visitType: VisitType;
+  clinicId: string;
+  customerId: string;
+  phone: string;
+  customerName: string;
+  petName: string;
+};
+
+/**
+ * Used when the dashboard reschedules an appointment via TypeScript code
+ * (complementary to the DB trigger, which fires the same SQL path).
+ * ON CONFLICT DO NOTHING ensures the trigger's row wins if it lands first.
+ */
+export async function enqueueRescheduleNotification(
+  p: RescheduleNotificationParams,
+): Promise<void> {
+  const { date: oldDate } = formatAppointmentDateTime(p.oldScheduledAt);
+  const { date: newDate, time: newTime } = formatAppointmentDateTime(p.newScheduledAt);
+  const location = p.visitType === "home_visit" ? HOME_VISIT_LOCATION : CLINIC_LOCATION;
+
+  await enqueueNotification({
+    clinicId:      p.clinicId,
+    customerId:    p.customerId,
+    appointmentId: p.appointmentId,
+    phone:         p.phone,
+    type:          "reschedule_update",
+    body:          smsTemplates.reschedule_update({
+      customerName: p.customerName,
+      petName:      p.petName,
+      oldDate,
+      newDate,
+      newTime,
+      location,
+    }),
+    scheduledFor: new Date(),
+  });
+}
+
 /** Cancel future notifications and enqueue client_cancellation_confirmation immediately. */
 export async function enqueueClientCancellationConfirmation(
   p: ClientCancellationParams,
