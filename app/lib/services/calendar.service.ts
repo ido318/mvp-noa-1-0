@@ -1,27 +1,24 @@
 import { ok, type Result } from "@/lib/errors/app-error";
+import {
+  CLINIC_TIMEZONE,
+  effectiveDuration,
+  getClinicHoursForDate,
+  toIsraelLocalIso,
+} from "@/lib/appointment-rules";
 import type { AppointmentRepository } from "@/lib/repositories/appointment.repository";
 import type { ServiceActor } from "@/lib/services/service-context";
 import type { Appointment } from "@/types/domain/appointment";
+import type { AppointmentType } from "@/types/domain/appointment";
 import type { CalendarAvailabilityResponse } from "@/types/api/appointments";
 
 function dayBounds(date: string): { startIso: string; endIso: string } {
-  // For Phase 3 we keep timezone handling simple and deterministic at UTC boundaries.
-  // Business hours are interpreted in clinic local timezone in service logic below.
-  const start = new Date(`${date}T00:00:00.000Z`);
-  const end = new Date(`${date}T23:59:59.999Z`);
+  const start = new Date(toIsraelLocalIso(date, "00:00"));
+  const end = new Date(toIsraelLocalIso(date, "23:59"));
   return { startIso: start.toISOString(), endIso: end.toISOString() };
 }
 
-function getWorkingHoursForDay(date: Date): { open: string; close: string } | null {
-  // 0=Sun, 1=Mon, ... 6=Sat (Phase 3 temporary business config)
-  const weekday = date.getUTCDay();
-  if (weekday >= 0 && weekday <= 4) return { open: "09:00", close: "18:00" };
-  if (weekday === 5) return { open: "09:00", close: "13:00" };
-  return null;
-}
-
 function combineDateAndClock(date: string, hhmm: string): Date {
-  return new Date(`${date}T${hhmm}:00.000Z`);
+  return new Date(toIsraelLocalIso(date, hhmm));
 }
 
 export class CalendarService {
@@ -45,7 +42,7 @@ export class CalendarService {
     clinicId: string,
     weekStartDate: string,
   ): Promise<Result<Appointment[]>> {
-    const from = new Date(`${weekStartDate}T00:00:00.000Z`);
+    const from = new Date(toIsraelLocalIso(weekStartDate, "00:00"));
     const to = new Date(from.getTime() + 7 * 24 * 60 * 60 * 1000);
     return this.appointmentRepository.list({
       clinicIds: actor.clinicIds.filter((id) => id === clinicId),
@@ -58,15 +55,16 @@ export class CalendarService {
     actor: ServiceActor,
     clinicId: string,
     date: string,
-    timezone = "Asia/Jerusalem",
+    timezone = CLINIC_TIMEZONE,
+    visitType: AppointmentType = "checkup",
   ): Promise<Result<CalendarAvailabilityResponse>> {
-    const dayDate = new Date(`${date}T00:00:00.000Z`);
-    const workingHours = getWorkingHoursForDay(dayDate);
+    const workingHours = getClinicHoursForDate(date);
+    const slotMinutes = effectiveDuration(visitType);
     if (!workingHours) {
       return ok({
         clinicId,
         date,
-        slotMinutes: 30,
+        slotMinutes,
         timezone,
         availableSlots: [],
       });
@@ -84,17 +82,20 @@ export class CalendarService {
     if (!appointmentsResult.ok) return appointmentsResult;
 
     const active = appointmentsResult.value.filter(
-      (row) => row.status === "scheduled" || row.status === "confirmed",
+      (row) =>
+        row.status === "scheduled" ||
+        row.status === "confirmed" ||
+        row.status === "pending_approval",
     );
 
     const slots: string[] = [];
     for (
       let cursor = openAt.getTime();
-      cursor + 30 * 60_000 <= closeAt.getTime();
-      cursor += 30 * 60_000
+      cursor + slotMinutes * 60_000 <= closeAt.getTime();
+      cursor += 10 * 60_000
     ) {
       const slotStart = cursor;
-      const slotEnd = cursor + 30 * 60_000;
+      const slotEnd = cursor + slotMinutes * 60_000;
       const overlaps = active.some((appointment) => {
         const start = new Date(appointment.scheduledAt).getTime();
         const end = start + appointment.durationMinutes * 60_000;
@@ -106,7 +107,7 @@ export class CalendarService {
     return ok({
       clinicId,
       date,
-      slotMinutes: 30,
+      slotMinutes,
       timezone,
       availableSlots: slots,
     });

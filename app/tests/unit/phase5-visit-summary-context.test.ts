@@ -88,7 +88,8 @@ describe("phase5 visit summary context", () => {
     const truncated = truncateNotes(notes);
     const total = truncated.reduce((sum, n) => sum + n.content.length, 0);
     expect(total).toBeLessThanOrEqual(4000);
-    expect(truncated[0].content.length).toBeLessThanOrEqual(2000);
+    expect(truncated[0]).toBeDefined();
+    expect(truncated[0]!.content.length).toBeLessThanOrEqual(2000);
   });
 
   it("buildVisitSummaryContext includes visit and pet", () => {

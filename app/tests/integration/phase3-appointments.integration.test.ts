@@ -1,4 +1,3 @@
-import { createClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { AppointmentRepository } from "@/lib/repositories/appointment.repository";
 import { AuditLogRepository } from "@/lib/repositories/audit-log.repository";
@@ -7,6 +6,10 @@ import { PetRepository } from "@/lib/repositories/pet.repository";
 import { AppointmentService } from "@/lib/services/appointment.service";
 import { AuditService } from "@/lib/services/audit.service";
 import type { ServiceActor } from "@/lib/services/service-context";
+import {
+  createTestSupabaseClient,
+  type TestSupabaseClient,
+} from "@/tests/support/supabase-test-client";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -21,9 +24,9 @@ const clinic1 = "00000000-0000-4000-8000-000000000001";
 const clinic2 = "00000000-0000-4000-8000-000000000002";
 
 describe.runIf(runIntegration)("phase3 appointments + calendar constraints", () => {
-  let ownerClient: ReturnType<typeof createClient>;
-  let otherClient: ReturnType<typeof createClient>;
-  let adminClient: ReturnType<typeof createClient>;
+  let ownerClient: TestSupabaseClient;
+  let otherClient: TestSupabaseClient;
+  let adminClient: TestSupabaseClient;
   let ownerUserId = "";
   let otherUserId = "";
   let actor: ServiceActor;
@@ -32,15 +35,9 @@ describe.runIf(runIntegration)("phase3 appointments + calendar constraints", () 
   const createdAppointmentIds: string[] = [];
 
   beforeAll(async () => {
-    adminClient = createClient(supabaseUrl!, serviceRoleKey!, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
-    ownerClient = createClient(supabaseUrl!, anonKey!, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
-    otherClient = createClient(supabaseUrl!, anonKey!, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
+    adminClient = createTestSupabaseClient(supabaseUrl!, serviceRoleKey!);
+    ownerClient = createTestSupabaseClient(supabaseUrl!, anonKey!);
+    otherClient = createTestSupabaseClient(supabaseUrl!, anonKey!);
 
     const ownerLogin = await ownerClient.auth.signInWithPassword({
       email: ownerEmail,

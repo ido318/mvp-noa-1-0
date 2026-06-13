@@ -6,10 +6,14 @@ import type {
   AppointmentSource,
   AppointmentType,
 } from "@/types/domain/appointment";
+import { effectiveDuration, VISIT_TYPE_CONFIG } from "@/lib/appointment-rules";
 
 const APPOINTMENT_TYPES: AppointmentType[] = [
   "checkup",
+  "home_visit",
   "vaccination",
+  "phone_consultation",
+  "neutering",
   "consultation",
   "urgent",
   "follow_up",
@@ -56,7 +60,7 @@ export function AppointmentForm({ clinicId, customerId, petId }: Props) {
         appointmentType,
         source,
         scheduledAt: new Date(scheduledAt).toISOString(),
-        durationMinutes: 30,
+        durationMinutes: effectiveDuration(appointmentType),
         reason: reason || null,
         notes: notes || null,
       }),
@@ -102,7 +106,7 @@ export function AppointmentForm({ clinicId, customerId, petId }: Props) {
         >
           {APPOINTMENT_TYPES.map((value) => (
             <option key={value} value={value}>
-              {value}
+              {VISIT_TYPE_CONFIG[value].labelHe}
             </option>
           ))}
         </select>

@@ -9,6 +9,7 @@ import {
   isTooLateToCancel,
   effectiveDuration,
   VISIT_TYPE_CONFIG,
+  toIso,
 } from "../../../src/lib/appointments.js";
 
 // Reference dates (verified):
@@ -103,10 +104,33 @@ const WEEKDAY_HOURS = { start: { h: 8, m: 0 }, end: { h: 20, m: 0 } };
 const FRIDAY_HOURS  = { start: { h: 8, m: 30 }, end: { h: 13, m: 0 } };
 
 describe("generateSlotsForVisitType — checkup (effective 40 min)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("ללא תורים תפוסים — מחזיר עד 6 slots", () => {
     const slots = generateSlotsForVisitType("2026-06-14", WEEKDAY_HOURS, "checkup", []);
     expect(slots.length).toBe(6);
     expect(formatSlotLabel(slots[0]!)).toBe("08:00");
+  });
+
+  it("מציג חלונות פרוסים לאורך היום ולא רק 08:00-08:50", () => {
+    const slots = generateSlotsForVisitType("2026-06-14", WEEKDAY_HOURS, "checkup", []);
+    expect(slots.map(formatSlotLabel)).toEqual([
+      "08:00",
+      "10:10",
+      "12:20",
+      "14:30",
+      "16:40",
+      "18:50",
+    ]);
+  });
+
+  it("להיום — לא מציע שעות שכבר עברו", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-14T06:05:00Z")); // 09:05 Asia/Jerusalem
+    const slots = generateSlotsForVisitType("2026-06-14", WEEKDAY_HOURS, "checkup", []);
+    expect(formatSlotLabel(slots[0]!)).toBe("09:10");
   });
 
   it("slot ראשון תפוס — מחזיר מ-08:10", () => {
@@ -182,6 +206,20 @@ describe("isWithin14Days", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-06-11T10:00:00Z"));
     expect(isWithin14Days("2026-06-10")).toBe(false);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Israel timezone / DST
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("Israel timezone", () => {
+  it("uses +03:00 during Israeli daylight saving time", () => {
+    expect(toIso("2026-06-14", 8, 0)).toBe("2026-06-14T08:00:00+03:00");
+  });
+
+  it("uses +02:00 during Israeli winter time", () => {
+    expect(toIso("2026-01-15", 8, 0)).toBe("2026-01-15T08:00:00+02:00");
   });
 });
 

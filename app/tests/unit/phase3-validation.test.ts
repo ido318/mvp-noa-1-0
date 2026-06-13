@@ -6,7 +6,7 @@ import {
 } from "@/lib/validators/appointment";
 
 describe("phase3 validators", () => {
-  it("accepts valid create appointment payload with 30 minute slots", () => {
+  it("accepts valid create appointment payload with effective duration", () => {
     const result = createAppointmentSchema.safeParse({
       clinicId: "00000000-0000-4000-8000-000000000001",
       customerId: "00000000-0000-4000-8000-000000000010",
@@ -14,20 +14,33 @@ describe("phase3 validators", () => {
       appointmentType: "checkup",
       source: "front_desk",
       scheduledAt: new Date().toISOString(),
-      durationMinutes: 30,
+      durationMinutes: 40,
     });
     expect(result.success).toBe(true);
   });
 
-  it("rejects non-30-minute appointment duration", () => {
+  it("accepts home visit with 90 minute effective duration", () => {
     const result = createAppointmentSchema.safeParse({
       clinicId: "00000000-0000-4000-8000-000000000001",
       customerId: "00000000-0000-4000-8000-000000000010",
       petId: "00000000-0000-4000-8000-000000000011",
-      appointmentType: "consultation",
+      appointmentType: "home_visit",
       source: "phone",
       scheduledAt: new Date().toISOString(),
-      durationMinutes: 45,
+      durationMinutes: 90,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects duration that does not match appointment type", () => {
+    const result = createAppointmentSchema.safeParse({
+      clinicId: "00000000-0000-4000-8000-000000000001",
+      customerId: "00000000-0000-4000-8000-000000000010",
+      petId: "00000000-0000-4000-8000-000000000011",
+      appointmentType: "home_visit",
+      source: "phone",
+      scheduledAt: new Date().toISOString(),
+      durationMinutes: 30,
     });
     expect(result.success).toBe(false);
   });

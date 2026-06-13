@@ -1,4 +1,5 @@
 import { AppError, err, ok, type Result } from "@/lib/errors/app-error";
+import { isExpectedDuration } from "@/lib/appointment-rules";
 import type { AppointmentRepository } from "@/lib/repositories/appointment.repository";
 import type { CustomerRepository } from "@/lib/repositories/customer.repository";
 import type { PetRepository } from "@/lib/repositories/pet.repository";
@@ -64,8 +65,8 @@ export class AppointmentService {
     if (!actor.clinicIds.includes(input.clinicId)) {
       return err(AppError.forbidden("Cannot create appointment in this clinic"));
     }
-    if (input.durationMinutes !== 30) {
-      return err(AppError.validation("Phase 3 supports only 30-minute appointments"));
+    if (!isExpectedDuration(input.appointmentType, input.durationMinutes)) {
+      return err(AppError.validation("Duration does not match appointment type"));
     }
 
     const customer = await this.customerRepository.findById(input.customerId);
@@ -131,9 +132,10 @@ export class AppointmentService {
     }
 
     const nextScheduledAt = input.scheduledAt ?? existing.value.scheduledAt;
+    const nextType = input.appointmentType ?? existing.value.appointmentType;
     const nextDuration = input.durationMinutes ?? existing.value.durationMinutes;
-    if (nextDuration !== 30) {
-      return err(AppError.validation("Phase 3 supports only 30-minute appointments"));
+    if (!isExpectedDuration(nextType, nextDuration)) {
+      return err(AppError.validation("Duration does not match appointment type"));
     }
 
     const overlapCheck = await this.appointmentRepository.findActiveOverlaps(

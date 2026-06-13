@@ -1,8 +1,12 @@
 import { z } from "zod";
+import { isExpectedDuration } from "@/lib/appointment-rules";
 
 export const appointmentTypeSchema = z.enum([
   "checkup",
+  "home_visit",
   "vaccination",
+  "phone_consultation",
+  "neutering",
   "consultation",
   "urgent",
   "follow_up",
@@ -15,6 +19,8 @@ export const appointmentStatusSchema = z.enum([
   "completed",
   "cancelled",
   "no_show",
+  "pending_approval",
+  "late_cancellation",
 ]);
 
 export const appointmentSourceSchema = z.enum([
@@ -32,10 +38,13 @@ export const createAppointmentSchema = z.object({
   appointmentType: appointmentTypeSchema,
   source: appointmentSourceSchema,
   scheduledAt: z.string().datetime(),
-  durationMinutes: z.literal(30),
+  durationMinutes: z.number().int().positive(),
   reason: z.string().trim().max(400).optional().nullable(),
   notes: z.string().trim().max(2000).optional().nullable(),
-});
+}).refine(
+  (value) => isExpectedDuration(value.appointmentType, value.durationMinutes),
+  { path: ["durationMinutes"], message: "Duration does not match appointment type" },
+);
 
 export const updateAppointmentSchema = z
   .object({
@@ -45,13 +54,20 @@ export const updateAppointmentSchema = z
         appointmentType: appointmentTypeSchema.optional(),
         source: appointmentSourceSchema.optional(),
         scheduledAt: z.string().datetime().optional(),
-        durationMinutes: z.literal(30).optional(),
+        durationMinutes: z.number().int().positive().optional(),
         reason: z.string().trim().max(400).optional().nullable(),
         notes: z.string().trim().max(2000).optional().nullable(),
       })
       .refine((value) => Object.keys(value).length > 0, {
         message: "At least one field is required",
-      }),
+      })
+      .refine(
+        (value) =>
+          value.appointmentType === undefined ||
+          value.durationMinutes === undefined ||
+          isExpectedDuration(value.appointmentType, value.durationMinutes),
+        { path: ["durationMinutes"], message: "Duration does not match appointment type" },
+      ),
   })
   .strict();
 
@@ -74,4 +90,5 @@ export const listAppointmentsSchema = z.object({
 export const availabilitySchema = z.object({
   clinicId: z.string().uuid(),
   date: z.string().date(),
+  visitType: appointmentTypeSchema.default("checkup"),
 });

@@ -23,8 +23,54 @@
   },
   {
     "type": "webhook",
+    "name": "conversation-policy",
+    "description": "מחזיר הנחיית שיחה קצרה בעברית: מה השלב הבא, מה לומר, ומה לשאול. השתמש כשיש בעיה רפואית לא ברורה, כשחסר הצעד הבא, או כשהשיחה מתחילה להיתקע בלופ. זה לא כלי טריאז' רפואי ולא מחליף את triage-pet-case.",
+    "api_schema": {
+      "url": "{{AGENT_PUBLIC_URL}}/tools/conversation-policy",
+      "method": "POST",
+      "request_headers": {
+        "Authorization": "Bearer {{AGENT_JOBS_BEARER_TOKEN}}"
+      },
+      "request_body_schema": {
+        "type": "object",
+        "properties": {
+          "user_utterance_he": {
+            "type": "string",
+            "description": "המשפט האחרון של הלקוח בעברית"
+          },
+          "known_pet_type": {
+            "type": "string",
+            "description": "סוג החיה אם כבר ידוע: כלב, חתול, או אחר"
+          },
+          "known_symptoms_he": {
+            "type": "string",
+            "description": "סיכום קצר בעברית של התסמינים שכבר נאמרו"
+          },
+          "known_duration_he": {
+            "type": "string",
+            "description": "משך הזמן אם כבר ידוע"
+          },
+          "red_flag_answers_he": {
+            "type": "array",
+            "description": "תשובות הלקוח לשאלות דגלים אדומים, אם כבר נאמרו"
+          },
+          "last_agent_action": {
+            "type": "string",
+            "description": "הפעולה האחרונה שלך, למשל ask_vomit_frequency"
+          },
+          "repeated_turns": {
+            "type": "number",
+            "description": "כמה פעמים השיחה נתקעה או חזרה על אותה נקודה"
+          }
+        },
+        "required": ["user_utterance_he"]
+      }
+    }
+  },
+  {
+    "type": "webhook",
     "name": "triage-pet-case",
-    "description": "מבצע טריאז' לתסמינים רפואיים של חיית המחמד. יש לקרוא לכלי זה מיד עם כל תלונה רפואית ולהחזיר את התוצאה מילה במילה ללא שינוי.",
+    "description": "מבצע טריאז' לתסמינים רפואיים של חיית המחמד אחרי שאספת פרטים בסיסיים ושאלת דגלי חירום רלוונטיים. השתמש בתוצאה כהחלטת בטיחות: חירום מפורש מפנים לבית חולים; ללא דגל חירום מציעים תור אצל ד\"ר נועה בשיחה טבעית.",
     "api_schema": {
       "url": "{{AGENT_PUBLIC_URL}}/tools/triage-pet-case",
       "method": "POST",

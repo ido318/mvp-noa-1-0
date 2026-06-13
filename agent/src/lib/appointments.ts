@@ -1,5 +1,4 @@
-// Slot availability logic for Get A Vet clinic (Israel time UTC+3)
-// DST note: Israel is UTC+3 in summer, UTC+2 in winter. MVP uses fixed +03:00.
+// Slot availability logic for Get A Vet clinic (Asia/Jerusalem).
 
 export type DayHours = {
   start: { h: number; m: number };
@@ -59,28 +58,26 @@ const HOURS_BY_DAY: Record<number, DayHours | null> = {
 };
 
 const HE_DAYS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
-export const ISRAEL_TZ_OFFSET = "+03:00";
+const ISRAEL_TZ = "Asia/Jerusalem";
 const SLOT_GRANULARITY_MIN = 10; // GCD of 20, 30 — candidate start times every 10 min
 const MAX_SLOTS_TO_SHOW = 6;
 const MAX_BOOKING_DAYS_AHEAD = 14;
 const LATE_CANCEL_HOURS = 4;
 
 export function getClinicHours(dateIso: string): DayHours | null {
-  const d = new Date(`${dateIso}T12:00:00${ISRAEL_TZ_OFFSET}`);
-  return HOURS_BY_DAY[d.getDay()] ?? null;
+  return HOURS_BY_DAY[dayOfWeekInIsrael(dateIso)] ?? null;
 }
 
 export function getDayNameHe(dateIso: string): string {
-  const d = new Date(`${dateIso}T12:00:00${ISRAEL_TZ_OFFSET}`);
-  return HE_DAYS[d.getDay()] ?? "";
+  return HE_DAYS[dayOfWeekInIsrael(dateIso)] ?? "";
 }
 
 /** Returns false if dateIso is more than 14 days from today (Israel time). */
 export function isWithin14Days(dateIso: string): boolean {
   const now = new Date();
   const todayIso = toIsraelDateIso(now);
-  const todayMs = new Date(`${todayIso}T00:00:00${ISRAEL_TZ_OFFSET}`).getTime();
-  const targetMs = new Date(`${dateIso}T00:00:00${ISRAEL_TZ_OFFSET}`).getTime();
+  const todayMs = new Date(toIso(todayIso, 0, 0)).getTime();
+  const targetMs = new Date(toIso(dateIso, 0, 0)).getTime();
   const diffDays = (targetMs - todayMs) / (1000 * 60 * 60 * 24);
   return diffDays >= 0 && diffDays <= MAX_BOOKING_DAYS_AHEAD;
 }
@@ -104,9 +101,12 @@ export function maxBookingDateIso(): string {
 }
 
 function toIsraelDateIso(d: Date): string {
-  // Shift by +3h, then slice the date part
-  const shifted = new Date(d.getTime() + 3 * 60 * 60 * 1000);
-  return shifted.toISOString().slice(0, 10);
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: ISRAEL_TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
 }
 
 /**
@@ -134,11 +134,12 @@ export function generateSlotsForVisitType(
     endMs:   new Date(r.end).getTime(),
   }));
 
-  const slots: string[] = [];
-  let cursor = dayStartMin;
+  const candidateSlots: Array<{ iso: string; startMin: number }> = [];
+  let cursor = Math.max(dayStartMin, earliestCandidateStartMin(dateIso));
 
-  while (cursor <= latestStartMin && slots.length < MAX_SLOTS_TO_SHOW) {
-    const slotStartMs = new Date(`${dateIso}T${minToHHMM(cursor)}:00${ISRAEL_TZ_OFFSET}`).getTime();
+  while (cursor <= latestStartMin) {
+    const slotStartIso = toIso(dateIso, Math.floor(cursor / 60), cursor % 60);
+    const slotStartMs = new Date(slotStartIso).getTime();
     const slotEndMs   = slotStartMs + durationMin * 60 * 1000;
 
     const overlaps = booked.some(
@@ -146,13 +147,13 @@ export function generateSlotsForVisitType(
     );
 
     if (!overlaps) {
-      slots.push(`${dateIso}T${minToHHMM(cursor)}:00${ISRAEL_TZ_OFFSET}`);
+      candidateSlots.push({ iso: slotStartIso, startMin: cursor });
     }
 
     cursor += SLOT_GRANULARITY_MIN;
   }
 
-  return slots;
+  return pickRepresentativeSlots(candidateSlots, dayStartMin, latestStartMin);
 }
 
 export function formatSlotLabel(iso: string): string {
@@ -167,11 +168,106 @@ export function formatDateHe(dateIso: string): string {
 }
 
 export function toIso(dateIso: string, hours: number, minutes: number): string {
-  return `${dateIso}T${minToHHMM(hours * 60 + minutes)}:00${ISRAEL_TZ_OFFSET}`;
+  const totalMin = hours * 60 + minutes;
+  return `${dateIso}T${minToHHMM(totalMin)}:00${israelOffsetForLocalDateTime(dateIso, hours, minutes)}`;
 }
 
 function minToHHMM(totalMin: number): string {
   const h = Math.floor(totalMin / 60);
   const m = totalMin % 60;
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+function dayOfWeekInIsrael(dateIso: string): number {
+  const weekday = new Intl.DateTimeFormat("en-US", {
+    timeZone: ISRAEL_TZ,
+    weekday: "short",
+  }).format(new Date(toIso(dateIso, 12, 0)));
+  const map: Record<string, number> = {
+    Sun: 0,
+    Mon: 1,
+    Tue: 2,
+    Wed: 3,
+    Thu: 4,
+    Fri: 5,
+    Sat: 6,
+  };
+  return map[weekday] ?? 0;
+}
+
+function israelOffsetForLocalDateTime(
+  dateIso: string,
+  hours: number,
+  minutes: number,
+): string {
+  for (const offset of ["+02:00", "+03:00"]) {
+    const candidate = new Date(`${dateIso}T${minToHHMM(hours * 60 + minutes)}:00${offset}`);
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: ISRAEL_TZ,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).formatToParts(candidate);
+
+    const value = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+    const localDate = `${value("year")}-${value("month")}-${value("day")}`;
+    const localTime = `${value("hour")}:${value("minute")}`;
+
+    if (localDate === dateIso && localTime === minToHHMM(hours * 60 + minutes)) {
+      return offset;
+    }
+  }
+
+  return "+02:00";
+}
+
+function pickRepresentativeSlots(
+  candidates: Array<{ iso: string; startMin: number }>,
+  dayStartMin: number,
+  latestStartMin: number,
+): string[] {
+  if (candidates.length <= MAX_SLOTS_TO_SHOW) {
+    return candidates.map((slot) => slot.iso);
+  }
+
+  const spreadStep =
+    Math.max(
+      SLOT_GRANULARITY_MIN,
+      Math.floor(
+        ((latestStartMin - dayStartMin) / (MAX_SLOTS_TO_SHOW - 1)) /
+          SLOT_GRANULARITY_MIN,
+      ) * SLOT_GRANULARITY_MIN,
+    );
+
+  const selected: Array<{ iso: string; startMin: number }> = [];
+  for (let i = 0; i < MAX_SLOTS_TO_SHOW; i++) {
+    const targetMin = dayStartMin + i * spreadStep;
+    const match = candidates.find(
+      (slot) =>
+        slot.startMin >= targetMin &&
+        !selected.some((selectedSlot) => selectedSlot.iso === slot.iso),
+    );
+    if (match) selected.push(match);
+  }
+
+  return selected.map((slot) => slot.iso);
+}
+
+function earliestCandidateStartMin(dateIso: string): number {
+  const now = new Date();
+  if (toIsraelDateIso(now) !== dateIso) return 0;
+
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: ISRAEL_TZ,
+    hour: "numeric",
+    minute: "numeric",
+    hour12: false,
+  }).formatToParts(now);
+  const hour = parseInt(parts.find((p) => p.type === "hour")?.value ?? "0", 10);
+  const minute = parseInt(parts.find((p) => p.type === "minute")?.value ?? "0", 10);
+  const total = hour * 60 + minute;
+  return Math.ceil(total / SLOT_GRANULARITY_MIN) * SLOT_GRANULARITY_MIN;
 }

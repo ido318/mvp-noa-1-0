@@ -1,6 +1,9 @@
 export type AppointmentType =
   | "checkup"
+  | "home_visit"
   | "vaccination"
+  | "phone_consultation"
+  | "neutering"
   | "consultation"
   | "urgent"
   | "follow_up"

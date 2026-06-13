@@ -1,0 +1,161 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { Hono } from "hono";
+
+function toolHeaders(): Record<string, string> {
+  return {
+    "Content-Type": "application/json",
+    "Authorization": "Bearer test-bearer-token-1234567",
+  };
+}
+
+vi.mock("../../../src/lib/store.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../src/lib/store.js")>();
+  return {
+    ...actual,
+    checkAvailability: vi.fn(),
+    bookAppointment: vi.fn(),
+    cancelAppointment: vi.fn(),
+    rescheduleAppointment: vi.fn(),
+    joinWaitlist: vi.fn(),
+    findCustomerByPhone: vi.fn(),
+    addEscalation: vi.fn().mockResolvedValue(undefined),
+  };
+});
+
+import { toolsRoutes } from "../../../src/server/routes/tools.js";
+import {
+  bookAppointment,
+  cancelAppointment,
+  checkAvailability,
+  joinWaitlist,
+  rescheduleAppointment,
+} from "../../../src/lib/store.js";
+
+function makeApp() {
+  const app = new Hono();
+  app.route("/", toolsRoutes);
+  return app;
+}
+
+describe("appointment tools", () => {
+  beforeEach(() => {
+    vi.mocked(checkAvailability).mockResolvedValue("חלונות פנויים: 09:10, 12:20");
+    vi.mocked(bookAppointment).mockResolvedValue("✅ תור נקבע");
+    vi.mocked(cancelAppointment).mockResolvedValue("✅ התור בוטל בהצלחה.");
+    vi.mocked(rescheduleAppointment).mockResolvedValue("✅ התור הוזז בהצלחה.");
+    vi.mocked(joinWaitlist).mockResolvedValue("✅ נרשמ/ה לרשימת ההמתנה.");
+  });
+
+  it("POST /tools/check-availability returns result string", async () => {
+    const res = await makeApp().request("/tools/check-availability", {
+      method: "POST",
+      headers: toolHeaders(),
+      body: JSON.stringify({ date_iso: "2026-06-14", visit_type: "checkup" }),
+    });
+
+    expect(res.status).toBe(200);
+    const json = await res.json() as { result: string };
+    expect(json.result).toContain("09:10");
+    expect(vi.mocked(checkAvailability)).toHaveBeenCalledWith("2026-06-14", "checkup");
+  });
+
+  it("POST /tools/conversation-policy returns Hebrew next-step guidance", async () => {
+    const res = await makeApp().request("/tools/conversation-policy", {
+      method: "POST",
+      headers: toolHeaders(),
+      body: JSON.stringify({
+        user_utterance_he: "הכלב טיפה מקיא ולא מרגיש טוב",
+        known_pet_type: "כלב",
+        known_symptoms_he: "טיפה מקיא ולא מרגיש טוב",
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    const json = await res.json() as { result: string };
+    expect(json.result).toContain("פעולה הבאה: ask_follow_up");
+    expect(json.result).toContain("כמה פעמים");
+    expect(json.result).toContain("לא להפנות לבית חולים");
+  });
+
+  it("POST /tools/book-appointment passes full booking payload", async () => {
+    const payload = {
+      phone: "+972541234567",
+      customer_name: "Ido",
+      pet_name: "Mika",
+      pet_species: "כלב",
+      scheduled_at: "2026-06-14T09:10:00+03:00",
+      visit_type: "home_visit",
+      reason: "בדיקה",
+    };
+    const res = await makeApp().request("/tools/book-appointment", {
+      method: "POST",
+      headers: toolHeaders(),
+      body: JSON.stringify(payload),
+    });
+
+    expect(res.status).toBe(200);
+    const json = await res.json() as { result: string };
+    expect(json.result).toContain("תור");
+    expect(vi.mocked(bookAppointment)).toHaveBeenCalledWith(payload);
+  });
+
+  it("POST /tools/cancel-or-reschedule cancels appointments", async () => {
+    const res = await makeApp().request("/tools/cancel-or-reschedule", {
+      method: "POST",
+      headers: toolHeaders(),
+      body: JSON.stringify({
+        phone: "+972541234567",
+        action: "cancel",
+        current_scheduled_at: "2026-06-14T09:10:00+03:00",
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(vi.mocked(cancelAppointment)).toHaveBeenCalledWith(
+      "+972541234567",
+      "2026-06-14T09:10:00+03:00",
+    );
+  });
+
+  it("POST /tools/cancel-or-reschedule reschedules appointments", async () => {
+    const res = await makeApp().request("/tools/cancel-or-reschedule", {
+      method: "POST",
+      headers: toolHeaders(),
+      body: JSON.stringify({
+        phone: "+972541234567",
+        action: "reschedule",
+        current_scheduled_at: "2026-06-14T09:10:00+03:00",
+        new_scheduled_at: "2026-06-15T12:20:00+03:00",
+        visit_type: "checkup",
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(vi.mocked(rescheduleAppointment)).toHaveBeenCalledWith(
+      "+972541234567",
+      "2026-06-14T09:10:00+03:00",
+      "2026-06-15T12:20:00+03:00",
+      "checkup",
+    );
+  });
+
+  it("POST /tools/join-waitlist passes waitlist payload", async () => {
+    const payload = {
+      phone: "+972541234567",
+      customer_name: "Ido",
+      pet_name: "Mika",
+      pet_species: "כלב",
+      visit_type: "checkup",
+      preferred_start: "2026-06-14",
+      notes: "אפשר בבוקר",
+    };
+    const res = await makeApp().request("/tools/join-waitlist", {
+      method: "POST",
+      headers: toolHeaders(),
+      body: JSON.stringify(payload),
+    });
+
+    expect(res.status).toBe(200);
+    expect(vi.mocked(joinWaitlist)).toHaveBeenCalledWith(payload);
+  });
+});

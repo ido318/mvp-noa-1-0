@@ -7,7 +7,7 @@ export type AppointmentListResponse = {
 export type CalendarAvailabilityResponse = {
   clinicId: string;
   date: string;
-  slotMinutes: 30;
+  slotMinutes: number;
   timezone: string;
   availableSlots: string[];
 };

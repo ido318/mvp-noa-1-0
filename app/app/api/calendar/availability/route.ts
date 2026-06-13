@@ -14,6 +14,7 @@ export async function GET(request: Request) {
     const parsed = parseOrThrow(availabilitySchema, {
       clinicId: searchParams.get("clinicId"),
       date: searchParams.get("date"),
+      visitType: searchParams.get("visitType") ?? undefined,
     });
     if (!actor.clinicIds.includes(parsed.clinicId)) {
       throw AppError.forbidden("Cannot access requested clinic");
@@ -24,6 +25,7 @@ export async function GET(request: Request) {
       parsed.clinicId,
       parsed.date,
       "Asia/Jerusalem",
+      parsed.visitType,
     );
     if (!result.ok) return handleRouteError(result.error, requestId);
     return jsonSuccess(result.value, 200, requestId);

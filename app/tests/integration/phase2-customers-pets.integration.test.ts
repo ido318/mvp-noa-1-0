@@ -1,4 +1,3 @@
-import { createClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { AuditLogRepository } from "@/lib/repositories/audit-log.repository";
 import { CustomerRepository } from "@/lib/repositories/customer.repository";
@@ -6,6 +5,10 @@ import { PetRepository } from "@/lib/repositories/pet.repository";
 import { AuditService } from "@/lib/services/audit.service";
 import { CustomerService } from "@/lib/services/customer.service";
 import { PetService } from "@/lib/services/pet.service";
+import {
+  createTestSupabaseClient,
+  type TestSupabaseClient,
+} from "@/tests/support/supabase-test-client";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -20,25 +23,18 @@ const clinic1 = "00000000-0000-4000-8000-000000000001";
 const clinic2 = "00000000-0000-4000-8000-000000000002";
 
 describe.runIf(runIntegration)("phase2 customers + pets", () => {
-  let ownerClient: ReturnType<typeof createClient>;
-  let otherClient: ReturnType<typeof createClient>;
-  let adminClient: ReturnType<typeof createClient>;
+  let ownerClient: TestSupabaseClient;
+  let otherClient: TestSupabaseClient;
+  let adminClient: TestSupabaseClient;
   let ownerUserId = "";
   let otherUserId = "";
   const createdCustomerIds: string[] = [];
   const createdPetIds: string[] = [];
 
   beforeAll(async () => {
-    adminClient = createClient(supabaseUrl!, serviceRoleKey!, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
-
-    ownerClient = createClient(supabaseUrl!, anonKey!, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
-    otherClient = createClient(supabaseUrl!, anonKey!, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
+    adminClient = createTestSupabaseClient(supabaseUrl!, serviceRoleKey!);
+    ownerClient = createTestSupabaseClient(supabaseUrl!, anonKey!);
+    otherClient = createTestSupabaseClient(supabaseUrl!, anonKey!);
 
     const ownerLogin = await ownerClient.auth.signInWithPassword({
       email: ownerEmail,
@@ -167,7 +163,12 @@ describe.runIf(runIntegration)("phase2 customers + pets", () => {
     const petService = new PetService(petRepository, customerRepository, auditService);
 
     const customerResult = await customerService.createCustomer(
-      { userId: ownerUserId, clinicIds: [clinic1], defaultClinicId: clinic1 },
+      {
+        userId: ownerUserId,
+        clinicIds: [clinic1],
+        defaultClinicId: clinic1,
+        memberships: [{ clinicId: clinic1, role: "owner" }],
+      },
       {
         clinicId: clinic1,
         fullName: `Svc Customer ${Date.now()}`,
@@ -180,7 +181,12 @@ describe.runIf(runIntegration)("phase2 customers + pets", () => {
     createdCustomerIds.push(customerResult.value.id);
 
     const mismatch = await petService.createPet(
-      { userId: ownerUserId, clinicIds: [clinic1], defaultClinicId: clinic1 },
+      {
+        userId: ownerUserId,
+        clinicIds: [clinic1],
+        defaultClinicId: clinic1,
+        memberships: [{ clinicId: clinic1, role: "owner" }],
+      },
       {
         clinicId: clinic2,
         customerId: customerResult.value.id,
@@ -191,7 +197,12 @@ describe.runIf(runIntegration)("phase2 customers + pets", () => {
     expect(mismatch.ok).toBe(false);
 
     const validPet = await petService.createPet(
-      { userId: ownerUserId, clinicIds: [clinic1], defaultClinicId: clinic1 },
+      {
+        userId: ownerUserId,
+        clinicIds: [clinic1],
+        defaultClinicId: clinic1,
+        memberships: [{ clinicId: clinic1, role: "owner" }],
+      },
       {
         clinicId: clinic1,
         customerId: customerResult.value.id,
@@ -204,7 +215,12 @@ describe.runIf(runIntegration)("phase2 customers + pets", () => {
     createdPetIds.push(validPet.value.id);
 
     const deletePet = await petService.softDeletePet(
-      { userId: ownerUserId, clinicIds: [clinic1], defaultClinicId: clinic1 },
+      {
+        userId: ownerUserId,
+        clinicIds: [clinic1],
+        defaultClinicId: clinic1,
+        memberships: [{ clinicId: clinic1, role: "owner" }],
+      },
       validPet.value.id,
     );
     if (!deletePet.ok) {

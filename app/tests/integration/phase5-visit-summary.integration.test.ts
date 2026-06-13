@@ -1,4 +1,3 @@
-import { createClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createStubVisitSummaryProvider } from "@/lib/ai/visit-summary/provider";
 import { AIEventRepository } from "@/lib/repositories/ai-event.repository";
@@ -14,6 +13,10 @@ import { AuditService } from "@/lib/services/audit.service";
 import type { ServiceActor } from "@/lib/services/service-context";
 import { VisitSummaryAssistantService } from "@/lib/services/visit-summary-assistant.service";
 import { VisitService } from "@/lib/services/visit.service";
+import {
+  createTestSupabaseClient,
+  type TestSupabaseClient,
+} from "@/tests/support/supabase-test-client";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -37,8 +40,8 @@ function assertSafeAiEventPayload(payload: Record<string, unknown> | null) {
 }
 
 describe.runIf(runIntegration)("phase5 visit summary assistant", () => {
-  let ownerClient: ReturnType<typeof createClient>;
-  let adminClient: ReturnType<typeof createClient>;
+  let ownerClient: TestSupabaseClient;
+  let adminClient: TestSupabaseClient;
   let ownerUserId = "";
   let staffUserId = "";
   let actor: ServiceActor;
@@ -50,12 +53,8 @@ describe.runIf(runIntegration)("phase5 visit summary assistant", () => {
   const createdAiEventIds: string[] = [];
 
   beforeAll(async () => {
-    adminClient = createClient(supabaseUrl!, serviceRoleKey!, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
-    ownerClient = createClient(supabaseUrl!, anonKey!, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
+    adminClient = createTestSupabaseClient(supabaseUrl!, serviceRoleKey!);
+    ownerClient = createTestSupabaseClient(supabaseUrl!, anonKey!);
 
     const ownerLogin = await ownerClient.auth.signInWithPassword({
       email: ownerEmail,

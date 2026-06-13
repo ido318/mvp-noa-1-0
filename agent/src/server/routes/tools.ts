@@ -20,6 +20,10 @@ import {
   AFTER_HOURS_SCRIPT,
   ROUTINE_SCRIPT,
 } from "../../services/triage.service.js";
+import {
+  decideConversationPolicy,
+  formatConversationPolicyForVoice,
+} from "../../services/conversation-policy.service.js";
 
 export const toolsRoutes = new Hono();
 
@@ -61,6 +65,31 @@ const VISIT_TYPE_VALUES = [
 
 // ISO8601 datetime — requires timezone (Z or ±HH:MM) to avoid ambiguous local times
 const ISO_DATETIME_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?(Z|[+-]\d{2}:\d{2})$/;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /tools/conversation-policy
+// ─────────────────────────────────────────────────────────────────────────────
+
+const conversationPolicySchema = z.object({
+  user_utterance_he: z.string().min(1),
+  known_pet_type: z.enum(["כלב", "חתול", "אחר"]).optional(),
+  known_symptoms_he: z.string().optional(),
+  known_duration_he: z.string().optional(),
+  red_flag_answers_he: z.array(z.string()).optional(),
+  last_agent_action: z.string().optional(),
+  repeated_turns: z.number().int().min(0).optional(),
+});
+
+toolsRoutes.post("/tools/conversation-policy", async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const parsed = conversationPolicySchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ result: "פרמטר חסר: user_utterance_he." }, 400);
+  }
+
+  const policy = decideConversationPolicy(parsed.data);
+  return c.json({ result: formatConversationPolicyForVoice(policy) });
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /tools/lookup-customer

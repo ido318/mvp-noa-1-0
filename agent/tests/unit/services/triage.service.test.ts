@@ -139,6 +139,12 @@ describe("decideTriage — after_hours_referral (urgency 4-7, outside hours)", (
 });
 
 describe("decideTriage — routine (urgency < 4)", () => {
+  it("טיפה מקיא ולא מרגיש טוב → routine, לא emergency", () => {
+    const r = decideTriage({ text: "הכלב טיפה מקיא ולא מרגיש טוב", now: WITHIN_HOURS });
+    expect(r.decision).toBe("routine");
+    expect(r.matchedFlags).toHaveLength(0);
+  });
+
   it("הוא השתעל פעם אחת → routine", () => {
     const r = decideTriage({ text: "הוא השתעל פעם אחת", now: WITHIN_HOURS });
     expect(r.decision).toBe("routine");
@@ -197,7 +203,8 @@ describe("scripts snapshot — 4 נוסחים קבועים", () => {
   it("AFTER_HOURS_SCRIPT מכיל 'המרפאה סגורה' + הפנייה לביה\"ח", () => {
     expect(AFTER_HOURS_SCRIPT).toMatchSnapshot();
     expect(AFTER_HOURS_SCRIPT).toContain("המרפאה סגורה");
-    expect(AFTER_HOURS_SCRIPT).toContain("בית חולים וטרינרי");
+    expect(AFTER_HOURS_SCRIPT).toContain("נועה");
+    expect(AFTER_HOURS_SCRIPT).not.toContain("מומלץ לא להמתין");
   });
 
   it("ROUTINE_SCRIPT מכיל הצעת תור ואזהרת 'אם מחמיר'", () => {

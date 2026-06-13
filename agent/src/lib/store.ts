@@ -14,7 +14,6 @@ import {
   isTooLateToCancel,
   maxBookingDateIso,
   toIso,
-  ISRAEL_TZ_OFFSET,
 } from "./appointments.js";
 import {
   scheduleBookingNotifications,
@@ -180,8 +179,8 @@ export async function checkAvailability(
   const env = getEnv();
 
   // 3. Calendar blocks — check if any block covers the requested date
-  const dayStart = `${dateIso}T00:00:00${ISRAEL_TZ_OFFSET}`;
-  const dayEnd   = `${dateIso}T23:59:59${ISRAEL_TZ_OFFSET}`;
+  const dayStart = toIso(dateIso, 0, 0);
+  const dayEnd   = toIso(dateIso, 23, 59);
 
   const { data: blocks, error: blockErr } = await getSupabase()
     .from("calendar_blocks")
