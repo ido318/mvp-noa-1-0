@@ -54,8 +54,18 @@ describe("matchRedFlags", () => {
     expect(flags.map((f) => f.id)).toContain("suspected_poisoning");
   });
 
+  it("suspected_poisoning — trigger: רעל עכברים", () => {
+    const flags = matchRedFlags("הכלב אכל רעל עכברים בגינה");
+    expect(flags.map((f) => f.id)).toContain("suspected_poisoning");
+  });
+
   it("severe_trauma — trigger: נפגע ממכונית", () => {
     const flags = matchRedFlags("נפגע ממכונית ברחוב");
+    expect(flags.map((f) => f.id)).toContain("severe_trauma");
+  });
+
+  it("severe_trauma — trigger: נדרס", () => {
+    const flags = matchRedFlags("הכלב נדרס עכשיו");
     expect(flags.map((f) => f.id)).toContain("severe_trauma");
   });
 
@@ -79,6 +89,11 @@ describe("matchRedFlags", () => {
     expect(flags.map((f) => f.id)).toContain("cat_not_urinating");
   });
 
+  it("cat_not_urinating — trigger: נכנס ויוצא מהארגז (חתול)", () => {
+    const flags = matchRedFlags("החתול נכנס ויוצא מהארגז ולא מצליח", [], "חתול");
+    expect(flags.map((f) => f.id)).toContain("cat_not_urinating");
+  });
+
   it("vomiting_blood — trigger: הקיא דם", () => {
     const flags = matchRedFlags("הקיא דם הבוקר");
     expect(flags.map((f) => f.id)).toContain("vomiting_blood");
@@ -86,6 +101,11 @@ describe("matchRedFlags", () => {
 
   it("vomiting_blood — trigger: הצואה שחורה", () => {
     const flags = matchRedFlags("הצואה שחורה", [], "כלב");
+    expect(flags.map((f) => f.id)).toContain("vomiting_blood");
+  });
+
+  it("vomiting_blood — trigger: דם בקקי", () => {
+    const flags = matchRedFlags("ראיתי דם בקקי שלו", [], "כלב");
     expect(flags.map((f) => f.id)).toContain("vomiting_blood");
   });
 
@@ -129,6 +149,16 @@ describe("matchRedFlags", () => {
   it("תסמין רגיל — גרד לא מפעיל דגל", () => {
     const flags = matchRedFlags("מגרד את עצמו הרבה");
     expect(flags).toHaveLength(0);
+  });
+
+  it("תשובה שלילית — אין בטן נפוחה לא מפעיל GDV", () => {
+    const flags = matchRedFlags("הוא הקיא פעמיים אבל אין בטן נפוחה ואין בטן קשה", [], "כלב");
+    expect(flags.map((f) => f.id)).not.toContain("abdominal_swelling_gdv");
+  });
+
+  it("תשובה שלילית — לא מדמם לא מפעיל דימום משמעותי", () => {
+    const flags = matchRedFlags("הפצע קטן והוא לא מדמם", [], "כלב");
+    expect(flags.map((f) => f.id)).not.toContain("significant_bleeding");
   });
 
   // ── additional_signs_he ──────────────────────────────────────────────────

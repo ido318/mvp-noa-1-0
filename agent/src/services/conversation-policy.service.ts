@@ -49,7 +49,33 @@ const emergencySignals = [
 const vomitingSignals = ["מקיא", "הקיא", "הקאות", "קיא"];
 
 function includesAny(text: string, signals: string[]): boolean {
-  return signals.some((signal) => text.includes(signal));
+  return signals.some((signal) => hasNonNegatedSignal(text, signal));
+}
+
+function hasNonNegatedSignal(text: string, signal: string): boolean {
+  let index = text.indexOf(signal);
+
+  while (index !== -1) {
+    if (!isNegatedSignal(text, signal, index)) {
+      return true;
+    }
+    index = text.indexOf(signal, index + signal.length);
+  }
+
+  return false;
+}
+
+function isNegatedSignal(text: string, signal: string, signalIndex: number): boolean {
+  if (signal.startsWith("לא ") || signal.startsWith("אין ") || signal.startsWith("אינו ") || signal.startsWith("אינה ")) {
+    return false;
+  }
+
+  const prefix = text
+    .slice(Math.max(0, signalIndex - 24), signalIndex)
+    .replace(/[,.!?;:()[\]״"׳']/g, " ")
+    .replace(/\s+/g, " ");
+
+  return /(?:^|\s)ו?(אין|לא|ללא|בלי|אינו|אינה)\s+$/.test(prefix);
 }
 
 function hasEmergencySignal(input: ConversationPolicyInput): boolean {

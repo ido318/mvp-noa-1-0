@@ -28,6 +28,19 @@ describe("conversation policy", () => {
     expect(policy.say_he).toContain("בית חולים וטרינרי");
   });
 
+  it("does not route negated red flag answers to emergency referral", () => {
+    const policy = decideConversationPolicy({
+      user_utterance_he: "הוא הקיא פעמיים, אין דם ואין בטן נפוחה או קשה",
+      known_pet_type: "כלב",
+      known_symptoms_he: "הקיא פעמיים",
+      red_flag_answers_he: ["אין דם", "אין בטן נפוחה", "הבטן לא קשה"],
+    });
+
+    expect(policy.next_action).not.toBe("emergency_referral");
+    expect(policy.stage).toBe("medical_intake");
+    expect(policy.ask_he).toContain("כמה פעמים");
+  });
+
   it("recovers from repeated answers instead of repeating the same question", () => {
     const policy = decideConversationPolicy({
       user_utterance_he: "כבר אמרתי לך, הוא הקיא פעמיים",
