@@ -33,9 +33,7 @@ toolsRoutes.use("/tools/*", async (c, next) => {
 
   let ok = false;
   try {
-    ok =
-      authHeader.length === expected.length &&
-      timingSafeEqual(Buffer.from(authHeader), Buffer.from(expected));
+    ok = timingSafeEqual(Buffer.from(authHeader), Buffer.from(expected));
   } catch {
     ok = false;
   }
