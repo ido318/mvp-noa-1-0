@@ -19,6 +19,10 @@ export function verifyElevenLabsSignature(
   secret: string,
   nowSecs: number = Math.floor(Date.now() / 1000),
 ): boolean {
+  // Refuse to verify if the secret is not configured — prevents accepting
+  // unauthenticated webhooks when the env var is accidentally empty.
+  if (!secret) return false;
+
   const parts = Object.fromEntries(
     signatureHeader
       .split(",")

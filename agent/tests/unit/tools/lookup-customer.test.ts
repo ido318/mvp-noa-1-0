@@ -1,18 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Hono } from "hono";
-import { createHmac } from "node:crypto";
 
-// SECRET must match ELEVENLABS_WEBHOOK_SECRET set in tests/setup.ts
-const SECRET = "test-secret";
-
-function signedHeaders(body: string): Record<string, string> {
-  const timestamp = String(Math.floor(Date.now() / 1000));
-  const sig = createHmac("sha256", SECRET).update(`${timestamp}.${body}`).digest("hex");
+// Must match JOBS_BEARER_TOKEN set in tests/setup.ts
+function toolHeaders(): Record<string, string> {
   return {
     "Content-Type": "application/json",
-    "elevenlabs-signature": `t=${timestamp},v0=${sig}`,
+    "Authorization": "Bearer test-bearer-token-1234567",
   };
 }
+// Alias used throughout this file
+const signedHeaders = (_body: string) => toolHeaders();
 
 import { toolsRoutes } from "../../../src/server/routes/tools.js";
 

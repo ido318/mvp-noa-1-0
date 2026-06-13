@@ -1,0 +1,260 @@
+[
+  {
+    "type": "webhook",
+    "name": "lookup-customer",
+    "description": "מחפש לקוח קיים לפי מספר טלפון. מחזיר שם הלקוח ושמות חיות המחמד שלו, או הודעה שהלקוח לא מוכר.",
+    "api_schema": {
+      "url": "{{AGENT_PUBLIC_URL}}/tools/lookup-customer",
+      "method": "POST",
+      "request_headers": {
+        "Authorization": "Bearer {{AGENT_JOBS_BEARER_TOKEN}}"
+      },
+      "request_body_schema": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "description": "מספר טלפון של המתקשר בפורמט E.164 או מקומי (למשל 054-9581991)"
+          }
+        },
+        "required": ["phone"]
+      }
+    }
+  },
+  {
+    "type": "webhook",
+    "name": "triage-pet-case",
+    "description": "מבצע טריאז' לתסמינים רפואיים של חיית המחמד. יש לקרוא לכלי זה מיד עם כל תלונה רפואית ולהחזיר את התוצאה מילה במילה ללא שינוי.",
+    "api_schema": {
+      "url": "{{AGENT_PUBLIC_URL}}/tools/triage-pet-case",
+      "method": "POST",
+      "request_headers": {
+        "Authorization": "Bearer {{AGENT_JOBS_BEARER_TOKEN}}"
+      },
+      "request_body_schema": {
+        "type": "object",
+        "properties": {
+          "symptoms_he": {
+            "type": "string",
+            "description": "תיאור התסמינים בעברית כפי שתואר על ידי בעל החיה"
+          },
+          "pet_type": {
+            "type": "string",
+            "description": "סוג החיה: כלב, חתול, או אחר"
+          },
+          "duration_he": {
+            "type": "string",
+            "description": "משך הזמן שהתסמינים קיימים (למשל 'מאתמול', 'שלושה ימים')"
+          },
+          "pet_age_years": {
+            "type": "number",
+            "description": "גיל החיה בשנים"
+          },
+          "pet_weight_kg": {
+            "type": "number",
+            "description": "משקל החיה בק\"ג"
+          },
+          "additional_signs_he": {
+            "type": "array",
+            "description": "תסמינים נוספים"
+          },
+          "customer_id": {
+            "type": "string",
+            "description": "מזהה הלקוח מ-lookup-customer (UUID)"
+          },
+          "pet_id": {
+            "type": "string",
+            "description": "מזהה החיה מ-lookup-customer (UUID)"
+          }
+        },
+        "required": ["symptoms_he", "pet_type"]
+      }
+    }
+  },
+  {
+    "type": "webhook",
+    "name": "check-availability",
+    "description": "בודק תורים פנויים לסוג ביקור מסוים בתאריך נתון. יש לקרוא לכלי זה לפני קביעת תור.",
+    "api_schema": {
+      "url": "{{AGENT_PUBLIC_URL}}/tools/check-availability",
+      "method": "POST",
+      "request_headers": {
+        "Authorization": "Bearer {{AGENT_JOBS_BEARER_TOKEN}}"
+      },
+      "request_body_schema": {
+        "type": "object",
+        "properties": {
+          "date_iso": {
+            "type": "string",
+            "description": "תאריך בפורמט YYYY-MM-DD (למשל 2026-06-20)"
+          },
+          "visit_type": {
+            "type": "string",
+            "description": "סוג הביקור: checkup, home_visit, vaccination, phone_consultation, neutering, consultation, urgent, follow_up, other"
+          }
+        },
+        "required": ["date_iso", "visit_type"]
+      }
+    }
+  },
+  {
+    "type": "webhook",
+    "name": "book-appointment",
+    "description": "קובע תור חדש לאחר שהלקוח אישר שעה ספציפית. עיקור/סירוס ייווצר כ'ממתין לאישור' ויישלח SMS לאחר אישור ד\"ר נועה.",
+    "api_schema": {
+      "url": "{{AGENT_PUBLIC_URL}}/tools/book-appointment",
+      "method": "POST",
+      "request_headers": {
+        "Authorization": "Bearer {{AGENT_JOBS_BEARER_TOKEN}}"
+      },
+      "request_body_schema": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "description": "מספר טלפון הלקוח"
+          },
+          "customer_name": {
+            "type": "string",
+            "description": "שם מלא של הלקוח"
+          },
+          "pet_name": {
+            "type": "string",
+            "description": "שם חיית המחמד"
+          },
+          "pet_species": {
+            "type": "string",
+            "description": "מין החיה (כלב/חתול)"
+          },
+          "scheduled_at": {
+            "type": "string",
+            "description": "תאריך ושעה בפורמט ISO8601 עם timezone (למשל 2026-06-20T10:00:00+03:00)"
+          },
+          "visit_type": {
+            "type": "string",
+            "description": "סוג הביקור: checkup, home_visit, vaccination, phone_consultation, neutering, consultation, urgent, follow_up, other"
+          },
+          "reason": {
+            "type": "string",
+            "description": "סיבת הביקור"
+          }
+        },
+        "required": ["phone", "customer_name", "pet_name", "pet_species", "scheduled_at", "visit_type"]
+      }
+    }
+  },
+  {
+    "type": "webhook",
+    "name": "cancel-or-reschedule",
+    "description": "מבטל או מזיז תור קיים. ביטול פחות מ-4 שעות לפני התור מחויב במלואו.",
+    "api_schema": {
+      "url": "{{AGENT_PUBLIC_URL}}/tools/cancel-or-reschedule",
+      "method": "POST",
+      "request_headers": {
+        "Authorization": "Bearer {{AGENT_JOBS_BEARER_TOKEN}}"
+      },
+      "request_body_schema": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "description": "מספר טלפון הלקוח"
+          },
+          "action": {
+            "type": "string",
+            "description": "cancel לביטול, reschedule להזזה"
+          },
+          "current_scheduled_at": {
+            "type": "string",
+            "description": "תאריך ושעה של התור הקיים בפורמט ISO8601 עם timezone"
+          },
+          "new_scheduled_at": {
+            "type": "string",
+            "description": "תאריך ושעה חדשים לתור (נדרש להזזה בלבד), פורמט ISO8601 עם timezone"
+          },
+          "visit_type": {
+            "type": "string",
+            "description": "סוג הביקור: checkup, home_visit, vaccination, phone_consultation, neutering, consultation, urgent, follow_up, other"
+          }
+        },
+        "required": ["phone", "action", "current_scheduled_at"]
+      }
+    }
+  },
+  {
+    "type": "webhook",
+    "name": "join-waitlist",
+    "description": "רושם לקוח לרשימת המתנה כשאין תורים פנויים. לאחר רישום — ציין שאם מצב החיה מחמיר יש לפנות לבית חולים וטרינרי.",
+    "api_schema": {
+      "url": "{{AGENT_PUBLIC_URL}}/tools/join-waitlist",
+      "method": "POST",
+      "request_headers": {
+        "Authorization": "Bearer {{AGENT_JOBS_BEARER_TOKEN}}"
+      },
+      "request_body_schema": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "description": "מספר טלפון הלקוח"
+          },
+          "customer_name": {
+            "type": "string",
+            "description": "שם מלא של הלקוח"
+          },
+          "pet_name": {
+            "type": "string",
+            "description": "שם חיית המחמד"
+          },
+          "pet_species": {
+            "type": "string",
+            "description": "מין החיה (כלב/חתול)"
+          },
+          "visit_type": {
+            "type": "string",
+            "description": "סוג הביקור: checkup, home_visit, vaccination, phone_consultation, neutering, consultation, urgent, follow_up, other"
+          },
+          "preferred_start": {
+            "type": "string",
+            "description": "תאריך התחלה מועדף YYYY-MM-DD"
+          },
+          "preferred_end": {
+            "type": "string",
+            "description": "תאריך סיום מועדף YYYY-MM-DD"
+          },
+          "notes": {
+            "type": "string",
+            "description": "הערות נוספות"
+          }
+        },
+        "required": ["phone", "customer_name", "pet_name", "pet_species", "visit_type"]
+      }
+    }
+  },
+  {
+    "type": "webhook",
+    "name": "escalate-to-noa",
+    "description": "מעביר פנייה לתשומת לב אישית של ד\"ר נועה — לענייינים לא-רפואיים בלבד (חשבונית, תלונה, שאלה שאין לה תשובה, בקשה אישית). כלי triage-pet-case מבצע escalation פנימי בעצמו; אין לקרוא לשני הכלים על אותה פנייה רפואית.",
+    "api_schema": {
+      "url": "{{AGENT_PUBLIC_URL}}/tools/escalate-to-noa",
+      "method": "POST",
+      "request_headers": {
+        "Authorization": "Bearer {{AGENT_JOBS_BEARER_TOKEN}}"
+      },
+      "request_body_schema": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "description": "תיאור קצר של הפנייה"
+          },
+          "urgency": {
+            "type": "number",
+            "description": "רמת דחיפות מ-1 (נמוכה) עד 10 (חירום)"
+          }
+        },
+        "required": ["reason", "urgency"]
+      }
+    }
+  }
+]

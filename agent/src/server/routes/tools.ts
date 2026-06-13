@@ -1,8 +1,8 @@
 import { Hono } from "hono";
 import { z } from "zod";
+import { timingSafeEqual } from "node:crypto";
 import { logger, maskPhone } from "../../lib/logger.js";
 import { getEnv } from "../../lib/env.js";
-import { verifyElevenLabsSignature } from "../../lib/elevenLabsAuth.js";
 import {
   findCustomerByPhone,
   addEscalation,
@@ -23,15 +23,25 @@ import {
 
 export const toolsRoutes = new Hono();
 
-// All /tools/* routes require a valid ElevenLabs signature.
-// Hono caches the body after the first read, so route handlers can still call c.req.json().
+// All /tools/* routes require a Bearer token sent by ElevenLabs as a static request header.
+// ElevenLabs ConvAI tool calls do not use HMAC signing — they use a pre-shared Bearer token
+// configured in each tool's api_schema.request_headers (set by sync-elevenlabs-agent.ts).
 toolsRoutes.use("/tools/*", async (c, next) => {
   const env = getEnv();
-  const rawBody = await c.req.text();
-  const sigHeader = c.req.header("elevenlabs-signature") ?? "";
+  const authHeader = c.req.header("authorization") ?? "";
+  const expected = `Bearer ${env.JOBS_BEARER_TOKEN}`;
 
-  if (!verifyElevenLabsSignature(rawBody, sigHeader, env.ELEVENLABS_WEBHOOK_SECRET)) {
-    logger.warn({ path: c.req.path }, "tools: invalid ElevenLabs signature");
+  let ok = false;
+  try {
+    ok =
+      authHeader.length === expected.length &&
+      timingSafeEqual(Buffer.from(authHeader), Buffer.from(expected));
+  } catch {
+    ok = false;
+  }
+
+  if (!ok) {
+    logger.warn({ path: c.req.path }, "tools: unauthorized");
     return c.json({ error: "forbidden" }, 403);
   }
 

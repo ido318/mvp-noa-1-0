@@ -50,10 +50,11 @@ twilioRoutes.post("/twilio/voice", twilioValidate, async (c) => {
     );
   }
 
+  const xmlUrl = signed_url.replace(/&/g, "&amp;");
   const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Connect>
-    <Stream url="${signed_url}">
+    <Stream url="${xmlUrl}">
       <Parameter name="caller_number" value="${callerPhone}"/>
     </Stream>
   </Connect>
@@ -61,4 +62,24 @@ twilioRoutes.post("/twilio/voice", twilioValidate, async (c) => {
 
   logger.info({ caller: maskPhone(callerPhone) }, "twilio: returning ElevenLabs TwiML");
   return c.text(twiml, 200, { "Content-Type": "text/xml" });
+});
+
+/**
+ * POST /twilio/status
+ *
+ * Twilio calls this with call status updates (initiated, ringing, in-progress,
+ * completed, etc.). We log the transition for observability; the authoritative
+ * call record is written by /hooks/call-ended (ElevenLabs post-call webhook).
+ */
+twilioRoutes.post("/twilio/status", async (c) => {
+  const body = await c.req.parseBody();
+  logger.info(
+    {
+      callSid: body["CallSid"],
+      callStatus: body["CallStatus"],
+      caller: maskPhone(typeof body["From"] === "string" ? body["From"] : ""),
+    },
+    "twilio: call status update",
+  );
+  return c.body(null, 204);
 });
