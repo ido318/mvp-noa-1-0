@@ -158,7 +158,7 @@ describe("generateSlotsForVisitType — home_visit (effective 90 min)", () => {
 
 describe("generateSlotsForVisitType — שישי (08:30-13:00) + vaccination (30 min eff)", () => {
   it("מתחיל ב-08:30 ומסיים לא לאחר 12:30", () => {
-    const slots = generateSlotsForVisitType("2026-06-19", FRIDAY_HOURS, "vaccination", []);
+    const slots = generateSlotsForVisitType("2026-06-26", FRIDAY_HOURS, "vaccination", []);
     expect(slots.length).toBeGreaterThan(0);
     expect(formatSlotLabel(slots[0]!)).toBe("08:30");
     const labels = slots.map(formatSlotLabel);
