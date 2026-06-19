@@ -63,6 +63,15 @@ function minutesBetween(startIso: string, endIso: string) {
   return Math.max(10, Math.round((new Date(endIso).getTime() - new Date(startIso).getTime()) / 60_000));
 }
 
+function calendarBlockErrorMessage(payload: {
+  error?: { code?: string; message?: string };
+} | null) {
+  if (payload?.error?.code === "VALIDATION_ERROR") {
+    return "בדקו שהתאריך והשעות תקינים וששעת הסיום אחרי שעת ההתחלה.";
+  }
+  return payload?.error?.message ?? "שמירת החסימה נכשלה";
+}
+
 function fmtDayHeader(d: Date) {
   return new Intl.DateTimeFormat("he-IL", { timeZone: TZ, day: "numeric", month: "short" }).format(d);
 }
@@ -263,20 +272,29 @@ export default function CalendarPage() {
     setSavingBlock(true);
     setBlockError(null);
     try {
+      const startAt = toIsraelLocalIso(blockDate, blockStart);
+      const endAt = toIsraelLocalIso(blockDate, blockEnd);
+      if (new Date(endAt).getTime() <= new Date(startAt).getTime()) {
+        setBlockError("שעת הסיום חייבת להיות אחרי שעת ההתחלה.");
+        return;
+      }
+
       const res = await fetch("/api/calendar-blocks", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           clinicId,
-          startAt: toIsraelLocalIso(blockDate, blockStart),
-          endAt: toIsraelLocalIso(blockDate, blockEnd),
+          startAt,
+          endAt,
           reason: blockReason.trim() || null,
         }),
       });
 
       if (!res.ok) {
-        const payload = await res.json().catch(() => null) as { error?: { message?: string } } | null;
-        throw new Error(payload?.error?.message ?? "שמירת החסימה נכשלה");
+        const payload = await res.json().catch(() => null) as {
+          error?: { code?: string; message?: string };
+        } | null;
+        throw new Error(calendarBlockErrorMessage(payload));
       }
 
       await fetchData();

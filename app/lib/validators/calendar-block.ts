@@ -1,15 +1,15 @@
 import { z } from "zod";
 
 export const listCalendarBlocksSchema = z.object({
-  from: z.string().datetime(),
-  to: z.string().datetime(),
+  from: z.string().datetime({ offset: true }),
+  to: z.string().datetime({ offset: true }),
 });
 
 export const createCalendarBlockSchema = z
   .object({
     clinicId: z.string().uuid(),
-    startAt: z.string().datetime(),
-    endAt: z.string().datetime(),
+    startAt: z.string().datetime({ offset: true }),
+    endAt: z.string().datetime({ offset: true }),
     reason: z.string().trim().max(300).optional().nullable(),
   })
   .refine(
