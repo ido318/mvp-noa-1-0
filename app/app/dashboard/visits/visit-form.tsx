@@ -40,7 +40,7 @@ export function VisitForm({ clinicId, customerId, petId, appointmentId }: Props)
       const payload = (await response.json()) as {
         error?: { message?: string };
       };
-      setError(payload.error?.message ?? "Failed to create visit");
+      setError(payload.error?.message ?? "יצירת הביקור נכשלה");
       return;
     }
 
@@ -53,7 +53,7 @@ export function VisitForm({ clinicId, customerId, petId, appointmentId }: Props)
     <form onSubmit={onSubmit} className="space-y-4">
       <div>
         <label htmlFor="chiefComplaint" className="mb-1 block text-sm font-medium text-zinc-700">
-          Chief complaint
+          סיבת הביקור
         </label>
         <input
           id="chiefComplaint"
@@ -64,7 +64,7 @@ export function VisitForm({ clinicId, customerId, petId, appointmentId }: Props)
       </div>
       <div>
         <label htmlFor="manualVisitSummary" className="mb-1 block text-sm font-medium text-zinc-700">
-          Manual visit summary
+          סיכום ביקור ידני
         </label>
         <textarea
           id="manualVisitSummary"
@@ -75,7 +75,7 @@ export function VisitForm({ clinicId, customerId, petId, appointmentId }: Props)
         />
       </div>
       {appointmentId ? (
-        <p className="text-sm text-zinc-600">Linked appointment: {appointmentId}</p>
+        <p className="text-sm text-zinc-600">תור מקושר: {appointmentId}</p>
       ) : null}
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
       <button
@@ -83,7 +83,7 @@ export function VisitForm({ clinicId, customerId, petId, appointmentId }: Props)
         disabled={loading}
         className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
       >
-        {loading ? "Creating..." : "Create visit"}
+        {loading ? "יוצר..." : "צור ביקור"}
       </button>
     </form>
   );

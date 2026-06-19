@@ -42,7 +42,7 @@ export function VisitAiSummarySection({
       const payload = (await response.json()) as {
         error?: { message?: string };
       };
-      setError(payload.error?.message ?? "Failed to generate summary");
+      setError(payload.error?.message ?? "יצירת סיכום AI נכשלה");
       return;
     }
 
@@ -54,7 +54,7 @@ export function VisitAiSummarySection({
 
   async function onAccept() {
     if (!draftText?.trim()) {
-      setError("Summary text is required");
+      setError("חובה להזין טקסט סיכום");
       return;
     }
 
@@ -75,7 +75,7 @@ export function VisitAiSummarySection({
       const payload = (await response.json()) as {
         error?: { message?: string };
       };
-      setError(payload.error?.message ?? "Failed to accept summary");
+      setError(payload.error?.message ?? "שמירת הסיכום נכשלה");
       return;
     }
 
@@ -91,21 +91,21 @@ export function VisitAiSummarySection({
   return (
     <div className="space-y-4">
       <div>
-        <h4 className="text-sm font-medium text-zinc-800">Manual visit summary</h4>
+        <h4 className="text-sm font-medium text-zinc-800">סיכום ביקור ידני</h4>
         {manualVisitSummary ? (
           <p className="mt-1 whitespace-pre-wrap text-sm text-zinc-700">
             {manualVisitSummary}
           </p>
         ) : (
-          <p className="mt-1 text-sm text-zinc-500">No manual summary.</p>
+          <p className="mt-1 text-sm text-zinc-500">אין עדיין סיכום ידני.</p>
         )}
       </div>
 
       <div className="border-t border-zinc-100 pt-4">
-        <h4 className="text-sm font-medium text-zinc-800">AI visit summary</h4>
+        <h4 className="text-sm font-medium text-zinc-800">סיכום ביקור AI</h4>
         <p className="mt-1 text-xs text-zinc-500">
-          AI-generated drafts require veterinarian review before acceptance. Not for
-          client communication.
+          טיוטות AI מחייבות בדיקה ואישור של וטרינר לפני שימוש. לא לשליחה ישירה
+          ללקוח.
         </p>
 
         {aiVisitSummary ? (
@@ -113,20 +113,19 @@ export function VisitAiSummarySection({
             {aiVisitSummary}
           </p>
         ) : (
-          <p className="mt-2 text-sm text-zinc-500">No accepted AI summary yet.</p>
+          <p className="mt-2 text-sm text-zinc-500">אין עדיין סיכום AI מאושר.</p>
         )}
 
         {!canUseAi ? (
           <p className="mt-2 text-sm text-zinc-500">
-            Elevated clinic role (owner, admin, or veterinarian) required to generate
-            or accept AI summaries.
+            יצירה או אישור של סיכומי AI זמינים רק לבעלים, מנהל או וטרינר.
           </p>
         ) : null}
 
         {draftText !== null ? (
           <div className="mt-3 space-y-3">
             <label htmlFor="aiDraft" className="block text-sm font-medium text-zinc-700">
-              Draft (editable)
+              טיוטה לעריכה
             </label>
             <textarea
               id="aiDraft"
@@ -142,7 +141,7 @@ export function VisitAiSummarySection({
                 disabled={loading}
                 className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
               >
-                {loading ? "Saving…" : "Accept summary"}
+                {loading ? "שומר..." : "אשר סיכום"}
               </button>
               <button
                 type="button"
@@ -150,7 +149,7 @@ export function VisitAiSummarySection({
                 disabled={loading}
                 className="rounded-lg border border-zinc-300 px-4 py-2 text-sm text-zinc-700"
               >
-                Discard draft
+                מחק טיוטה
               </button>
             </div>
           </div>
@@ -161,7 +160,7 @@ export function VisitAiSummarySection({
             disabled={loading}
             className="mt-3 rounded-lg border border-emerald-600 px-4 py-2 text-sm font-medium text-emerald-800 disabled:opacity-50"
           >
-            {loading ? "Generating…" : "Generate draft"}
+            {loading ? "יוצר..." : "צור טיוטה"}
           </button>
         ) : null}
 
@@ -172,7 +171,7 @@ export function VisitAiSummarySection({
             disabled={loading}
             className="mt-3 rounded-lg border border-zinc-300 px-4 py-2 text-sm text-zinc-700 disabled:opacity-50"
           >
-            {loading ? "Generating…" : "Regenerate draft"}
+            {loading ? "יוצר..." : "צור טיוטה מחדש"}
           </button>
         ) : null}
 

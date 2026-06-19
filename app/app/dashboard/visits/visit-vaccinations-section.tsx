@@ -51,7 +51,7 @@ export function VisitVaccinationsSection({
       const payload = (await response.json()) as {
         error?: { message?: string };
       };
-      setError(payload.error?.message ?? "Failed to record vaccination");
+      setError(payload.error?.message ?? "שמירת החיסון נכשלה");
       return;
     }
 
@@ -65,14 +65,14 @@ export function VisitVaccinationsSection({
     <div className="space-y-4">
       <ul className="space-y-2">
         {visitLinked.length === 0 ? (
-          <li className="text-sm text-zinc-500">No vaccinations linked to this visit.</li>
+          <li className="text-sm text-zinc-500">אין חיסונים שמקושרים לביקור הזה.</li>
         ) : (
           visitLinked.map((v) => (
             <li key={v.id} className="rounded-lg border border-zinc-100 p-3 text-sm">
               <p className="font-medium text-zinc-800">{v.vaccineName}</p>
               <p className="text-zinc-600">
                 {new Date(v.administeredAt).toLocaleString()}
-                {v.batchNumber ? ` · batch ${v.batchNumber}` : ""}
+                {v.batchNumber ? ` · אצווה ${v.batchNumber}` : ""}
               </p>
             </li>
           ))
@@ -84,7 +84,7 @@ export function VisitVaccinationsSection({
           value={vaccineName}
           onChange={(event) => setVaccineName(event.target.value)}
           required
-          placeholder="Vaccine name"
+          placeholder="שם החיסון"
           className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
         />
         <input
@@ -97,7 +97,7 @@ export function VisitVaccinationsSection({
         <input
           value={batchNumber}
           onChange={(event) => setBatchNumber(event.target.value)}
-          placeholder="Batch number (optional)"
+          placeholder="מספר אצווה (לא חובה)"
           className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
         />
         {error ? <p className="text-sm text-red-600">{error}</p> : null}
@@ -106,7 +106,7 @@ export function VisitVaccinationsSection({
           disabled={loading}
           className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
         >
-          {loading ? "Saving..." : "Record vaccination"}
+          {loading ? "שומר..." : "שמור חיסון"}
         </button>
       </form>
     </div>

@@ -6,6 +6,12 @@ import type { VisitStatus } from "@/types/domain/visit";
 
 const STATUS_OPTIONS: VisitStatus[] = ["in_progress", "completed", "cancelled"];
 
+const STATUS_LABELS: Record<VisitStatus, string> = {
+  in_progress: "בטיפול",
+  completed: "הושלם",
+  cancelled: "בוטל",
+};
+
 type Props = {
   visitId: string;
   currentVersion: number;
@@ -33,7 +39,7 @@ export function VisitActions({ visitId, currentVersion, currentStatus }: Props) 
       const payload = (await response.json()) as {
         error?: { message?: string };
       };
-      setError(payload.error?.message ?? "Failed to update status");
+      setError(payload.error?.message ?? "עדכון הסטטוס נכשל");
       return;
     }
     router.refresh();
@@ -52,7 +58,7 @@ export function VisitActions({ visitId, currentVersion, currentStatus }: Props) 
       const payload = (await response.json()) as {
         error?: { message?: string };
       };
-      setError(payload.error?.message ?? "Failed to delete visit");
+      setError(payload.error?.message ?? "מחיקת הביקור נכשלה");
       return;
     }
     router.push("/dashboard/visits");
@@ -63,7 +69,7 @@ export function VisitActions({ visitId, currentVersion, currentStatus }: Props) 
     <div className="space-y-3">
       <div>
         <label className="mb-1 block text-sm font-medium text-zinc-700" htmlFor="status">
-          Change status
+          שינוי סטטוס
         </label>
         <select
           id="status"
@@ -73,7 +79,7 @@ export function VisitActions({ visitId, currentVersion, currentStatus }: Props) 
         >
           {STATUS_OPTIONS.map((value) => (
             <option key={value} value={value}>
-              {value}
+              {STATUS_LABELS[value]}
             </option>
           ))}
         </select>
@@ -86,7 +92,7 @@ export function VisitActions({ visitId, currentVersion, currentStatus }: Props) 
           onClick={updateStatus}
           className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
         >
-          {loading ? "Saving..." : "Update status"}
+          {loading ? "שומר..." : "עדכן סטטוס"}
         </button>
         <button
           type="button"
@@ -94,7 +100,7 @@ export function VisitActions({ visitId, currentVersion, currentStatus }: Props) 
           onClick={softDelete}
           className="rounded-lg border border-red-300 px-4 py-2 text-sm text-red-700 disabled:opacity-60"
         >
-          Soft delete
+          מחק ביקור
         </button>
       </div>
     </div>

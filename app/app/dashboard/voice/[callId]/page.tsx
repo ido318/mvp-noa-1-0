@@ -2,6 +2,22 @@ import Link from "next/link";
 import { dashboardApiFetch } from "@/app/dashboard/api-client";
 import type { VoiceCall } from "@/types/domain/voice-call";
 
+const CALL_STATUS_LABELS: Record<string, string> = {
+  ringing: "מצלצל",
+  in_progress: "בשיחה",
+  completed: "הושלם",
+  failed: "נכשל",
+  busy: "תפוס",
+  no_answer: "אין מענה",
+  canceled: "בוטל",
+  queued: "בתור",
+};
+
+const CALL_DIRECTION_LABELS: Record<string, string> = {
+  inbound: "נכנסת",
+  outbound: "יוצאת",
+};
+
 export default async function VoiceCallDetailPage({
   params,
 }: {
@@ -13,9 +29,9 @@ export default async function VoiceCallDetailPage({
   if (!call) {
     return (
       <section className="space-y-4">
-        <p className="text-sm text-zinc-600">Voice call not found.</p>
+        <p className="text-sm text-zinc-600">השיחה לא נמצאה.</p>
         <Link href="/dashboard/voice" className="text-sm text-emerald-700">
-          Back to calls
+          חזרה לשיחות
         </Link>
       </section>
     );
@@ -25,38 +41,40 @@ export default async function VoiceCallDetailPage({
     <section className="space-y-6">
       <div>
         <Link href="/dashboard/voice" className="text-sm text-emerald-700">
-          ← Back to calls
+          חזרה לשיחות
         </Link>
-        <h2 className="mt-2 text-xl font-semibold text-zinc-900">Voice call detail</h2>
+        <h2 className="mt-2 text-xl font-semibold text-zinc-900">פרטי שיחה</h2>
       </div>
 
       <div className="rounded-2xl border border-zinc-200 bg-white p-6 space-y-3 text-sm">
         <p>
-          <span className="font-medium text-zinc-700">From:</span> {call.fromNumber}
+          <span className="font-medium text-zinc-700">מאת:</span> {call.fromNumber}
         </p>
         <p>
-          <span className="font-medium text-zinc-700">To:</span> {call.toNumber}
+          <span className="font-medium text-zinc-700">אל:</span> {call.toNumber}
         </p>
         <p>
-          <span className="font-medium text-zinc-700">Status:</span> {call.status}
+          <span className="font-medium text-zinc-700">סטטוס:</span>{" "}
+          {CALL_STATUS_LABELS[call.status] ?? call.status}
         </p>
         <p>
-          <span className="font-medium text-zinc-700">Direction:</span> {call.direction}
+          <span className="font-medium text-zinc-700">כיוון:</span>{" "}
+          {CALL_DIRECTION_LABELS[call.direction] ?? call.direction}
         </p>
         <p>
-          <span className="font-medium text-zinc-700">Started:</span>{" "}
+            <span className="font-medium text-zinc-700">התחילה:</span>{" "}
           {new Date(call.startedAt).toLocaleString()}
         </p>
         {call.endedAt ? (
           <p>
-            <span className="font-medium text-zinc-700">Ended:</span>{" "}
+            <span className="font-medium text-zinc-700">הסתיימה:</span>{" "}
             {new Date(call.endedAt).toLocaleString()}
           </p>
         ) : null}
         {call.durationSeconds != null ? (
           <p>
-            <span className="font-medium text-zinc-700">Duration:</span>{" "}
-            {call.durationSeconds}s
+            <span className="font-medium text-zinc-700">משך:</span>{" "}
+            {call.durationSeconds} שניות
           </p>
         ) : null}
         <p>
@@ -64,27 +82,27 @@ export default async function VoiceCallDetailPage({
         </p>
         {call.customerId ? (
           <p>
-            <span className="font-medium text-zinc-700">Customer:</span>{" "}
+            <span className="font-medium text-zinc-700">לקוח:</span>{" "}
             <Link
               href={`/dashboard/customers/${call.customerId}`}
               className="text-emerald-700 hover:underline"
             >
-              View customer
+              הצג לקוח
             </Link>
           </p>
         ) : (
-          <p className="text-zinc-500">No matching customer for caller ID.</p>
+          <p className="text-zinc-500">לא נמצא לקוח שתואם למספר המתקשר.</p>
         )}
         {call.recordingUrl ? (
           <p>
-            <span className="font-medium text-zinc-700">Recording:</span>{" "}
+            <span className="font-medium text-zinc-700">הקלטה:</span>{" "}
             <a
               href={call.recordingUrl}
               target="_blank"
               rel="noreferrer"
               className="text-emerald-700 hover:underline"
             >
-              Open recording
+              פתח הקלטה
             </a>
           </p>
         ) : null}

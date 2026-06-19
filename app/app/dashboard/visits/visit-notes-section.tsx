@@ -13,6 +13,15 @@ const NOTE_TYPES: MedicalNoteType[] = [
   "follow_up",
 ];
 
+const NOTE_TYPE_LABELS: Record<MedicalNoteType, string> = {
+  general: "כללי",
+  soap_subjective: "SOAP - תלונת לקוח",
+  soap_objective: "SOAP - ממצאים",
+  soap_assessment: "SOAP - הערכה",
+  soap_plan: "SOAP - תוכנית טיפול",
+  follow_up: "מעקב",
+};
+
 type Props = {
   visitId: string;
   initialNotes: MedicalNote[];
@@ -41,7 +50,7 @@ export function VisitNotesSection({ visitId, initialNotes }: Props) {
       const payload = (await response.json()) as {
         error?: { message?: string };
       };
-      setError(payload.error?.message ?? "Failed to add note");
+      setError(payload.error?.message ?? "הוספת ההערה נכשלה");
       return;
     }
 
@@ -53,11 +62,11 @@ export function VisitNotesSection({ visitId, initialNotes }: Props) {
     <div className="space-y-4">
       <ul className="space-y-2">
         {initialNotes.length === 0 ? (
-          <li className="text-sm text-zinc-500">No notes yet.</li>
+          <li className="text-sm text-zinc-500">אין עדיין הערות.</li>
         ) : (
           initialNotes.map((note) => (
             <li key={note.id} className="rounded-lg border border-zinc-100 p-3 text-sm">
-              <p className="font-medium text-zinc-800">{note.noteType}</p>
+              <p className="font-medium text-zinc-800">{NOTE_TYPE_LABELS[note.noteType]}</p>
               <p className="mt-1 whitespace-pre-wrap text-zinc-700">{note.content}</p>
             </li>
           ))
@@ -72,7 +81,7 @@ export function VisitNotesSection({ visitId, initialNotes }: Props) {
         >
           {NOTE_TYPES.map((value) => (
             <option key={value} value={value}>
-              {value}
+              {NOTE_TYPE_LABELS[value]}
             </option>
           ))}
         </select>
@@ -81,7 +90,7 @@ export function VisitNotesSection({ visitId, initialNotes }: Props) {
           onChange={(event) => setContent(event.target.value)}
           required
           rows={3}
-          placeholder="Clinical note (human-authored)"
+          placeholder="הערה רפואית שנכתבה על ידי הצוות"
           className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
         />
         {error ? <p className="text-sm text-red-600">{error}</p> : null}
@@ -90,7 +99,7 @@ export function VisitNotesSection({ visitId, initialNotes }: Props) {
           disabled={loading}
           className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
         >
-          {loading ? "Saving..." : "Add note"}
+          {loading ? "שומר..." : "הוסף הערה"}
         </button>
       </form>
     </div>

@@ -55,8 +55,8 @@ export default async function NewVisitPage({
   if (!clinicId || !customerId || !petId) {
     return (
       <section className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-800">
-        To create a visit, ensure at least one customer and one pet exist in the selected
-        clinic.
+        כדי ליצור ביקור, צריך לוודא שקיימים לפחות לקוח אחד וחיה אחת במרפאה
+        שנבחרה.
       </section>
     );
   }
@@ -65,9 +65,9 @@ export default async function NewVisitPage({
     <section className="space-y-4">
       <div>
         <Link href="/dashboard/visits" className="text-sm text-emerald-700">
-          ← Back to visits
+          חזרה לביקורים
         </Link>
-        <h2 className="mt-2 text-xl font-semibold text-zinc-900">New visit</h2>
+        <h2 className="mt-2 text-xl font-semibold text-zinc-900">ביקור חדש</h2>
       </div>
 
       <div className="rounded-2xl border border-zinc-200 bg-white p-6">

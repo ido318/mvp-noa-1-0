@@ -1,8 +1,14 @@
 import Link from "next/link";
 import { dashboardApiFetch } from "@/app/dashboard/api-client";
-import type { Visit } from "@/types/domain/visit";
+import type { Visit, VisitStatus } from "@/types/domain/visit";
 
 type SearchParams = Promise<{ petId?: string; clinicId?: string }>;
+
+const VISIT_STATUS_LABELS: Record<VisitStatus, string> = {
+  in_progress: "בטיפול",
+  completed: "הושלם",
+  cancelled: "בוטל",
+};
 
 export default async function VisitsPage({
   searchParams,
@@ -24,19 +30,19 @@ export default async function VisitsPage({
   return (
     <section className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold text-zinc-900">Visits</h2>
+        <h2 className="text-xl font-semibold text-zinc-900">ביקורים</h2>
         <Link
           href={newHref}
           className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-medium text-white"
         >
-          New visit
+          ביקור חדש
         </Link>
       </div>
 
       <div className="rounded-2xl border border-zinc-200 bg-white">
         <ul className="divide-y divide-zinc-200">
           {items.length === 0 ? (
-            <li className="p-4 text-sm text-zinc-500">No visits found.</li>
+            <li className="p-4 text-sm text-zinc-500">לא נמצאו ביקורים.</li>
           ) : (
             items.map((visit) => (
               <li key={visit.id} className="p-4">
@@ -44,10 +50,11 @@ export default async function VisitsPage({
                   href={`/dashboard/visits/${visit.id}`}
                   className="font-medium text-zinc-900 hover:text-emerald-700"
                 >
-                  {new Date(visit.startedAt).toLocaleString()} · {visit.status}
+                  {new Date(visit.startedAt).toLocaleString()} ·{" "}
+                  {VISIT_STATUS_LABELS[visit.status]}
                 </Link>
                 <p className="text-sm text-zinc-600">
-                  {visit.chiefComplaint ?? "No chief complaint recorded"}
+                  {visit.chiefComplaint ?? "לא נרשמה סיבת ביקור"}
                 </p>
               </li>
             ))
