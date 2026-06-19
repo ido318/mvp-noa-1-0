@@ -60,7 +60,7 @@ const HOURS_BY_DAY: Record<number, DayHours | null> = {
 const HE_DAYS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
 const ISRAEL_TZ = "Asia/Jerusalem";
 const SLOT_GRANULARITY_MIN = 10; // GCD of 20, 30 — candidate start times every 10 min
-const MAX_SLOTS_TO_SHOW = 6;
+const MAX_SLOTS_TO_SHOW = 10;
 const MAX_BOOKING_DAYS_AHEAD = 14;
 const LATE_CANCEL_HOURS = 4;
 
@@ -160,6 +160,10 @@ export function formatSlotLabel(iso: string): string {
   const match = iso.match(/T(\d{2}):(\d{2})/);
   if (!match) return iso;
   return `${match[1]}:${match[2]}`;
+}
+
+export function formatSlotOptionForTool(iso: string): string {
+  return `${formatSlotLabel(iso)} (scheduled_at=${iso})`;
 }
 
 export function formatDateHe(dateIso: string): string {

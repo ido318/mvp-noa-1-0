@@ -69,10 +69,31 @@ const tools: ElevenLabsTool[] = JSON.parse(toolsJson) as ElevenLabsTool[];
 const patchPayload = {
   conversation_config: {
     agent: {
+      first_message: "שלום, הגעתם למרפאת גט אה וֵט, מדבר תומר. איך אפשר לעזור?",
+      language: "he",
       prompt: {
         prompt: systemPrompt,
         tools,
       },
+    },
+    turn: {
+      turn_timeout: 3,
+      turn_eagerness: "eager",
+      soft_timeout_config: {
+        timeout_seconds: 2.5,
+        message: "אני איתך.",
+        use_llm_generated_message: false,
+        randomize_fillers: false,
+        max_soft_timeouts_per_generation: 1,
+      },
+    },
+    tts: {
+      model_id: "eleven_v3_conversational",
+      voice_id: "6u58Zr4cXPCkxTgRpkKk",
+      speed: 1.08,
+      stability: 0.4,
+      optimize_streaming_latency: 3,
+      text_normalisation_type: "system_prompt",
     },
   },
 };
@@ -93,7 +114,16 @@ if (isDryRun) {
     if (res.ok) {
       const data = await res.json() as {
         conversation_config?: {
-          agent?: { prompt?: { prompt?: string; tools?: Array<{ name?: string }> } };
+          agent?: {
+            first_message?: string;
+            prompt?: { prompt?: string; tools?: Array<{ name?: string }> };
+          };
+          turn?: {
+            turn_timeout?: number;
+            turn_eagerness?: string;
+            soft_timeout_config?: { timeout_seconds?: number };
+          };
+          tts?: { speed?: number; stability?: number; optimize_streaming_latency?: number };
         };
       };
       currentPrompt =
@@ -132,6 +162,13 @@ if (isDryRun) {
     console.log(`    URL: ${apiUrl}`);
     console.log(`    Required: ${JSON.stringify(reqBody?.required ?? [])}`);
   }
+
+  console.log("\n── VOICE TURN SETTINGS ────────────────────────────────────────");
+  console.log(`First message: ${patchPayload.conversation_config.agent.first_message}`);
+  console.log(`Turn timeout : ${patchPayload.conversation_config.turn.turn_timeout}s`);
+  console.log(`Turn eagerness: ${patchPayload.conversation_config.turn.turn_eagerness}`);
+  console.log(`Soft timeout : ${patchPayload.conversation_config.turn.soft_timeout_config.timeout_seconds}s`);
+  console.log(`TTS speed    : ${patchPayload.conversation_config.tts.speed}`);
 
   console.log("\n=== Run without --dry-run to apply ===");
   process.exit(0);

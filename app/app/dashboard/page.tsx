@@ -9,13 +9,14 @@ import { EmptyState } from "@/components/dashboard/ui/empty-state";
 import { Skeleton } from "@/components/dashboard/ui/skeleton";
 import { useToast } from "@/components/dashboard/ui/toast";
 import { PhoneIcon, ClockIcon, SparkleIcon, CheckIcon, XIcon, UserIcon } from "@/components/dashboard/icons";
+import { ISRAEL_TIMEZONE, israelDateIso } from "@/lib/israel-date";
 import type { Appointment } from "@/types/domain/appointment";
 import type { Escalation } from "@/types/domain/escalation";
 import type { VoiceCall } from "@/types/domain/voice-call";
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
-const TZ = "Asia/Jerusalem";
+const TZ = ISRAEL_TIMEZONE;
 
 function israelTime(iso: string) {
   return new Intl.DateTimeFormat("he-IL", { timeZone: TZ, hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(iso));
@@ -297,7 +298,7 @@ export default function TodayPage() {
 
   useEffect(() => { void fetchData(); }, [fetchData]);
 
-  const todayAppts = appointments.filter(a => a.scheduledAt.startsWith(today));
+  const todayAppts = appointments.filter(a => israelDateIso(a.scheduledAt) === today);
   const pending = appointments.filter(a => a.status === "pending_approval");
   const completedCalls = todayCalls.filter(c => c.status === "completed").length;
 

@@ -7,11 +7,12 @@ import { TypePill } from "@/components/dashboard/ui/type-pill";
 import { EmptyState } from "@/components/dashboard/ui/empty-state";
 import { Skeleton } from "@/components/dashboard/ui/skeleton";
 import { ChevLeftIcon, ChevRightIcon, CalendarIcon } from "@/components/dashboard/icons";
+import { ISRAEL_TIMEZONE, israelDateIso } from "@/lib/israel-date";
 import type { Appointment } from "@/types/domain/appointment";
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
-const TZ = "Asia/Jerusalem";
+const TZ = ISRAEL_TIMEZONE;
 const HOUR_START = 8;
 const HOUR_END   = 20;
 const HOUR_SPAN  = HOUR_END - HOUR_START;
@@ -169,7 +170,7 @@ export default function CalendarPage() {
 
   function apptForDay(d: Date) {
     const iso = isoOfDate(d);
-    return appointments.filter(a => a.scheduledAt.startsWith(iso));
+    return appointments.filter(a => israelDateIso(a.scheduledAt) === iso);
   }
 
   const pendingCount = appointments.filter(a => a.status === "pending_approval").length;

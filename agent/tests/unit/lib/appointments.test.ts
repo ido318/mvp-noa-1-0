@@ -4,6 +4,7 @@ import {
   getDayNameHe,
   generateSlotsForVisitType,
   formatSlotLabel,
+  formatSlotOptionForTool,
   formatDateHe,
   isWithin14Days,
   isTooLateToCancel,
@@ -65,6 +66,14 @@ describe("formatDateHe", () => {
   });
 });
 
+describe("formatSlotOptionForTool", () => {
+  it("כולל שעה קריאה וגם scheduled_at מדויק עם timezone ישראל", () => {
+    expect(formatSlotOptionForTool("2026-06-14T11:30:00+03:00")).toBe(
+      "11:30 (scheduled_at=2026-06-14T11:30:00+03:00)",
+    );
+  });
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Visit type config
 // ─────────────────────────────────────────────────────────────────────────────
@@ -108,21 +117,25 @@ describe("generateSlotsForVisitType — checkup (effective 40 min)", () => {
     vi.useRealTimers();
   });
 
-  it("ללא תורים תפוסים — מחזיר עד 6 slots", () => {
+  it("ללא תורים תפוסים — מחזיר עד 10 slots", () => {
     const slots = generateSlotsForVisitType("2026-06-14", WEEKDAY_HOURS, "checkup", []);
-    expect(slots.length).toBe(6);
+    expect(slots.length).toBe(10);
     expect(formatSlotLabel(slots[0]!)).toBe("08:00");
   });
 
-  it("מציג חלונות פרוסים לאורך היום ולא רק 08:00-08:50", () => {
+  it("מציג חלונות פרוסים לאורך היום ולא רק 4 שעות ספציפיות", () => {
     const slots = generateSlotsForVisitType("2026-06-14", WEEKDAY_HOURS, "checkup", []);
     expect(slots.map(formatSlotLabel)).toEqual([
       "08:00",
-      "10:10",
-      "12:20",
-      "14:30",
-      "16:40",
-      "18:50",
+      "09:10",
+      "10:20",
+      "11:30",
+      "12:40",
+      "13:50",
+      "15:00",
+      "16:10",
+      "17:20",
+      "18:30",
     ]);
   });
 

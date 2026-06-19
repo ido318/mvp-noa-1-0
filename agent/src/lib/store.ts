@@ -9,6 +9,7 @@ import {
   getDayNameHe,
   generateSlotsForVisitType,
   formatSlotLabel,
+  formatSlotOptionForTool,
   formatDateHe,
   isWithin14Days,
   isTooLateToCancel,
@@ -228,8 +229,11 @@ export async function checkAvailability(
     return `אין חלונות פנויים ל${typeLabelHe} ב-${formatDateHe(dateIso)} (${getDayNameHe(dateIso)}). נסה תאריך אחר.`;
   }
 
-  const labels = freeSlots.map(formatSlotLabel).join(", ");
-  return `חלונות פנויים ל${typeLabelHe} ב-${formatDateHe(dateIso)} (יום ${getDayNameHe(dateIso)}): ${labels}`;
+  const labels = freeSlots.map(formatSlotOptionForTool).join(", ");
+  return (
+    `חלונות פנויים ל${typeLabelHe} ב-${formatDateHe(dateIso)} (יום ${getDayNameHe(dateIso)}): ${labels}. ` +
+    "לקביעת תור חובה להשתמש בערך scheduled_at המדויק מאחת האופציות, כולל אזור הזמן."
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
