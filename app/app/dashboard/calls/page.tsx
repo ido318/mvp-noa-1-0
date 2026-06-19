@@ -118,6 +118,8 @@ function CallDrawer({
   call: VoiceCall;
   onClose: () => void;
 }) {
+  const [tab, setTab] = useState<"summary" | "transcript" | "recording">("summary");
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", onKey);
@@ -156,35 +158,66 @@ function CallDrawer({
             )}
           </div>
 
-          {/* Recording */}
-          {call.recordingStoragePath && (
-            <div>
-              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">הקלטה</p>
-              <AudioPlayer callId={call.id} />
-            </div>
+          <div className="flex rounded-[var(--r-md)] border border-[var(--line)] overflow-hidden">
+            {[
+              ["summary", "סיכום"],
+              ["transcript", "תמלול"],
+              ["recording", "הקלטה"],
+            ].map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setTab(value as "summary" | "transcript" | "recording")}
+                className={[
+                  "flex-1 px-3 py-1.5 text-xs font-semibold transition-colors",
+                  tab === value
+                    ? "bg-[var(--brand-600)] text-white"
+                    : "text-[var(--ink-2)] hover:bg-[var(--surface-2)]",
+                ].join(" ")}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {tab === "summary" && (
+            call.aiSummary ? (
+              <div className="rounded-[var(--r-md)] bg-[var(--brand-50)] p-3">
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <SparkleIcon size={13} className="text-[var(--brand-600)]" />
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--brand-700)]">סיכום AI</p>
+                </div>
+                <p className="text-[13px] text-[var(--ink)] leading-relaxed">{call.aiSummary}</p>
+              </div>
+            ) : (
+              <p className="text-sm text-[var(--muted)]">אין סיכום AI לשיחה הזו.</p>
+            )
           )}
 
-          {/* AI summary */}
-          {call.aiSummary && (
-            <div className="rounded-[var(--r-md)] bg-[var(--brand-50)] p-3">
-              <div className="flex items-center gap-1.5 mb-1.5">
-                <SparkleIcon size={13} className="text-[var(--brand-600)]" />
-                <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--brand-700)]">סיכום AI</p>
+          {tab === "recording" && (
+            call.recordingStoragePath ? (
+              <div>
+                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">הקלטת השיחה</p>
+                <AudioPlayer callId={call.id} />
               </div>
-              <p className="text-[13px] text-[var(--ink)] leading-relaxed">{call.aiSummary}</p>
-            </div>
+            ) : (
+              <p className="text-sm text-[var(--muted)]">אין הקלטה שמורה לשיחה הזו.</p>
+            )
           )}
 
-          {/* Transcript */}
-          {call.transcript && call.transcript.length > 0 && (
-            <div>
-              <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">שיחה</p>
-              <div className="space-y-3">
-                {call.transcript.map((item, i) => (
-                  <TranscriptBubble key={i} item={item} />
-                ))}
+          {tab === "transcript" && (
+            call.transcript && call.transcript.length > 0 ? (
+              <div>
+                <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">תמלול השיחה</p>
+                <div className="space-y-3">
+                  {call.transcript.map((item, i) => (
+                    <TranscriptBubble key={i} item={item} />
+                  ))}
+                </div>
               </div>
-            </div>
+            ) : (
+              <p className="text-sm text-[var(--muted)]">אין תמלול שמור לשיחה הזו.</p>
+            )
           )}
         </div>
       </div>

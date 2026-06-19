@@ -79,8 +79,8 @@ describe("formatSlotOptionForTool", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("VISIT_TYPE_CONFIG", () => {
-  it("checkup: 30+10=40 effective, no approval", () => {
-    expect(effectiveDuration("checkup")).toBe(40);
+  it("checkup: ברירת מחדל 30 דקות, no approval", () => {
+    expect(effectiveDuration("checkup")).toBe(30);
     expect(VISIT_TYPE_CONFIG.checkup.requiresApproval).toBe(false);
   });
 
@@ -112,30 +112,29 @@ describe("VISIT_TYPE_CONFIG", () => {
 const WEEKDAY_HOURS = { start: { h: 8, m: 0 }, end: { h: 20, m: 0 } };
 const FRIDAY_HOURS  = { start: { h: 8, m: 30 }, end: { h: 13, m: 0 } };
 
-describe("generateSlotsForVisitType — checkup (effective 40 min)", () => {
+describe("generateSlotsForVisitType — checkup (effective 30 min)", () => {
   afterEach(() => {
     vi.useRealTimers();
   });
 
-  it("ללא תורים תפוסים — מחזיר עד 10 slots", () => {
+  it("ללא תורים תפוסים — מחזיר את כל ה-slots הפנויים", () => {
     const slots = generateSlotsForVisitType("2026-06-14", WEEKDAY_HOURS, "checkup", []);
-    expect(slots.length).toBe(10);
+    expect(slots.length).toBe(70);
     expect(formatSlotLabel(slots[0]!)).toBe("08:00");
+    expect(formatSlotLabel(slots.at(-1)!)).toBe("19:30");
   });
 
-  it("מציג חלונות פרוסים לאורך היום ולא רק 4 שעות ספציפיות", () => {
+  it("מציג כל חלון פנוי בקפיצות של 10 דקות", () => {
     const slots = generateSlotsForVisitType("2026-06-14", WEEKDAY_HOURS, "checkup", []);
-    expect(slots.map(formatSlotLabel)).toEqual([
+    expect(slots.map(formatSlotLabel).slice(0, 8)).toEqual([
       "08:00",
+      "08:10",
+      "08:20",
+      "08:30",
+      "08:40",
+      "08:50",
+      "09:00",
       "09:10",
-      "10:20",
-      "11:30",
-      "12:40",
-      "13:50",
-      "15:00",
-      "16:10",
-      "17:20",
-      "18:30",
     ]);
   });
 
@@ -146,18 +145,27 @@ describe("generateSlotsForVisitType — checkup (effective 40 min)", () => {
     expect(formatSlotLabel(slots[0]!)).toBe("09:10");
   });
 
-  it("slot ראשון תפוס — מחזיר מ-08:10", () => {
-    // Block 08:00–08:40
-    const booked = [{ start: "2026-06-14T08:00:00+03:00", end: "2026-06-14T08:40:00+03:00" }];
+  it("slot ראשון תפוס — מחזיר מ-08:30", () => {
+    // Block 08:00-08:30
+    const booked = [{ start: "2026-06-14T08:00:00+03:00", end: "2026-06-14T08:30:00+03:00" }];
     const slots = generateSlotsForVisitType("2026-06-14", WEEKDAY_HOURS, "checkup", booked);
-    expect(formatSlotLabel(slots[0]!)).toBe("08:40");
+    expect(formatSlotLabel(slots[0]!)).toBe("08:30");
+  });
+
+  it("חסימה חלקית משאירה את שעות הבוקר פנויות", () => {
+    const booked = [{ start: "2026-06-14T12:00:00+03:00", end: "2026-06-14T20:00:00+03:00" }];
+    const slots = generateSlotsForVisitType("2026-06-14", WEEKDAY_HOURS, "checkup", booked);
+    const labels = slots.map(formatSlotLabel);
+    expect(labels[0]).toBe("08:00");
+    expect(labels.at(-1)).toBe("11:30");
+    expect(labels).not.toContain("12:00");
   });
 
   it("לא מציע slot שסיומו לאחר סגירת המרפאה", () => {
-    // Latest checkup (40 min eff) can start at 19:20 (ends 20:00)
+    // Latest checkup (30 min eff) can start at 19:30 (ends 20:00)
     const slots = generateSlotsForVisitType("2026-06-14", WEEKDAY_HOURS, "checkup", []);
     const labels = slots.map(formatSlotLabel);
-    expect(labels.every((l) => l <= "19:20")).toBe(true);
+    expect(labels.every((l) => l <= "19:30")).toBe(true);
   });
 });
 

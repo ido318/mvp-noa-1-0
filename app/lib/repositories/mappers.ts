@@ -5,6 +5,7 @@ import type {
   AppointmentStatus,
   AppointmentType,
 } from "@/types/domain/appointment";
+import type { CalendarBlock } from "@/types/domain/calendar-block";
 import type { AuditLog } from "@/types/domain/audit-log";
 import type { Clinic, ClinicMembership, ClinicRole } from "@/types/domain/clinic";
 import type {
@@ -259,6 +260,26 @@ export function mapAppointmentRow(row: {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     deletedAt: row.deleted_at,
+  };
+}
+
+export function mapCalendarBlockRow(row: {
+  id: string;
+  clinic_id: string;
+  start_at: string;
+  end_at: string;
+  reason: string | null;
+  created_by: string | null;
+  created_at: string;
+}): CalendarBlock {
+  return {
+    id: row.id,
+    clinicId: row.clinic_id,
+    startAt: row.start_at,
+    endAt: row.end_at,
+    reason: row.reason,
+    createdBy: row.created_by,
+    createdAt: row.created_at,
   };
 }
 

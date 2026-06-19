@@ -179,7 +179,7 @@ export async function checkAvailability(
 
   const env = getEnv();
 
-  // 3. Calendar blocks — check if any block covers the requested date
+  // 3. Calendar blocks — unavailable ranges for the requested date
   const dayStart = toIso(dateIso, 0, 0);
   const dayEnd   = toIso(dateIso, 23, 59);
 
@@ -192,14 +192,6 @@ export async function checkAvailability(
     .limit(1);
 
   if (blockErr) throw new Error(`calendar_blocks query failed: ${blockErr.message}`);
-
-  if (blocks && blocks.length > 0) {
-    const block = blocks[0] as { start_at: string; end_at: string; reason: string | null };
-    // Compute first available day after the block
-    const blockEndDate = block.end_at.slice(0, 10);
-    const reason = block.reason ? ` (${block.reason})` : "";
-    return `נועה אינה זמינה בתאריך זה${reason}. ניתן לקבוע תור החל מ-${formatDateHe(blockEndDate)}.`;
-  }
 
   // 4. Fetch existing appointments for the day (scheduled_at + end_at)
   const { data: appts, error: apptErr } = await getSupabase()
@@ -219,8 +211,17 @@ export async function checkAvailability(
     return start && end ? [{ start, end }] : [];
   });
 
+  const blockedRanges = (blocks ?? []).flatMap((r) => {
+    const start = extractString(r, "start_at");
+    const end = extractString(r, "end_at");
+    return start && end ? [{ start, end }] : [];
+  });
+
   // 5. Generate free slots for the requested visit type
-  const freeSlots = generateSlotsForVisitType(dateIso, hours, visitType, bookedRanges);
+  const freeSlots = generateSlotsForVisitType(dateIso, hours, visitType, [
+    ...bookedRanges,
+    ...blockedRanges,
+  ]);
 
   const config = getVisitConfig(visitType);
   const typeLabelHe = config.labelHe;

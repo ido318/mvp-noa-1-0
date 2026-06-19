@@ -26,15 +26,15 @@ export type VisitTypeConfig = {
 // effectiveDuration = durationMin + bufferMin; stored in duration_minutes so
 // the GIST constraint in the DB automatically enforces inter-appointment gaps.
 export const VISIT_TYPE_CONFIG: Record<VisitType, VisitTypeConfig> = {
-  checkup:            { durationMin: 30, bufferMin: 10, requiresApproval: false, labelHe: "בדיקה בקליניקה" },
+  checkup:            { durationMin: 30, bufferMin:  0, requiresApproval: false, labelHe: "בדיקה בקליניקה" },
   home_visit:         { durationMin: 60, bufferMin: 30, requiresApproval: false, labelHe: "ביקור בית" },
   vaccination:        { durationMin: 20, bufferMin: 10, requiresApproval: false, labelHe: "חיסונים" },
   phone_consultation: { durationMin: 20, bufferMin:  0, requiresApproval: false, labelHe: "ייעוץ טלפוני" },
   neutering:          { durationMin: 30, bufferMin: 10, requiresApproval: true,  labelHe: "עיקור/סירוס" },
   consultation:       { durationMin: 20, bufferMin: 10, requiresApproval: false, labelHe: "ייעוץ" },
-  urgent:             { durationMin: 30, bufferMin: 10, requiresApproval: false, labelHe: "דחוף" },
-  follow_up:          { durationMin: 20, bufferMin: 10, requiresApproval: false, labelHe: "ביקור מעקב" },
-  other:              { durationMin: 30, bufferMin: 10, requiresApproval: false, labelHe: "אחר" },
+  urgent:             { durationMin: 30, bufferMin:  0, requiresApproval: false, labelHe: "דחוף" },
+  follow_up:          { durationMin: 30, bufferMin:  0, requiresApproval: false, labelHe: "ביקור מעקב" },
+  other:              { durationMin: 30, bufferMin:  0, requiresApproval: false, labelHe: "אחר" },
 };
 
 export function getVisitConfig(visitType: VisitType): VisitTypeConfig {
@@ -60,7 +60,6 @@ const HOURS_BY_DAY: Record<number, DayHours | null> = {
 const HE_DAYS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
 const ISRAEL_TZ = "Asia/Jerusalem";
 const SLOT_GRANULARITY_MIN = 10; // GCD of 20, 30 — candidate start times every 10 min
-const MAX_SLOTS_TO_SHOW = 10;
 const MAX_BOOKING_DAYS_AHEAD = 14;
 const LATE_CANCEL_HOURS = 4;
 
@@ -153,7 +152,7 @@ export function generateSlotsForVisitType(
     cursor += SLOT_GRANULARITY_MIN;
   }
 
-  return pickRepresentativeSlots(candidateSlots, dayStartMin, latestStartMin);
+  return candidateSlots.map((slot) => slot.iso);
 }
 
 export function formatSlotLabel(iso: string): string {
@@ -226,38 +225,6 @@ function israelOffsetForLocalDateTime(
   }
 
   return "+02:00";
-}
-
-function pickRepresentativeSlots(
-  candidates: Array<{ iso: string; startMin: number }>,
-  dayStartMin: number,
-  latestStartMin: number,
-): string[] {
-  if (candidates.length <= MAX_SLOTS_TO_SHOW) {
-    return candidates.map((slot) => slot.iso);
-  }
-
-  const spreadStep =
-    Math.max(
-      SLOT_GRANULARITY_MIN,
-      Math.floor(
-        ((latestStartMin - dayStartMin) / (MAX_SLOTS_TO_SHOW - 1)) /
-          SLOT_GRANULARITY_MIN,
-      ) * SLOT_GRANULARITY_MIN,
-    );
-
-  const selected: Array<{ iso: string; startMin: number }> = [];
-  for (let i = 0; i < MAX_SLOTS_TO_SHOW; i++) {
-    const targetMin = dayStartMin + i * spreadStep;
-    const match = candidates.find(
-      (slot) =>
-        slot.startMin >= targetMin &&
-        !selected.some((selectedSlot) => selectedSlot.iso === slot.iso),
-    );
-    if (match) selected.push(match);
-  }
-
-  return selected.map((slot) => slot.iso);
 }
 
 function earliestCandidateStartMin(dateIso: string): number {

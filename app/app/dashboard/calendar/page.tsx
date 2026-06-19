@@ -7,8 +7,11 @@ import { TypePill } from "@/components/dashboard/ui/type-pill";
 import { EmptyState } from "@/components/dashboard/ui/empty-state";
 import { Skeleton } from "@/components/dashboard/ui/skeleton";
 import { ChevLeftIcon, ChevRightIcon, CalendarIcon } from "@/components/dashboard/icons";
+import { toIsraelLocalIso } from "@/lib/appointment-rules";
 import { ISRAEL_TIMEZONE, israelDateIso } from "@/lib/israel-date";
+import type { MeResponse } from "@/types/api/me";
 import type { Appointment } from "@/types/domain/appointment";
+import type { CalendarBlock } from "@/types/domain/calendar-block";
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -56,6 +59,10 @@ function heightPct(minutes: number) {
   return (minutes / (HOUR_SPAN * 60)) * 100;
 }
 
+function minutesBetween(startIso: string, endIso: string) {
+  return Math.max(10, Math.round((new Date(endIso).getTime() - new Date(startIso).getTime()) / 60_000));
+}
+
 function fmtDayHeader(d: Date) {
   return new Intl.DateTimeFormat("he-IL", { timeZone: TZ, day: "numeric", month: "short" }).format(d);
 }
@@ -89,16 +96,58 @@ function ApptBlock({ appt }: { appt: Appointment }) {
   );
 }
 
+function CalendarBlockOverlay({
+  block,
+  onDelete,
+}: {
+  block: CalendarBlock;
+  onDelete: (blockId: string) => void;
+}) {
+  const top = topPct(block.startAt);
+  const h = heightPct(minutesBetween(block.startAt, block.endAt));
+
+  return (
+    <div
+      className="absolute inset-x-0.5 overflow-hidden rounded-[8px] border border-[var(--line)] bg-[var(--surface-2)] px-1.5 py-1 text-[10px] text-[var(--muted)]"
+      style={{
+        top: `${Math.max(0, top)}%`,
+        height: `${Math.max(h, 4)}%`,
+        minHeight: "26px",
+      }}
+      title={block.reason ?? "חסימת יומן"}
+    >
+      <div className="flex items-center justify-between gap-1">
+        <span className="font-bold text-[var(--ink-2)]">חסום</span>
+        <button
+          type="button"
+          className="rounded px-1 text-[9px] text-[var(--red-700)] hover:bg-[var(--red-50)]"
+          onClick={(event) => {
+            event.stopPropagation();
+            onDelete(block.id);
+          }}
+        >
+          מחק
+        </button>
+      </div>
+      {block.reason && <div className="truncate">{block.reason}</div>}
+    </div>
+  );
+}
+
 function DayColumn({
   day,
   dayIndex,
   appointments,
+  blocks,
   isToday,
+  onDeleteBlock,
 }: {
   day: Date;
   dayIndex: number;
   appointments: Appointment[];
+  blocks: CalendarBlock[];
   isToday: boolean;
+  onDeleteBlock: (blockId: string) => void;
 }) {
   const isFriday = day.getDay() === 5;
   const isSaturday = day.getDay() === 6;
@@ -134,6 +183,10 @@ function DayColumn({
       )}
 
       {/* Appointments */}
+      {blocks.map(block => (
+        <CalendarBlockOverlay key={block.id} block={block} onDelete={onDeleteBlock} />
+      ))}
+
       {appointments.map(appt => (
         <ApptBlock key={appt.id} appt={appt} />
       ))}
@@ -147,7 +200,15 @@ export default function CalendarPage() {
   const today = isoOfDate(new Date());
   const [weekStart, setWeekStart] = useState<Date>(() => weekStartSun(today));
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [blocks, setBlocks] = useState<CalendarBlock[]>([]);
+  const [clinicId, setClinicId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [savingBlock, setSavingBlock] = useState(false);
+  const [blockDate, setBlockDate] = useState(today);
+  const [blockStart, setBlockStart] = useState("12:00");
+  const [blockEnd, setBlockEnd] = useState("20:00");
+  const [blockReason, setBlockReason] = useState("סיום מוקדם");
+  const [blockError, setBlockError] = useState<string | null>(null);
 
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)) as [Date, Date, Date, Date, Date, Date, Date];
   const from = isoOfDate(weekStart);
@@ -156,10 +217,24 @@ export default function CalendarPage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/appointments?from=${from}&to=${to}`);
-      if (res.ok) {
-        const d = await res.json() as { data: { items: Appointment[] } };
+      const rangeStart = toIsraelLocalIso(from, "00:00");
+      const rangeEnd = toIsraelLocalIso(to, "23:59");
+      const [apptRes, blockRes, meRes] = await Promise.all([
+        fetch(`/api/appointments?from=${encodeURIComponent(rangeStart)}&to=${encodeURIComponent(rangeEnd)}`),
+        fetch(`/api/calendar-blocks?from=${encodeURIComponent(rangeStart)}&to=${encodeURIComponent(rangeEnd)}`),
+        fetch("/api/me"),
+      ]);
+      if (apptRes.ok) {
+        const d = await apptRes.json() as { data: { items: Appointment[] } };
         setAppointments(d.data.items ?? []);
+      }
+      if (blockRes.ok) {
+        const d = await blockRes.json() as { data: { items: CalendarBlock[] } };
+        setBlocks(d.data.items ?? []);
+      }
+      if (meRes.ok) {
+        const d = await meRes.json() as { data: MeResponse };
+        setClinicId(d.data.profile.defaultClinicId ?? d.data.memberships[0]?.clinicId ?? null);
       }
     } finally {
       setLoading(false);
@@ -171,6 +246,52 @@ export default function CalendarPage() {
   function apptForDay(d: Date) {
     const iso = isoOfDate(d);
     return appointments.filter(a => israelDateIso(a.scheduledAt) === iso);
+  }
+
+  function blocksForDay(d: Date) {
+    const iso = isoOfDate(d);
+    return blocks.filter(block => israelDateIso(block.startAt) === iso || israelDateIso(block.endAt) === iso);
+  }
+
+  async function createBlock(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!clinicId) {
+      setBlockError("לא נמצאה מרפאה פעילה למשתמש.");
+      return;
+    }
+
+    setSavingBlock(true);
+    setBlockError(null);
+    try {
+      const res = await fetch("/api/calendar-blocks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          clinicId,
+          startAt: toIsraelLocalIso(blockDate, blockStart),
+          endAt: toIsraelLocalIso(blockDate, blockEnd),
+          reason: blockReason.trim() || null,
+        }),
+      });
+
+      if (!res.ok) {
+        const payload = await res.json().catch(() => null) as { error?: { message?: string } } | null;
+        throw new Error(payload?.error?.message ?? "שמירת החסימה נכשלה");
+      }
+
+      await fetchData();
+    } catch (error) {
+      setBlockError(error instanceof Error ? error.message : "שמירת החסימה נכשלה");
+    } finally {
+      setSavingBlock(false);
+    }
+  }
+
+  async function deleteBlock(blockId: string) {
+    const res = await fetch(`/api/calendar-blocks/${blockId}`, { method: "DELETE" });
+    if (res.ok) {
+      setBlocks(current => current.filter(block => block.id !== blockId));
+    }
   }
 
   const pendingCount = appointments.filter(a => a.status === "pending_approval").length;
@@ -212,6 +333,50 @@ export default function CalendarPage() {
           </div>
         </div>
       </div>
+
+      <Card className="space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-bold text-[var(--ink)]">חסימת יומן</h2>
+            <p className="text-xs text-[var(--muted)]">חסום שעות שבהן נועה לא זמינה. תומר לא יציע תורים בטווחים האלה.</p>
+          </div>
+          <Badge color="muted">{blocks.length} חסימות השבוע</Badge>
+        </div>
+
+        <form className="grid gap-2 md:grid-cols-[1fr_120px_120px_1.4fr_auto]" onSubmit={createBlock}>
+          <input
+            type="date"
+            value={blockDate}
+            onChange={(event) => setBlockDate(event.target.value)}
+            className="h-9 rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--bg)] px-3 text-sm text-[var(--ink)] outline-none focus:border-[var(--brand-400)]"
+            required
+          />
+          <input
+            type="time"
+            value={blockStart}
+            onChange={(event) => setBlockStart(event.target.value)}
+            className="h-9 rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--bg)] px-3 text-sm text-[var(--ink)] outline-none focus:border-[var(--brand-400)]"
+            required
+          />
+          <input
+            type="time"
+            value={blockEnd}
+            onChange={(event) => setBlockEnd(event.target.value)}
+            className="h-9 rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--bg)] px-3 text-sm text-[var(--ink)] outline-none focus:border-[var(--brand-400)]"
+            required
+          />
+          <input
+            type="text"
+            value={blockReason}
+            onChange={(event) => setBlockReason(event.target.value)}
+            placeholder="סיבה"
+            className="h-9 rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--bg)] px-3 text-sm text-[var(--ink)] outline-none placeholder:text-[var(--faint)] focus:border-[var(--brand-400)]"
+          />
+          <Btn type="submit" size="sm" loading={savingBlock}>חסום</Btn>
+        </form>
+
+        {blockError && <p className="text-xs font-semibold text-[var(--red-700)]">{blockError}</p>}
+      </Card>
 
       {loading ? (
         <Skeleton className="h-[560px]" />
@@ -269,7 +434,9 @@ export default function CalendarPage() {
                   day={day}
                   dayIndex={i}
                   appointments={apptForDay(day)}
+                  blocks={blocksForDay(day)}
                   isToday={isoOfDate(day) === today}
+                  onDeleteBlock={deleteBlock}
                 />
               ))}
             </div>

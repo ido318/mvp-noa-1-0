@@ -5,6 +5,7 @@ import {
   getClinicHoursForDate,
   toIsraelLocalIso,
 } from "@/lib/appointment-rules";
+import type { CalendarBlockRepository } from "@/lib/repositories/calendar-block.repository";
 import type { AppointmentRepository } from "@/lib/repositories/appointment.repository";
 import type { ServiceActor } from "@/lib/services/service-context";
 import type { Appointment } from "@/types/domain/appointment";
@@ -22,7 +23,10 @@ function combineDateAndClock(date: string, hhmm: string): Date {
 }
 
 export class CalendarService {
-  constructor(private readonly appointmentRepository: AppointmentRepository) {}
+  constructor(
+    private readonly appointmentRepository: AppointmentRepository,
+    private readonly calendarBlockRepository?: CalendarBlockRepository,
+  ) {}
 
   async listDay(
     actor: ServiceActor,
@@ -73,13 +77,23 @@ export class CalendarService {
     const openAt = combineDateAndClock(date, workingHours.open);
     const closeAt = combineDateAndClock(date, workingHours.close);
 
+    const clinicIds = actor.clinicIds.filter((id) => id === clinicId);
     const appointmentsResult = await this.appointmentRepository.list({
-      clinicIds: actor.clinicIds.filter((id) => id === clinicId),
+      clinicIds,
       from: openAt.toISOString(),
       to: closeAt.toISOString(),
       status: undefined,
     });
     if (!appointmentsResult.ok) return appointmentsResult;
+
+    const blocksResult = this.calendarBlockRepository
+      ? await this.calendarBlockRepository.list({
+          clinicIds,
+          from: openAt.toISOString(),
+          to: closeAt.toISOString(),
+        })
+      : { ok: true as const, value: [] };
+    if (!blocksResult.ok) return blocksResult;
 
     const active = appointmentsResult.value.filter(
       (row) =>
@@ -99,6 +113,10 @@ export class CalendarService {
       const overlaps = active.some((appointment) => {
         const start = new Date(appointment.scheduledAt).getTime();
         const end = start + appointment.durationMinutes * 60_000;
+        return slotStart < end && slotEnd > start;
+      }) || blocksResult.value.some((block) => {
+        const start = new Date(block.startAt).getTime();
+        const end = new Date(block.endAt).getTime();
         return slotStart < end && slotEnd > start;
       });
       if (!overlaps) slots.push(new Date(slotStart).toISOString());

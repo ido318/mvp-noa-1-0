@@ -3,6 +3,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { AIEventRepository } from "@/lib/repositories/ai-event.repository";
 import { AppointmentRepository } from "@/lib/repositories/appointment.repository";
 import { AuditLogRepository } from "@/lib/repositories/audit-log.repository";
+import { CalendarBlockRepository } from "@/lib/repositories/calendar-block.repository";
 import { ClinicRepository } from "@/lib/repositories/clinic.repository";
 import { CustomerRepository } from "@/lib/repositories/customer.repository";
 import { MedicalNoteRepository } from "@/lib/repositories/medical-note.repository";
@@ -15,6 +16,7 @@ import { AIEventService } from "@/lib/services/ai-event.service";
 import { AppointmentService } from "@/lib/services/appointment.service";
 import { AuditService } from "@/lib/services/audit.service";
 import { AuthService } from "@/lib/services/auth.service";
+import { CalendarBlockService } from "@/lib/services/calendar-block.service";
 import { CalendarService } from "@/lib/services/calendar.service";
 import { CustomerService } from "@/lib/services/customer.service";
 import { HealthService } from "@/lib/services/health.service";
@@ -36,6 +38,7 @@ export async function createServices() {
   const customerRepository = new CustomerRepository(supabase);
   const petRepository = new PetRepository(supabase);
   const appointmentRepository = new AppointmentRepository(supabase);
+  const calendarBlockRepository = new CalendarBlockRepository(supabase);
   const visitRepository = new VisitRepository(supabase);
   const voiceCallRepository = new VoiceCallRepository(supabase);
   const medicalNoteRepository = new MedicalNoteRepository(supabase);
@@ -61,7 +64,8 @@ export async function createServices() {
       auditService,
       new DashboardNotificationsService(supabase),
     ),
-    calendar: new CalendarService(appointmentRepository),
+    calendar: new CalendarService(appointmentRepository, calendarBlockRepository),
+    calendarBlock: new CalendarBlockService(calendarBlockRepository),
     visit: new VisitService(
       visitRepository,
       customerRepository,

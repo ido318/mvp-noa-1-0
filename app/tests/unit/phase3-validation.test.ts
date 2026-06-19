@@ -6,7 +6,7 @@ import {
 } from "@/lib/validators/appointment";
 
 describe("phase3 validators", () => {
-  it("accepts valid create appointment payload with effective duration", () => {
+  it("accepts valid create appointment payload with 30 minute default duration", () => {
     const result = createAppointmentSchema.safeParse({
       clinicId: "00000000-0000-4000-8000-000000000001",
       customerId: "00000000-0000-4000-8000-000000000010",
@@ -14,7 +14,7 @@ describe("phase3 validators", () => {
       appointmentType: "checkup",
       source: "front_desk",
       scheduledAt: new Date().toISOString(),
-      durationMinutes: 40,
+      durationMinutes: 30,
     });
     expect(result.success).toBe(true);
   });
