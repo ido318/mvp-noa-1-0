@@ -23,7 +23,8 @@ export function formatIsraelTime(iso: string | Date): string {
 export function formatIsraelDate(iso: string | Date): string {
   const dateIso = israelDateIso(iso);
   const [year, month, day] = dateIso.split("-");
-  return `${day}/${month}/${year}`;
+  if (!year || !month || !day) return dateIso;
+  return `${day}/${month}/${year.slice(-2)}`;
 }
 
 export function formatIsraelDateTime(iso: string | Date): string {

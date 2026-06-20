@@ -17,11 +17,11 @@ describe("Israel date/time display formatting", () => {
     expect(formatIsraelTime("2026-06-20T10:00:00.000Z")).toBe("13:00");
   });
 
-  it("formats dates as day/month/year", () => {
-    expect(formatIsraelDate("2026-06-20T10:00:00.000Z")).toBe("20/06/2026");
+  it("formats dates as dd/mm/yy", () => {
+    expect(formatIsraelDate("2026-06-20T10:00:00.000Z")).toBe("20/06/26");
   });
 
   it("formats date and time together without 12-hour clock", () => {
-    expect(formatIsraelDateTime("2026-06-20T10:00:00.000Z")).toBe("20/06/2026 13:00");
+    expect(formatIsraelDateTime("2026-06-20T10:00:00.000Z")).toBe("20/06/26 13:00");
   });
 });

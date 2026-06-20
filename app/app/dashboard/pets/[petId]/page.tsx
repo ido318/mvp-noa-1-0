@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { dashboardApiFetch } from "@/app/dashboard/api-client";
+import { formatIsraelDate, formatIsraelDateTime } from "@/lib/israel-date";
 import type { Pet } from "@/types/domain/pet";
 import type { Vaccination } from "@/types/domain/vaccination";
 import type { Visit, VisitStatus } from "@/types/domain/visit";
@@ -119,7 +120,7 @@ export default async function PetProfilePage({ params }: Params) {
                       href={`/dashboard/visits/${visit.id}`}
                       className="text-sm text-emerald-700"
                     >
-                      {new Date(visit.startedAt).toLocaleString()} ·{" "}
+                      {formatIsraelDateTime(visit.startedAt)} ·{" "}
                       {VISIT_STATUS_LABELS[visit.status]}
                     </Link>
                   </li>
@@ -138,7 +139,7 @@ export default async function PetProfilePage({ params }: Params) {
             <ul className="mt-2 space-y-1">
               {(vaccinationsData?.items ?? []).slice(0, 5).map((v) => (
                 <li key={v.id} className="text-sm text-zinc-600">
-                  {v.vaccineName} · {new Date(v.administeredAt).toLocaleDateString()}
+                  {v.vaccineName} · {formatIsraelDate(v.administeredAt)}
                 </li>
               ))}
               {(vaccinationsData?.items ?? []).length === 0 ? (

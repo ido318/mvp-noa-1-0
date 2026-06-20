@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import { formatIsraelDateTime } from "@/lib/israel-date";
 import type { Vaccination } from "@/types/domain/vaccination";
 
 type Props = {
@@ -71,7 +72,7 @@ export function VisitVaccinationsSection({
             <li key={v.id} className="rounded-lg border border-zinc-100 p-3 text-sm">
               <p className="font-medium text-zinc-800">{v.vaccineName}</p>
               <p className="text-zinc-600">
-                {new Date(v.administeredAt).toLocaleString()}
+                {formatIsraelDateTime(v.administeredAt)}
                 {v.batchNumber ? ` · אצווה ${v.batchNumber}` : ""}
               </p>
             </li>

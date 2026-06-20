@@ -4,6 +4,7 @@ import { Badge } from "@/components/dashboard/ui/badge";
 import { Card } from "@/components/dashboard/ui/card";
 import { EmptyState } from "@/components/dashboard/ui/empty-state";
 import { RecordsIcon } from "@/components/dashboard/icons";
+import { formatIsraelDateTime } from "@/lib/israel-date";
 import type { Visit } from "@/types/domain/visit";
 
 function statusHe(status: Visit["status"]): string {
@@ -71,11 +72,7 @@ export default async function RecordsPage() {
                       href={`/dashboard/visits/${visit.id}`}
                       className="font-bold text-[var(--ink)] hover:text-[var(--brand-700)]"
                     >
-                      {new Intl.DateTimeFormat("he-IL", {
-                        dateStyle: "medium",
-                        timeStyle: "short",
-                        timeZone: "Asia/Jerusalem",
-                      }).format(new Date(visit.startedAt))}
+                      {formatIsraelDateTime(visit.startedAt)}
                     </Link>
                     <p className="mt-1 text-sm text-[var(--muted)]">
                       {visit.chiefComplaint ?? "ללא תלונה ראשית"}
