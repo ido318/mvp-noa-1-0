@@ -64,4 +64,33 @@ describe("saveVoiceCall", () => {
     expect(mockUpdate.mock.calls[0]?.[0]).toHaveProperty("ended_at");
     expect(mockEq).toHaveBeenCalledWith("twilio_call_sid", "CA1234567890");
   });
+
+  it("marks ElevenLabs done webhook payloads as completed", async () => {
+    await saveVoiceCall(
+      "conv_done",
+      12,
+      null,
+      {
+        caller_number: "+972541234567",
+        status: "done",
+      },
+      {
+        transcript: [{ role: "user", message: "בדיקה" }],
+        aiSummary: "השיחה הסתיימה",
+        callCategory: "information",
+      },
+    );
+
+    expect(mockUpdate).not.toHaveBeenCalled();
+    expect(mockUpsert).toHaveBeenCalledOnce();
+    expect(mockUpsert.mock.calls[0]?.[0]).toMatchObject({
+      elevenlabs_conversation_id: "conv_done",
+      status: "completed",
+      duration_seconds: 12,
+      transcript: [{ role: "user", message: "בדיקה" }],
+      ai_summary: "השיחה הסתיימה",
+      call_category: "information",
+    });
+    expect(mockUpsert.mock.calls[0]?.[0]).toHaveProperty("ended_at");
+  });
 });

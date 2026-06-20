@@ -621,8 +621,19 @@ export async function saveVoiceCall(
       ? payload["caller_number"]
       : "unknown";
 
+  const payloadStatus =
+    typeof payload["status"] === "string" ? payload["status"].toLowerCase() : null;
   const status =
-    success === true ? "completed" : success === false ? "failed" : "in_progress";
+    success === true ||
+    payloadStatus === "done" ||
+    payloadStatus === "completed" ||
+    payloadStatus === "success"
+      ? "completed"
+      : success === false ||
+          payloadStatus === "failed" ||
+          payloadStatus === "error"
+        ? "failed"
+        : "in_progress";
 
   const row: Record<string, unknown> = {
     clinic_id:                    env.AGENT_CLINIC_ID,
