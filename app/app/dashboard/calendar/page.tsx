@@ -72,6 +72,13 @@ function calendarBlockErrorMessage(payload: {
   return payload?.error?.message ?? "שמירת החסימה נכשלה";
 }
 
+function apiErrorMessage(
+  payload: { error?: { message?: string } } | null,
+  fallback: string,
+) {
+  return payload?.error?.message ?? fallback;
+}
+
 function fmtDayHeader(d: Date) {
   return new Intl.DateTimeFormat("he-IL", { timeZone: TZ, day: "numeric", month: "short" }).format(d);
 }
@@ -218,6 +225,7 @@ export default function CalendarPage() {
   const [blockEnd, setBlockEnd] = useState("20:00");
   const [blockReason, setBlockReason] = useState("סיום מוקדם");
   const [blockError, setBlockError] = useState<string | null>(null);
+  const [calendarError, setCalendarError] = useState<string | null>(null);
 
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)) as [Date, Date, Date, Date, Date, Date, Date];
   const from = isoOfDate(weekStart);
@@ -226,25 +234,44 @@ export default function CalendarPage() {
   const fetchData = useCallback(async (options: { background?: boolean } = {}) => {
     if (!options.background) setLoading(true);
     try {
+      setCalendarError(null);
       const rangeStart = toIsraelLocalIso(from, "00:00");
       const rangeEnd = toIsraelLocalIso(to, "23:59");
-      const [apptRes, blockRes, meRes] = await Promise.all([
-        fetch(`/api/appointments?from=${encodeURIComponent(rangeStart)}&to=${encodeURIComponent(rangeEnd)}`),
+
+      const meRes = await fetch("/api/me");
+      if (!meRes.ok) {
+        const payload = await meRes.json().catch(() => null) as { error?: { message?: string } } | null;
+        throw new Error(apiErrorMessage(payload, "טעינת פרטי המשתמש נכשלה."));
+      }
+
+      const me = await meRes.json() as { data: MeResponse };
+      const activeClinicId = me.data.profile.defaultClinicId ?? me.data.memberships[0]?.clinicId ?? null;
+      setClinicId(activeClinicId);
+      if (!activeClinicId) {
+        throw new Error("לא נמצאה מרפאה פעילה למשתמש.");
+      }
+
+      const [calendarRes, blockRes] = await Promise.all([
+        fetch(`/api/calendar?clinicId=${encodeURIComponent(activeClinicId)}&view=week&date=${encodeURIComponent(from)}`),
         fetch(`/api/calendar-blocks?from=${encodeURIComponent(rangeStart)}&to=${encodeURIComponent(rangeEnd)}`),
-        fetch("/api/me"),
       ]);
-      if (apptRes.ok) {
-        const d = await apptRes.json() as { data: { items: Appointment[] } };
-        setAppointments(d.data.items ?? []);
+
+      if (!calendarRes.ok) {
+        const payload = await calendarRes.json().catch(() => null) as { error?: { message?: string } } | null;
+        throw new Error(apiErrorMessage(payload, "טעינת התורים ליומן נכשלה."));
       }
-      if (blockRes.ok) {
-        const d = await blockRes.json() as { data: { items: CalendarBlock[] } };
-        setBlocks(d.data.items ?? []);
+
+      if (!blockRes.ok) {
+        const payload = await blockRes.json().catch(() => null) as { error?: { message?: string } } | null;
+        throw new Error(apiErrorMessage(payload, "טעינת חסימות היומן נכשלה."));
       }
-      if (meRes.ok) {
-        const d = await meRes.json() as { data: MeResponse };
-        setClinicId(d.data.profile.defaultClinicId ?? d.data.memberships[0]?.clinicId ?? null);
-      }
+
+      const calendarData = await calendarRes.json() as { data: { items: Appointment[] } };
+      const blockData = await blockRes.json() as { data: { items: CalendarBlock[] } };
+      setAppointments(calendarData.data.items ?? []);
+      setBlocks(blockData.data.items ?? []);
+    } catch (error) {
+      setCalendarError(error instanceof Error ? error.message : "טעינת היומן נכשלה.");
     } finally {
       if (!options.background) setLoading(false);
     }
@@ -414,6 +441,12 @@ export default function CalendarPage() {
 
         {blockError && <p className="text-xs font-semibold text-[var(--red-700)]">{blockError}</p>}
       </Card>
+
+      {calendarError && (
+        <div className="rounded-[var(--r-md)] border border-[var(--red-200)] bg-[var(--red-50)] px-3 py-2 text-sm font-semibold text-[var(--red-700)]">
+          {calendarError}
+        </div>
+      )}
 
       {loading ? (
         <Skeleton className="h-[560px]" />
