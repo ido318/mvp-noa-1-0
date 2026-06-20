@@ -223,8 +223,8 @@ export default function CalendarPage() {
   const from = isoOfDate(weekStart);
   const to   = isoOfDate(weekDays[6]);
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
+  const fetchData = useCallback(async (options: { background?: boolean } = {}) => {
+    if (!options.background) setLoading(true);
     try {
       const rangeStart = toIsraelLocalIso(from, "00:00");
       const rangeEnd = toIsraelLocalIso(to, "23:59");
@@ -246,11 +246,30 @@ export default function CalendarPage() {
         setClinicId(d.data.profile.defaultClinicId ?? d.data.memberships[0]?.clinicId ?? null);
       }
     } finally {
-      setLoading(false);
+      if (!options.background) setLoading(false);
     }
   }, [from, to]);
 
   useEffect(() => { void fetchData(); }, [fetchData]);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      void fetchData({ background: true });
+    }, 5000);
+
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") {
+        void fetchData({ background: true });
+      }
+    };
+
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
+  }, [fetchData]);
 
   function apptForDay(d: Date) {
     const iso = isoOfDate(d);
