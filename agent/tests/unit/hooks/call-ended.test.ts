@@ -109,6 +109,45 @@ describe("POST /hooks/call-ended", () => {
     );
   });
 
+  it("unwraps ElevenLabs post_call_transcription event payloads", async () => {
+    const wrappedPayload = JSON.stringify({
+      type: "post_call_transcription",
+      event_timestamp: 1781945581,
+      data: {
+        conversation_id: "conv_wrapped",
+        status: "done",
+        has_audio: false,
+        transcript: [{ role: "user", message: "אני צריך תור", time_in_call_secs: 2 }],
+        metadata: { call_duration_secs: 33 },
+        analysis: { transcript_summary: "נקבע תור דרך תומר." },
+      },
+    });
+
+    const res = await makeApp().request("/hooks/call-ended", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "elevenlabs-signature": sign(wrappedPayload),
+      },
+      body: wrappedPayload,
+    });
+
+    expect(res.status).toBe(200);
+    expect(mockSaveVoiceCall).toHaveBeenCalledWith(
+      "conv_wrapped",
+      33,
+      null,
+      expect.objectContaining({
+        conversation_id: "conv_wrapped",
+        status: "done",
+      }),
+      expect.objectContaining({
+        transcript: [{ role: "user", message: "אני צריך תור", time_in_call_secs: 2 }],
+        aiSummary: "נקבע תור דרך תומר.",
+      }),
+    );
+  });
+
   it("fetches and stores recording when ElevenLabs reports audio is available", async () => {
     vi.stubGlobal(
       "fetch",

@@ -23,12 +23,14 @@ hooksRoutes.post("/hooks/call-ended", async (c) => {
     return c.json({ error: "invalid_signature" }, 401);
   }
 
-  let payload: Record<string, unknown>;
+  let eventPayload: Record<string, unknown>;
   try {
-    payload = JSON.parse(rawBody) as Record<string, unknown>;
+    eventPayload = JSON.parse(rawBody) as Record<string, unknown>;
   } catch {
     return c.json({ error: "invalid_json" }, 400);
   }
+
+  const payload = getConversationPayload(eventPayload);
 
   const conversationId =
     (payload["conversation_id"] as string | undefined) ?? `unknown-${Date.now()}`;
@@ -81,6 +83,13 @@ hooksRoutes.post("/hooks/call-ended", async (c) => {
 
   return c.json({ ok: true });
 });
+
+function getConversationPayload(eventPayload: Record<string, unknown>): Record<string, unknown> {
+  const data = eventPayload["data"];
+  return data && typeof data === "object" && !Array.isArray(data)
+    ? data as Record<string, unknown>
+    : eventPayload;
+}
 
 async function fetchAndStoreRecording(
   conversationId: string,
