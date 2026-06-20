@@ -1,5 +1,5 @@
 import { AppError, err, ok, type Result } from "@/lib/errors/app-error";
-import { isExpectedDuration } from "@/lib/appointment-rules";
+import { isExpectedDuration, toIsraelLocalIso } from "@/lib/appointment-rules";
 import type { AppointmentRepository } from "@/lib/repositories/appointment.repository";
 import type { CustomerRepository } from "@/lib/repositories/customer.repository";
 import type { PetRepository } from "@/lib/repositories/pet.repository";
@@ -25,6 +25,35 @@ const ALLOWED_STATUS_TRANSITIONS: Record<AppointmentStatus, AppointmentStatus[]>
   late_cancellation:[],
 };
 
+function addDaysIso(date: string, days: number): string {
+  const [yearRaw = "0", monthRaw = "1", dayRaw = "1"] = date.split("-");
+  const year = Number(yearRaw);
+  const month = Number(monthRaw);
+  const day = Number(dayRaw);
+  const next = new Date(Date.UTC(year, month - 1, day + days));
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "UTC",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(next);
+}
+
+function normalizeListFilters(
+  filters: Omit<AppointmentListFilters, "clinicIds"> & { clinicIds: string[] },
+): AppointmentListFilters {
+  if (!filters.date || filters.from || filters.to) {
+    return { ...filters, date: undefined };
+  }
+
+  return {
+    ...filters,
+    date: undefined,
+    from: new Date(toIsraelLocalIso(filters.date, "00:00")).toISOString(),
+    to: new Date(toIsraelLocalIso(addDaysIso(filters.date, 1), "00:00")).toISOString(),
+  };
+}
+
 export class AppointmentService {
   constructor(
     private readonly appointmentRepository: AppointmentRepository,
@@ -42,7 +71,7 @@ export class AppointmentService {
     if (clinicIds.some((clinicId) => !actor.clinicIds.includes(clinicId))) {
       return err(AppError.forbidden("Cannot list appointments for requested clinic"));
     }
-    return this.appointmentRepository.list({ ...filters, clinicIds });
+    return this.appointmentRepository.list(normalizeListFilters({ ...filters, clinicIds }));
   }
 
   async getAppointmentById(

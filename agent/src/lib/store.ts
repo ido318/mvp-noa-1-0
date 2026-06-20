@@ -287,8 +287,32 @@ export async function bookAppointment(params: BookAppointmentParams): Promise<st
 
   if (error) {
     if (error.code === "23P01" || error.message.includes("appointments_no_active_overlap")) {
-      return "השעה הזו כבר תפוסה. בחר/י שעה אחרת מהחלונות הפנויים.";
+      logger.warn(
+        {
+          phone: params.phone,
+          visitType: params.visit_type,
+          scheduledAt: params.scheduled_at,
+          error,
+        },
+        "bookAppointment: slot overlap, booking was not created",
+      );
+
+      try {
+        const dateIso = params.scheduled_at.slice(0, 10);
+        const availability = await checkAvailability(dateIso, params.visit_type);
+        return `השעה הזו כבר תפוסה. ${availability}`;
+      } catch (availabilityErr) {
+        logger.error(
+          { err: availabilityErr, scheduledAt: params.scheduled_at, visitType: params.visit_type },
+          "bookAppointment: failed to refresh availability after overlap",
+        );
+        return "השעה הזו כבר תפוסה. בחר/י שעה אחרת מהחלונות הפנויים.";
+      }
     }
+    logger.error(
+      { err: error, scheduledAt: params.scheduled_at, visitType: params.visit_type },
+      "bookAppointment: appointment insert failed",
+    );
     throw new Error(`bookAppointment failed: ${error.message}`);
   }
 
