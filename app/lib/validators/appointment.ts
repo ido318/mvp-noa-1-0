@@ -37,7 +37,7 @@ export const createAppointmentSchema = z.object({
   petId: z.string().uuid(),
   appointmentType: appointmentTypeSchema,
   source: appointmentSourceSchema,
-  scheduledAt: z.string().datetime(),
+  scheduledAt: z.string().datetime({ offset: true }),
   durationMinutes: z.number().int().positive(),
   reason: z.string().trim().max(400).optional().nullable(),
   notes: z.string().trim().max(2000).optional().nullable(),
@@ -53,7 +53,7 @@ export const updateAppointmentSchema = z
       .object({
         appointmentType: appointmentTypeSchema.optional(),
         source: appointmentSourceSchema.optional(),
-        scheduledAt: z.string().datetime().optional(),
+        scheduledAt: z.string().datetime({ offset: true }).optional(),
         durationMinutes: z.number().int().positive().optional(),
         reason: z.string().trim().max(400).optional().nullable(),
         notes: z.string().trim().max(2000).optional().nullable(),
@@ -80,8 +80,8 @@ export const changeStatusSchema = z.object({
 export const listAppointmentsSchema = z.object({
   clinicId: z.string().uuid().optional(),
   date: z.string().date().optional(),
-  from: z.string().datetime().optional(),
-  to: z.string().datetime().optional(),
+  from: z.string().datetime({ offset: true }).optional(),
+  to: z.string().datetime({ offset: true }).optional(),
   status: appointmentStatusSchema.optional(),
   customerId: z.string().uuid().optional(),
   petId: z.string().uuid().optional(),
