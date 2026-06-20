@@ -1,7 +1,7 @@
 # תוכנית עבודה - Tomer / Get A Vet
 
 > קובץ Markdown להעתקה ל-Notion.
-> סטטוס עדכני: Batch 1-3 כבר בוצעו בקוד, אך עדיין לא בוצע commit.
+> סטטוס עדכני: Batch 1-5 בוצעו בקוד. Batch 1-4 נדחפו ל-GitHub בענף `codex/batch-1-4-checkpoint`; Batch 5 בעבודה בענף `codex/batch-5-live-calls`.
 
 ---
 
@@ -21,8 +21,8 @@
 ## סטטוס כללי
 
 - [x] Batch 1-3: תשתית booking, גזע חיה, שינוי סוג ביקור ופורמט זמן/תאריך.
-- [ ] Batch 4: לוודא שכל תור שתומר קובע מופיע ביומן.
-- [ ] Batch 5: לשונית שיחות חיה עם תמלול והקלטות.
+- [x] Batch 4: לוודא שכל תור שתומר קובע מופיע ביומן.
+- [x] Batch 5: לשונית שיחות חיה עם תמלול והקלטות.
 - [ ] Batch 6: קול וזמן תגובה של תומר.
 - [ ] Batch 7: פתיחת ביקור רפואי רק אחרי הגעה.
 - [ ] Batch 8: מעבר בין תורים ו-no-show.
@@ -54,7 +54,7 @@
 
 ### הערות
 
-- [ ] לא בוצע commit.
+- [x] בוצע commit חתום ודחיפה ל-GitHub.
 - [ ] `lint` עדיין נכשל בגלל בעיות קיימות:
   - חסר `eslint.config.*` ב-agent.
   - בעיות React lint קיימות במסכי dashboard.
@@ -75,17 +75,17 @@ git commit -m "fix: stabilize voice booking and israel datetime formatting"
 
 ### Checklist
 
-- [ ] לוודא שכל קריאת `book-appointment` יוצרת רשומה ב-`appointments`.
-- [ ] לוודא ש-`checkup` מופיע ביומן כ-`scheduled`.
-- [ ] לוודא ש-`vaccination`, כולל חיסון כלבת, מופיע ביומן כ-`scheduled`.
-- [ ] לוודא ש-`home_visit` מופיע ביומן כ-`scheduled`.
-- [ ] לוודא ש-`phone_consultation` מופיע ביומן כ-`scheduled`.
-- [ ] לוודא ש-`neutering` מופיע ביומן כ-`pending_approval`.
-- [ ] לוודא שה-API של היומן מחזיר את התורים שתומר יצר.
-- [ ] לוודא שהמסכים "היום" ו"יומן" מציגים את התורים האלה.
-- [ ] להוסיף לוג ברור כאשר יצירת תור נכשלת.
-- [ ] לוודא שתומר לא אומר "התור נקבע" אם Supabase החזיר שגיאה.
-- [ ] אם השעה נתפסה, תומר מציע שעה אחרת במקום לסכם תור שלא נוצר.
+- [x] לוודא שכל קריאת `book-appointment` יוצרת רשומה ב-`appointments`.
+- [x] לוודא ש-`checkup` מופיע ביומן כ-`scheduled`.
+- [x] לוודא ש-`vaccination`, כולל חיסון כלבת, מופיע ביומן כ-`scheduled`.
+- [x] לוודא ש-`home_visit` מופיע ביומן כ-`scheduled`.
+- [x] לוודא ש-`phone_consultation` מופיע ביומן כ-`scheduled`.
+- [x] לוודא ש-`neutering` מופיע ביומן כ-`pending_approval`.
+- [x] לוודא שה-API של היומן מחזיר את התורים שתומר יצר.
+- [x] לוודא שהמסכים "היום" ו"יומן" מציגים את התורים האלה.
+- [x] להוסיף לוג ברור כאשר יצירת תור נכשלת.
+- [x] לוודא שתומר לא אומר "התור נקבע" אם Supabase החזיר שגיאה.
+- [x] אם השעה נתפסה, תומר מציע שעה אחרת במקום לסכם תור שלא נוצר.
 
 ### קבצים מרכזיים
 
@@ -98,9 +98,9 @@ git commit -m "fix: stabilize voice booking and israel datetime formatting"
 
 ### בדיקות
 
-- [ ] Unit test ל-`bookAppointment` עבור חיסון כלבת.
-- [ ] Unit test ל-`bookAppointment` עבור עיקור/סירוס.
-- [ ] API/service test שמוודא שתור שנוצר מוחזר ביומן.
+- [x] Unit test ל-`bookAppointment` עבור חיסון כלבת.
+- [x] Unit test ל-`bookAppointment` עבור עיקור/סירוס.
+- [x] API/service test שמוודא שתור שנוצר מוחזר ביומן.
 - [ ] בדיקה ידנית: שיחת תומר -> קביעת תור -> התור מופיע ביומן.
 
 ### Commit מוצע
@@ -119,24 +119,24 @@ git commit -m "fix: ensure voice bookings appear in calendar"
 
 ### Checklist
 
-- [ ] ליצור או לעדכן רשומת `voice_calls` בתחילת שיחה ב-`/twilio/voice`.
-- [ ] לא להמתין רק ל-`/hooks/call-ended` כדי שהשיחה תופיע בדשבורד.
-- [ ] להציג סטטוס `in_progress` כאשר השיחה פעילה.
-- [ ] לעדכן ל-`completed` כאשר ElevenLabs שולח webhook סיום.
-- [ ] לשמור `elevenlabs_conversation_id`.
-- [ ] לשמור `transcript` מתוך webhook הסיום.
-- [ ] לשמור `ai_summary` מתוך webhook הסיום.
-- [ ] להוריד הקלטה מ-ElevenLabs.
-- [ ] לשמור הקלטה ב-Supabase Storage bucket `call-recordings`.
-- [ ] לשמור `recording_storage_path` ב-`voice_calls`.
-- [ ] להציג בלשונית "שיחות" רשימת שיחות עדכנית.
-- [ ] לאפשר לחיצה על שיחה.
-- [ ] לפתוח Drawer או עמוד פרטים לשיחה.
-- [ ] להציג סיכום AI.
-- [ ] להציג תמלול מלא.
-- [ ] להציג נגן הקלטה.
-- [ ] להציג הודעת מצב ברורה אם אין עדיין תמלול או הקלטה.
-- [ ] להוסיף polling או realtime update למסך שיחות.
+- [x] ליצור או לעדכן רשומת `voice_calls` בתחילת שיחה ב-`/twilio/voice`.
+- [x] לא להמתין רק ל-`/hooks/call-ended` כדי שהשיחה תופיע בדשבורד.
+- [x] להציג סטטוס `in_progress` כאשר השיחה פעילה.
+- [x] לעדכן ל-`completed` כאשר ElevenLabs שולח webhook סיום.
+- [x] לשמור `elevenlabs_conversation_id`.
+- [x] לשמור `transcript` מתוך webhook הסיום.
+- [x] לשמור `ai_summary` מתוך webhook הסיום.
+- [x] להוריד הקלטה מ-ElevenLabs.
+- [x] לשמור הקלטה ב-Supabase Storage bucket `call-recordings`.
+- [x] לשמור `recording_storage_path` ב-`voice_calls`.
+- [x] להציג בלשונית "שיחות" רשימת שיחות עדכנית.
+- [x] לאפשר לחיצה על שיחה.
+- [x] לפתוח Drawer או עמוד פרטים לשיחה.
+- [x] להציג סיכום AI.
+- [x] להציג תמלול מלא.
+- [x] להציג נגן הקלטה.
+- [x] להציג הודעת מצב ברורה אם אין עדיין תמלול או הקלטה.
+- [x] להוסיף polling או realtime update למסך שיחות.
 
 ### קבצים מרכזיים
 
@@ -150,9 +150,9 @@ git commit -m "fix: ensure voice bookings appear in calendar"
 
 ### בדיקות
 
-- [ ] Unit test ליצירת voice call בתחילת שיחה.
-- [ ] Unit test ל-hook סיום שיחה עם transcript.
-- [ ] Unit test ל-hook סיום שיחה עם recording.
+- [x] Unit test ליצירת voice call בתחילת שיחה.
+- [x] Unit test ל-hook סיום שיחה עם transcript.
+- [x] Unit test ל-hook סיום שיחה עם recording.
 - [ ] בדיקה ידנית: שיחה נכנסת מופיעה כ"בשיחה".
 - [ ] בדיקה ידנית: אחרי סיום שיחה רואים תמלול והקלטה.
 
@@ -488,4 +488,3 @@ npm run typecheck:all
 npm run lint --workspace=agent
 npm run lint --workspace=app
 ```
-

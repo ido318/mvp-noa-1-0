@@ -232,8 +232,8 @@ export default function CallsPage() {
   const [category, setCategory] = useState<CategoryFilter>("all");
   const [selected, setSelected] = useState<VoiceCall | null>(null);
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
+  const fetchData = useCallback(async (showLoading = false) => {
+    if (showLoading) setLoading(true);
     try {
       const res = await fetch("/api/voice/calls");
       if (res.ok) {
@@ -241,11 +241,17 @@ export default function CallsPage() {
         setItems(d.data.items ?? []);
       }
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   }, []);
 
-  useEffect(() => { void fetchData(); }, [fetchData]);
+  useEffect(() => {
+    void fetchData(true);
+    const intervalId = window.setInterval(() => {
+      void fetchData(false);
+    }, 15000);
+    return () => window.clearInterval(intervalId);
+  }, [fetchData]);
 
   const filtered = category === "all"
     ? items

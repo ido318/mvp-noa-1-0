@@ -150,6 +150,28 @@ function extractNestedString(row: unknown, parent: string, key: string): string 
   return null;
 }
 
+function extractTwilioCallSid(payload: Record<string, unknown>): string | null {
+  const direct = payload["twilio_call_sid"];
+  if (typeof direct === "string" && direct.trim()) return direct;
+
+  const metadata = payload["metadata"];
+  if (metadata !== null && typeof metadata === "object") {
+    const value = (metadata as Record<string, unknown>)["twilio_call_sid"];
+    if (typeof value === "string" && value.trim()) return value;
+  }
+
+  const initiation = payload["conversation_initiation_client_data"];
+  if (initiation !== null && typeof initiation === "object") {
+    const dynamicVariables = (initiation as Record<string, unknown>)["dynamic_variables"];
+    if (dynamicVariables !== null && typeof dynamicVariables === "object") {
+      const value = (dynamicVariables as Record<string, unknown>)["twilio_call_sid"];
+      if (typeof value === "string" && value.trim()) return value;
+    }
+  }
+
+  return null;
+}
+
 async function findCustomerIdByPhone(phone: string): Promise<string | null> {
   const env = getEnv();
   const { data, error } = await getSupabase()
@@ -556,6 +578,36 @@ export type SaveVoiceCallEnrichment = {
   recordingStoragePath?: string | null;
 };
 
+export type SaveIncomingVoiceCallParams = {
+  twilioCallSid: string;
+  fromNumber: string;
+  toNumber: string;
+  status: "in_progress";
+  metadata: Record<string, unknown>;
+};
+
+export async function saveIncomingVoiceCall(
+  params: SaveIncomingVoiceCallParams,
+): Promise<void> {
+  const env = getEnv();
+  const { error } = await getSupabase()
+    .from("voice_calls")
+    .upsert(
+      {
+        clinic_id:        env.AGENT_CLINIC_ID,
+        direction:        "inbound",
+        status:           params.status,
+        from_number:      params.fromNumber,
+        to_number:        params.toNumber,
+        twilio_call_sid:  params.twilioCallSid,
+        agent_name:       "tomer",
+        metadata:         params.metadata,
+      },
+      { onConflict: "twilio_call_sid" },
+    );
+  if (error) throw new Error(`supabase incoming voice_call upsert failed: ${error.message}`);
+}
+
 export async function saveVoiceCall(
   conversationId: string,
   durationSeconds: number | null,
@@ -584,6 +636,7 @@ export async function saveVoiceCall(
     metadata:                     payload,
   };
 
+  if (status === "completed" || status === "failed") row["ended_at"] = new Date().toISOString();
   if (enrichment.transcript !== undefined)            row["transcript"]              = enrichment.transcript;
   if (enrichment.aiSummary !== undefined)             row["ai_summary"]              = enrichment.aiSummary;
   if (enrichment.callCategory !== undefined) {
@@ -591,6 +644,16 @@ export async function saveVoiceCall(
     row["call_category"] = cat !== null && VALID_CALL_CATEGORIES.has(cat) ? cat : null;
   }
   if (enrichment.recordingStoragePath !== undefined)  row["recording_storage_path"]  = enrichment.recordingStoragePath;
+
+  const twilioCallSid = extractTwilioCallSid(payload);
+  if (twilioCallSid) {
+    const { error } = await getSupabase()
+      .from("voice_calls")
+      .update(row)
+      .eq("twilio_call_sid", twilioCallSid);
+    if (error) throw new Error(`supabase voice_call update failed: ${error.message}`);
+    return;
+  }
 
   const { error } = await getSupabase()
     .from("voice_calls")

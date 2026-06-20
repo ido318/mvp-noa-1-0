@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { ElevenLabsClient } from "elevenlabs";
 import { getEnv } from "../../lib/env.js";
 import { logger, maskPhone } from "../../lib/logger.js";
+import { saveIncomingVoiceCall } from "../../lib/store.js";
 import { twilioValidate } from "../middleware/twilioValidate.js";
 
 export const twilioRoutes = new Hono();
@@ -31,8 +32,12 @@ twilioRoutes.post("/twilio/voice", twilioValidate, async (c) => {
   const body = await c.req.parseBody();
   const callerPhone =
     typeof body["From"] === "string" ? body["From"] : "unknown";
+  const toNumber =
+    typeof body["To"] === "string" ? body["To"] : env.TWILIO_PHONE_NUMBER;
+  const callSid =
+    typeof body["CallSid"] === "string" ? body["CallSid"] : `unknown-${Date.now()}`;
 
-  logger.info({ caller: maskPhone(callerPhone) }, "twilio: incoming call");
+  logger.info({ caller: maskPhone(callerPhone), callSid }, "twilio: incoming call");
 
   let signed_url: string;
   try {
@@ -50,12 +55,27 @@ twilioRoutes.post("/twilio/voice", twilioValidate, async (c) => {
     );
   }
 
+  try {
+    await saveIncomingVoiceCall({
+      twilioCallSid: callSid,
+      fromNumber: callerPhone,
+      toNumber,
+      status: "in_progress",
+      metadata: Object.fromEntries(
+        Object.entries(body).filter((entry): entry is [string, string] => typeof entry[1] === "string"),
+      ),
+    });
+  } catch (err) {
+    logger.error({ err, callSid }, "twilio: failed to create live voice call record");
+  }
+
   const xmlUrl = signed_url.replace(/&/g, "&amp;");
   const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Connect>
     <Stream url="${xmlUrl}">
       <Parameter name="caller_number" value="${callerPhone}"/>
+      <Parameter name="twilio_call_sid" value="${callSid}"/>
     </Stream>
   </Connect>
 </Response>`;

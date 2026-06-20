@@ -1,16 +1,32 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { afterEach, describe, it, expect, vi, beforeEach } from "vitest";
 import { createHmac } from "node:crypto";
 import { Hono } from "hono";
 import { hooksRoutes } from "../../../src/server/routes/hooks.js";
 
-const { mockSaveVoiceCall } = vi.hoisted(() => ({
+const { mockSaveVoiceCall, mockUpload, mockUpdate, mockEq } = vi.hoisted(() => ({
   mockSaveVoiceCall: vi.fn().mockResolvedValue(undefined),
+  mockUpload: vi.fn().mockResolvedValue({ error: null }),
+  mockEq: vi.fn().mockResolvedValue({ error: null }),
+  mockUpdate: vi.fn(() => ({ eq: mockEq })),
 }));
 
 vi.mock("../../../src/lib/store.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../../src/lib/store.js")>();
   return { ...actual, saveVoiceCall: mockSaveVoiceCall };
 });
+
+vi.mock("../../../src/lib/supabase.js", () => ({
+  getSupabase: vi.fn(() => ({
+    storage: {
+      from: vi.fn(() => ({
+        upload: mockUpload,
+      })),
+    },
+    from: vi.fn(() => ({
+      update: mockUpdate,
+    })),
+  })),
+}));
 
 // SECRET must match ELEVENLABS_WEBHOOK_SECRET set in tests/setup.ts
 const SECRET = "test-secret";
@@ -38,6 +54,13 @@ const payload = JSON.stringify({
 describe("POST /hooks/call-ended", () => {
   beforeEach(() => {
     mockSaveVoiceCall.mockClear();
+    mockUpload.mockClear();
+    mockUpdate.mockClear();
+    mockEq.mockClear();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it("returns 200 with valid signature and writes to DB", async () => {
@@ -53,6 +76,74 @@ describe("POST /hooks/call-ended", () => {
     const json = await res.json() as { ok: boolean };
     expect(json.ok).toBe(true);
     expect(mockSaveVoiceCall).toHaveBeenCalledOnce();
+  });
+
+  it("passes transcript and AI summary enrichment to saveVoiceCall", async () => {
+    const enrichedPayload = JSON.stringify({
+      conversation_id: "conv_with_transcript",
+      success: true,
+      has_audio: false,
+      transcript: [{ role: "user", message: "אני רוצה לקבוע תור", time_in_call_secs: 3 }],
+      analysis: { transcript_summary: "הלקוחה ביקשה לקבוע תור." },
+    });
+
+    const res = await makeApp().request("/hooks/call-ended", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "elevenlabs-signature": sign(enrichedPayload),
+      },
+      body: enrichedPayload,
+    });
+
+    expect(res.status).toBe(200);
+    expect(mockSaveVoiceCall).toHaveBeenCalledWith(
+      "conv_with_transcript",
+      null,
+      true,
+      expect.any(Object),
+      expect.objectContaining({
+        transcript: [{ role: "user", message: "אני רוצה לקבוע תור", time_in_call_secs: 3 }],
+        aiSummary: "הלקוחה ביקשה לקבוע תור.",
+      }),
+    );
+  });
+
+  it("fetches and stores recording when ElevenLabs reports audio is available", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(4)),
+      }),
+    );
+
+    const recordingPayload = JSON.stringify({
+      conversation_id: "conv_with_audio",
+      success: true,
+      has_audio: true,
+    });
+
+    const res = await makeApp().request("/hooks/call-ended", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "elevenlabs-signature": sign(recordingPayload),
+      },
+      body: recordingPayload,
+    });
+
+    expect(res.status).toBe(200);
+    await vi.waitFor(() => {
+      expect(mockUpload).toHaveBeenCalledOnce();
+    });
+    expect(mockUpload.mock.calls[0]?.[0]).toBe(
+      "00000000-0000-4000-8000-000000000001/conv_with_audio.mp3",
+    );
+    expect(mockUpdate).toHaveBeenCalledWith({
+      recording_storage_path: "00000000-0000-4000-8000-000000000001/conv_with_audio.mp3",
+    });
+    expect(mockEq).toHaveBeenCalledWith("elevenlabs_conversation_id", "conv_with_audio");
   });
 
   it("returns 401 with wrong signature — no DB write", async () => {
