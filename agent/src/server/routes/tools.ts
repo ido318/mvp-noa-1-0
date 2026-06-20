@@ -112,7 +112,9 @@ toolsRoutes.post("/tools/lookup-customer", async (c) => {
     return c.json({ result: "לקוח לא מוכר. אסוף פרטים בעצמך." });
   }
 
-  const petList = customer.pets.map((p) => p.name).join(", ");
+  const petList = customer.pets
+    .map((p) => [p.name, p.species, p.breed].filter(Boolean).join(" - "))
+    .join(", ");
   return c.json({
     result: `שם: ${customer.full_name}, חיות: ${petList}`,
   });
@@ -297,6 +299,7 @@ const bookSchema = z.object({
   customer_name: z.string().min(1),
   pet_name:      z.string().min(1),
   pet_species:   z.string().min(1),
+  pet_breed:     z.string().min(1).optional().nullable(),
   scheduled_at:  z.string().regex(ISO_DATETIME_RE, "Expected ISO8601 datetime"),
   visit_type:    z.enum(VISIT_TYPE_VALUES),
   reason:        z.string().optional(),
@@ -370,6 +373,7 @@ const waitlistSchema = z.object({
   customer_name:   z.string().min(1),
   pet_name:        z.string().min(1),
   pet_species:     z.string().min(1),
+  pet_breed:       z.string().min(1).optional().nullable(),
   visit_type:      z.enum(VISIT_TYPE_VALUES),
   preferred_start: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   preferred_end:   z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),

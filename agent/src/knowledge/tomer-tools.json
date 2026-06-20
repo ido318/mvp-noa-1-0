@@ -172,6 +172,10 @@
             "type": "string",
             "description": "מין החיה (כלב/חתול)"
           },
+          "pet_breed": {
+            "type": "string",
+            "description": "גזע החיה אם הלקוח יודע, למשל לברדור, שיצו, פרסי, מעורב"
+          },
           "scheduled_at": {
             "type": "string",
             "description": "תאריך ושעה בפורמט ISO8601 עם timezone (למשל 2026-06-20T10:00:00+03:00)"
@@ -255,6 +259,10 @@
           "pet_species": {
             "type": "string",
             "description": "מין החיה (כלב/חתול)"
+          },
+          "pet_breed": {
+            "type": "string",
+            "description": "גזע החיה אם הלקוח יודע, למשל לברדור, שיצו, פרסי, מעורב"
           },
           "visit_type": {
             "type": "string",

@@ -9,7 +9,7 @@ import { EmptyState } from "@/components/dashboard/ui/empty-state";
 import { Skeleton } from "@/components/dashboard/ui/skeleton";
 import { useToast } from "@/components/dashboard/ui/toast";
 import { PhoneIcon, ClockIcon, SparkleIcon, CheckIcon, XIcon, UserIcon } from "@/components/dashboard/icons";
-import { ISRAEL_TIMEZONE, israelDateIso } from "@/lib/israel-date";
+import { ISRAEL_TIMEZONE, formatIsraelDate, formatIsraelTime, israelDateIso } from "@/lib/israel-date";
 import type { Appointment } from "@/types/domain/appointment";
 import type { Escalation } from "@/types/domain/escalation";
 import type { VoiceCall } from "@/types/domain/voice-call";
@@ -19,7 +19,7 @@ import type { VoiceCall } from "@/types/domain/voice-call";
 const TZ = ISRAEL_TIMEZONE;
 
 function israelTime(iso: string) {
-  return new Intl.DateTimeFormat("he-IL", { timeZone: TZ, hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(iso));
+  return formatIsraelTime(iso);
 }
 
 function todayIso() {
@@ -322,7 +322,7 @@ export default function TodayPage() {
         <div>
           <h1 className="text-xl font-extrabold text-[var(--ink)]">היום</h1>
           <p className="text-sm text-[var(--muted)]">
-            {new Intl.DateTimeFormat("he-IL", { timeZone: TZ, weekday: "long", day: "numeric", month: "long" }).format(new Date())}
+            {formatIsraelDate(new Date())}
           </p>
         </div>
       </div>
@@ -345,7 +345,7 @@ export default function TodayPage() {
               <p className="text-sm font-bold text-[var(--amber-700)]">
                 {pending.length} תור{pending.length > 1 ? "ים" : ""} ממתין{pending.length > 1 ? "ים" : ""} לאישורך
               </p>
-              <p className="text-xs text-[var(--amber-600)]">תורי עיקור/סירוס שנקבעו ע"י תומר מחכים לאישור ידני</p>
+              <p className="text-xs text-[var(--amber-600)]">תורי עיקור/סירוס שנקבעו ע&quot;י תומר מחכים לאישור ידני</p>
             </div>
           </div>
           <div className="mt-3 space-y-2">
@@ -392,7 +392,7 @@ export default function TodayPage() {
                 <UrgencyMeter value={esc.urgency} showLabel={false} className="w-16" />
                 <div className="flex-1 min-w-0">
                   <p className="truncate text-[13px] font-semibold text-[var(--ink)]">{esc.reason}</p>
-                  <p className="text-xs text-[var(--muted)]">{new Date(esc.createdAt).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" })}</p>
+                  <p className="text-xs text-[var(--muted)]">{formatIsraelTime(esc.createdAt)}</p>
                 </div>
                 {esc.afterHours && (
                   <Badge color="amber">אחרי שעות</Badge>

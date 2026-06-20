@@ -24,7 +24,7 @@ import {
 import { processNotifications } from "../services/notification.processor.js";
 import { VALID_CALL_CATEGORIES } from "./callClassifier.js";
 
-export type Pet = { name: string; species: string };
+export type Pet = { name: string; species: string; breed: string | null };
 
 export type Customer = {
   phone: string;
@@ -57,7 +57,7 @@ export async function findCustomerByPhone(
 
   const { data, error } = await getSupabase()
     .from("customers")
-    .select("phone, full_name, notes, pets(name, species)")
+    .select("phone, full_name, notes, pets(name, species, breed)")
     .eq("clinic_id", env.AGENT_CLINIC_ID)
     .eq("phone", normalised)
     .is("deleted_at", null)
@@ -71,7 +71,7 @@ export async function findCustomerByPhone(
     phone: string;
     full_name: string;
     notes: string | null;
-    pets: Array<{ name: string; species: string }> | null;
+    pets: Array<{ name: string; species: string; breed: string | null }> | null;
   };
 
   return {
@@ -131,6 +131,12 @@ function extractNumber(row: unknown, key: string): number | null {
     if (typeof val === "number") return val;
   }
   return null;
+}
+
+function isSameAppointmentSlot(a: string, b: string): boolean {
+  const aMs = new Date(a).getTime();
+  const bMs = new Date(b).getTime();
+  return !Number.isNaN(aMs) && !Number.isNaN(bMs) && aMs === bMs;
 }
 
 function extractNestedString(row: unknown, parent: string, key: string): string | null {
@@ -246,6 +252,7 @@ export type BookAppointmentParams = {
   customer_name: string;
   pet_name: string;
   pet_species: string;
+  pet_breed?: string | null;
   scheduled_at: string;
   visit_type: VisitType;
   reason?: string;
@@ -259,7 +266,7 @@ export async function bookAppointment(params: BookAppointmentParams): Promise<st
   const status = config.requiresApproval ? "pending_approval" : "scheduled";
 
   const { customerId } = await createOrFindCustomer(phone, params.customer_name);
-  const { petId } = await createOrFindPet(customerId, params.pet_name, params.pet_species);
+  const { petId } = await createOrFindPet(customerId, params.pet_name, params.pet_species, params.pet_breed);
 
   const { data, error } = await getSupabase()
     .from("appointments")
@@ -398,6 +405,28 @@ export async function rescheduleAppointment(
   const resolvedType = (visitType ?? oldAppt.appointment_type) as VisitType;
   const durMin = effectiveDuration(resolvedType);
 
+  if (isSameAppointmentSlot(oldAppt.scheduled_at, newScheduledAt)) {
+    const nextStatus = getVisitConfig(resolvedType).requiresApproval ? "pending_approval" : "scheduled";
+    const { error: updateErr } = await getSupabase()
+      .from("appointments")
+      .update({
+        appointment_type: resolvedType,
+        duration_minutes: durMin,
+        status:           nextStatus,
+        changed_via:      "agent",
+      })
+      .eq("id", oldAppt.id);
+
+    if (updateErr) {
+      if (updateErr.code === "23P01" || updateErr.message.includes("appointments_no_active_overlap")) {
+        return "אי אפשר לשנות לסוג הביקור הזה באותה שעה כי משך התור החדש מתנגש עם תור אחר.";
+      }
+      throw new Error(`rescheduleAppointment type update failed: ${updateErr.message}`);
+    }
+
+    return `✅ סוג התור עודכן ל${getVisitConfig(resolvedType).labelHe} בשעה ${formatSlotLabel(oldAppt.scheduled_at)}.`;
+  }
+
   const { data: rpcData, error: rpcErr } = await getSupabase().rpc("reschedule_appointment", {
     p_clinic_id:          env.AGENT_CLINIC_ID,
     p_old_appointment_id: oldAppt.id,
@@ -457,6 +486,7 @@ export type JoinWaitlistParams = {
   customer_name: string;
   pet_name: string;
   pet_species: string;
+  pet_breed?: string | null;
   visit_type: VisitType;
   preferred_start?: string; // YYYY-MM-DD
   preferred_end?: string;   // YYYY-MM-DD
@@ -468,7 +498,7 @@ export async function joinWaitlist(params: JoinWaitlistParams): Promise<string> 
   const phone = normalisePhone(params.phone);
 
   const { customerId } = await createOrFindCustomer(phone, params.customer_name);
-  const { petId } = await createOrFindPet(customerId, params.pet_name, params.pet_species);
+  const { petId } = await createOrFindPet(customerId, params.pet_name, params.pet_species, params.pet_breed);
 
   const { error } = await getSupabase().from("waitlist").insert({
     clinic_id:       env.AGENT_CLINIC_ID,
@@ -610,6 +640,7 @@ async function createOrFindPet(
   customerId: string,
   petName: string,
   species: string,
+  breed?: string | null,
 ): Promise<{ petId: string }> {
   const env = getEnv();
 
@@ -629,7 +660,14 @@ async function createOrFindPet(
 
   const { data: inserted, error: insertErr } = await getSupabase()
     .from("pets")
-    .insert({ clinic_id: env.AGENT_CLINIC_ID, customer_id: customerId, name: petName, species, status: "active" })
+    .insert({
+      clinic_id:   env.AGENT_CLINIC_ID,
+      customer_id: customerId,
+      name:        petName,
+      species,
+      breed:       breed?.trim() ? breed.trim() : null,
+      status:      "active",
+    })
     .select("id")
     .single();
 

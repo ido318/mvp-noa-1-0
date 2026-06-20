@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { dashboardApiFetch } from "@/app/dashboard/api-client";
 import { AppointmentActions } from "@/app/dashboard/appointments/appointment-actions";
+import { formatIsraelDateTime } from "@/lib/israel-date";
 import type { Appointment } from "@/types/domain/appointment";
 
 type Params = { params: Promise<{ appointmentId: string }> };
@@ -24,7 +25,7 @@ export default async function AppointmentDetailPage({ params }: Params) {
           ← Back to appointments
         </Link>
         <h2 className="mt-2 text-xl font-semibold text-zinc-900">
-          {new Date(appointment.scheduledAt).toLocaleString()}
+          {formatIsraelDateTime(appointment.scheduledAt)}
         </h2>
         <p className="text-sm text-zinc-600">
           {appointment.appointmentType} · {appointment.status}

@@ -5,6 +5,7 @@ import { VisitAiSummarySection } from "@/app/dashboard/visits/visit-ai-summary-s
 import { VisitNotesSection } from "@/app/dashboard/visits/visit-notes-section";
 import { VisitPrescriptionsSection } from "@/app/dashboard/visits/visit-prescriptions-section";
 import { VisitVaccinationsSection } from "@/app/dashboard/visits/visit-vaccinations-section";
+import { formatIsraelDateTime } from "@/lib/israel-date";
 import type { MedicalNote } from "@/types/domain/medical-note";
 import type { Prescription } from "@/types/domain/prescription";
 import type { Vaccination } from "@/types/domain/vaccination";
@@ -52,7 +53,7 @@ export default async function VisitDetailPage({ params }: Params) {
           חזרה לביקורים
         </Link>
         <h2 className="mt-2 text-xl font-semibold text-zinc-900">
-          ביקור · {new Date(visit.startedAt).toLocaleString()}
+          ביקור · {formatIsraelDateTime(visit.startedAt)}
         </h2>
         <p className="text-sm text-zinc-600">
           סטטוס: {VISIT_STATUS_LABELS[visit.status]}

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { dashboardApiFetch } from "@/app/dashboard/api-client";
+import { formatIsraelDateTime } from "@/lib/israel-date";
 import type { Visit, VisitStatus } from "@/types/domain/visit";
 
 type SearchParams = Promise<{ petId?: string; clinicId?: string }>;
@@ -50,7 +51,7 @@ export default async function VisitsPage({
                   href={`/dashboard/visits/${visit.id}`}
                   className="font-medium text-zinc-900 hover:text-emerald-700"
                 >
-                  {new Date(visit.startedAt).toLocaleString()} ·{" "}
+                  {formatIsraelDateTime(visit.startedAt)} ·{" "}
                   {VISIT_STATUS_LABELS[visit.status]}
                 </Link>
                 <p className="text-sm text-zinc-600">

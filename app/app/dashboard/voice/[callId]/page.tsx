@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { dashboardApiFetch } from "@/app/dashboard/api-client";
+import { formatIsraelDateTime } from "@/lib/israel-date";
 import type { VoiceCall } from "@/types/domain/voice-call";
 
 const CALL_STATUS_LABELS: Record<string, string> = {
@@ -63,12 +64,12 @@ export default async function VoiceCallDetailPage({
         </p>
         <p>
             <span className="font-medium text-zinc-700">התחילה:</span>{" "}
-          {new Date(call.startedAt).toLocaleString()}
+          {formatIsraelDateTime(call.startedAt)}
         </p>
         {call.endedAt ? (
           <p>
             <span className="font-medium text-zinc-700">הסתיימה:</span>{" "}
-            {new Date(call.endedAt).toLocaleString()}
+            {formatIsraelDateTime(call.endedAt)}
           </p>
         ) : null}
         {call.durationSeconds != null ? (

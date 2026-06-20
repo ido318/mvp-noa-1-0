@@ -5,17 +5,14 @@ import { Badge } from "@/components/dashboard/ui/badge";
 import { EmptyState } from "@/components/dashboard/ui/empty-state";
 import { Skeleton } from "@/components/dashboard/ui/skeleton";
 import { CallStatusBadge } from "@/components/dashboard/ui/call-status";
-import { PhoneIcon, ClockIcon, SparkleIcon, PlayIcon, XIcon, UserIcon } from "@/components/dashboard/icons";
+import { PhoneIcon, ClockIcon, SparkleIcon, PlayIcon, XIcon } from "@/components/dashboard/icons";
+import { formatIsraelDateTime } from "@/lib/israel-date";
 import type { VoiceCall, TranscriptItem } from "@/types/domain/voice-call";
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
-const TZ = "Asia/Jerusalem";
-
 function fmtDate(iso: string) {
-  return new Intl.DateTimeFormat("he-IL", {
-    timeZone: TZ, day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
-  }).format(new Date(iso));
+  return formatIsraelDateTime(iso);
 }
 
 function fmtDuration(secs: number | null) {

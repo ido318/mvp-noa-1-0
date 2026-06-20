@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { dashboardApiFetch } from "@/app/dashboard/api-client";
+import { formatIsraelDateTime } from "@/lib/israel-date";
 import type { Appointment } from "@/types/domain/appointment";
 
 type SearchParams = Promise<{ clinicId?: string; date?: string; view?: "day" | "week" }>;
@@ -65,7 +66,7 @@ export default async function AppointmentsPage({
                   href={`/dashboard/appointments/${appointment.id}`}
                   className="font-medium text-zinc-900 hover:text-emerald-700"
                 >
-                  {new Date(appointment.scheduledAt).toLocaleString()} ·{" "}
+                  {formatIsraelDateTime(appointment.scheduledAt)} ·{" "}
                   {appointment.appointmentType}
                 </Link>
                 <p className="text-sm text-zinc-600">

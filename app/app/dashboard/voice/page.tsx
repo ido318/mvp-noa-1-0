@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { dashboardApiFetch } from "@/app/dashboard/api-client";
+import { formatIsraelDateTime } from "@/lib/israel-date";
 import type { VoiceCall } from "@/types/domain/voice-call";
 
 type SearchParams = Promise<{ clinicId?: string; status?: string }>;
@@ -73,7 +74,7 @@ export default async function VoiceCallsPage({
                   href={`/dashboard/voice/${call.id}`}
                   className="font-medium text-zinc-900 hover:text-emerald-700"
                 >
-                  {new Date(call.startedAt).toLocaleString()} · {call.fromNumber}
+                  {formatIsraelDateTime(call.startedAt)} · {call.fromNumber}
                 </Link>
                 <p className="text-sm text-zinc-600">
                   סטטוס: {CALL_STATUS_LABELS[call.status] ?? call.status} · כיוון:{" "}
