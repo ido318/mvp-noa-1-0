@@ -224,6 +224,8 @@ export function mapAppointmentRow(row: {
   clinic_id: string;
   customer_id: string;
   pet_id: string;
+  customer?: { full_name: string | null } | { full_name: string | null }[] | null;
+  pet?: { name: string | null; species: string | null } | { name: string | null; species: string | null }[] | null;
   appointment_type: AppointmentType;
   status: AppointmentStatus;
   source: AppointmentSource;
@@ -240,11 +242,17 @@ export function mapAppointmentRow(row: {
   updated_at: string;
   deleted_at: string | null;
 }): Appointment {
+  const customer = Array.isArray(row.customer) ? row.customer[0] : row.customer;
+  const pet = Array.isArray(row.pet) ? row.pet[0] : row.pet;
+
   return {
     id: row.id,
     clinicId: row.clinic_id,
     customerId: row.customer_id,
     petId: row.pet_id,
+    customerName: customer?.full_name ?? null,
+    petName: pet?.name ?? null,
+    petSpecies: pet?.species ?? null,
     appointmentType: row.appointment_type,
     status: row.status,
     source: row.source,

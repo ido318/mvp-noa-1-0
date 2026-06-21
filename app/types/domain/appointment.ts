@@ -30,6 +30,9 @@ export type Appointment = {
   clinicId: string;
   customerId: string;
   petId: string;
+  customerName?: string | null;
+  petName?: string | null;
+  petSpecies?: string | null;
   appointmentType: AppointmentType;
   status: AppointmentStatus;
   source: AppointmentSource;

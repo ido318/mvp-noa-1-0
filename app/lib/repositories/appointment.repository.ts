@@ -31,7 +31,11 @@ export class AppointmentRepository {
   async list(filters: AppointmentListFilters): Promise<Result<Appointment[]>> {
     let query = this.client
       .from("appointments")
-      .select("*")
+      .select(`
+        *,
+        customer:customers!appointments_customer_clinic_fk(full_name),
+        pet:pets!appointments_pet_clinic_fk(name, species)
+      `)
       .in("clinic_id", filters.clinicIds)
       .is("deleted_at", null)
       .order("scheduled_at", { ascending: true });

@@ -8,6 +8,9 @@ describe("dashboard calendar page live refresh", () => {
 
     expect(source).toContain("/api/calendar?clinicId=");
     expect(source).not.toContain("/api/appointments?from=");
+    expect(source).toContain("petName");
+    expect(source).toContain("customerName");
+    expect(source).toContain("appointmentAccent");
     expect(source).toContain("setInterval");
     expect(source).toContain("5000");
     expect(source).toContain("clearInterval");
