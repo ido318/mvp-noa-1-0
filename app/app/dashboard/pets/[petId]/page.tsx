@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { dashboardApiFetch } from "@/app/dashboard/api-client";
 import { formatIsraelDate, formatIsraelDateTime } from "@/lib/israel-date";
+import { PetProfileForm } from "@/app/dashboard/pets/[petId]/pet-profile-form";
 import type { Pet } from "@/types/domain/pet";
 import type { Vaccination } from "@/types/domain/vaccination";
 import type { Visit, VisitStatus } from "@/types/domain/visit";
@@ -21,7 +22,6 @@ const PET_SEX_LABELS: Record<string, string> = {
 
 const PET_STATUS_LABELS: Record<string, string> = {
   active: "פעיל",
-  deceased: "נפטר",
   inactive: "לא פעיל",
 };
 
@@ -89,6 +89,8 @@ export default async function PetProfilePage({ params }: Params) {
           </div>
         </dl>
       </div>
+
+      <PetProfileForm pet={pet} />
 
       <div className="rounded-2xl border border-zinc-200 bg-white p-6">
         <h3 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">הערות</h3>

@@ -51,7 +51,7 @@ export function createOpenAiVisitSummaryProvider(): VisitSummaryProvider {
 }
 
 export function createStubVisitSummaryProvider(
-  draftText = "Stub visit summary for testing.",
+  draftText = "סיכום בדיקה לדוגמה לצורכי בדיקות.",
 ): VisitSummaryProvider {
   return {
     async generateSummary(): Promise<VisitSummaryGenerationResult> {
