@@ -19,6 +19,8 @@ const TZ = ISRAEL_TIMEZONE;
 const HOUR_START = 8;
 const HOUR_END   = 20;
 const HOUR_SPAN  = HOUR_END - HOUR_START;
+const HOUR_HEIGHT_PX = 150;
+const TIMELINE_HEIGHT_PX = HOUR_SPAN * HOUR_HEIGHT_PX;
 
 // Days: Sun(0)=א, Mon(1)=ב, Tue(2)=ג, Wed(3)=ד, Thu(4)=ה, Fri(5)=ו
 const HE_DAYS = ["א'", "ב'", "ג'", "ד'", "ה'", "ו'", "ש'"];
@@ -50,13 +52,13 @@ function israelHour(iso: string) {
   };
 }
 
-function topPct(iso: string) {
+function topPx(iso: string) {
   const { h, m } = israelHour(iso);
-  return ((h * 60 + m - HOUR_START * 60) / (HOUR_SPAN * 60)) * 100;
+  return ((h * 60 + m - HOUR_START * 60) / 60) * HOUR_HEIGHT_PX;
 }
 
-function heightPct(minutes: number) {
-  return (minutes / (HOUR_SPAN * 60)) * 100;
+function heightPx(minutes: number) {
+  return (minutes / 60) * HOUR_HEIGHT_PX;
 }
 
 function minutesBetween(startIso: string, endIso: string) {
@@ -148,8 +150,8 @@ function appointmentTime(iso: string) {
 // ─── Week columns ──────────────────────────────────────────────────────────────
 
 function ApptBlock({ appt }: { appt: Appointment }) {
-  const top  = topPct(appt.scheduledAt);
-  const h    = heightPct(appt.durationMinutes);
+  const top  = topPx(appt.scheduledAt);
+  const h    = heightPx(appt.durationMinutes);
   const accent = appointmentAccent(appt.appointmentType, appt.status);
   const petName = appt.petName ?? "חיה";
   const customerName = appt.customerName ?? "לקוח";
@@ -159,8 +161,8 @@ function ApptBlock({ appt }: { appt: Appointment }) {
     <div
       className="absolute inset-x-3 z-10 overflow-hidden rounded-[12px] border px-3 py-2.5 text-[12px] shadow-[0_10px_22px_rgba(81,58,39,0.10)] transition-transform hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(81,58,39,0.16)]"
       style={{
-        top: `${top}%`,
-        height: `${Math.max(h, 9.25)}%`,
+        top: `${top}px`,
+        height: `${Math.max(h, 72)}px`,
         borderColor: accent.border,
         backgroundColor: accent.bg,
         color: accent.text,
@@ -193,15 +195,15 @@ function CalendarBlockOverlay({
   block: CalendarBlock;
   onDelete: (blockId: string) => void;
 }) {
-  const top = topPct(block.startAt);
-  const h = heightPct(minutesBetween(block.startAt, block.endAt));
+  const top = topPx(block.startAt);
+  const h = heightPx(minutesBetween(block.startAt, block.endAt));
 
   return (
     <div
       className="absolute inset-x-2 overflow-hidden rounded-[10px] border border-[#D9D0C5] bg-[#EFE8DF] px-2 py-1.5 text-[10px] text-[var(--muted)] shadow-[inset_3px_0_0_#B8A99A]"
       style={{
-        top: `${Math.max(0, top)}%`,
-        height: `${Math.max(h, 4)}%`,
+        top: `${Math.max(0, top)}px`,
+        height: `${Math.max(h, 48)}px`,
         minHeight: "26px",
       }}
       title={block.reason ?? "חסימת יומן"}
@@ -241,7 +243,7 @@ function DayColumn({
 }) {
   const isFriday = day.getDay() === 5;
   const isSaturday = day.getDay() === 6;
-  const friEnd = ((13 * 60 + 0 - HOUR_START * 60) / (HOUR_SPAN * 60)) * 100;
+  const friEnd = ((13 * 60 + 0 - HOUR_START * 60) / 60) * HOUR_HEIGHT_PX;
 
   if (isSaturday) {
     return (
@@ -265,7 +267,7 @@ function DayColumn({
         <div
           key={h}
           className="absolute inset-x-0 border-t border-[#F1E8DE]"
-          style={{ top: `${((h - HOUR_START) / HOUR_SPAN) * 100}%` }}
+          style={{ top: `${(h - HOUR_START) * HOUR_HEIGHT_PX}px` }}
         />
       ))}
 
@@ -273,7 +275,7 @@ function DayColumn({
       {isFriday && (
         <div
           className="absolute inset-x-0 bottom-0 bg-[var(--bg)] opacity-60"
-          style={{ top: `${friEnd}%` }}
+          style={{ top: `${friEnd}px` }}
         />
       )}
 
@@ -581,7 +583,7 @@ export default function CalendarPage() {
 
           <div
             className="flex overflow-auto bg-white"
-            style={{ height: "780px" }}
+            style={{ height: `${TIMELINE_HEIGHT_PX}px` }}
           >
             <div className="relative w-16 flex-shrink-0 bg-white">
               {HOURS.map(h => (
@@ -589,9 +591,9 @@ export default function CalendarPage() {
                   key={h}
                   className="absolute w-16 pe-3 text-end text-[11px] font-semibold leading-none text-[var(--muted)]"
                   style={{
-                    top: `${((h - HOUR_START) / HOUR_SPAN) * 100}%`,
+                    top: `${(h - HOUR_START) * HOUR_HEIGHT_PX}px`,
                     transform: "translateY(-50%)",
-                    height: `${100 / HOUR_SPAN}%`,
+                    height: `${HOUR_HEIGHT_PX}px`,
                   }}
                 >
                   {String(h).padStart(2, "0")}:00

@@ -12,7 +12,8 @@ describe("dashboard calendar page live refresh", () => {
     expect(source).toContain("customerName");
     expect(source).toContain("appointmentAccent");
     expect(source).toContain('minHeight: "72px"');
-    expect(source).toContain('style={{ height: "780px" }}');
+    expect(source).toContain("HOUR_HEIGHT_PX = 150");
+    expect(source).toContain("TIMELINE_HEIGHT_PX");
     expect(source).toContain("setInterval");
     expect(source).toContain("5000");
     expect(source).toContain("clearInterval");
