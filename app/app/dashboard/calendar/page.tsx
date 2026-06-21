@@ -157,30 +157,30 @@ function ApptBlock({ appt }: { appt: Appointment }) {
 
   return (
     <div
-      className="absolute inset-x-2 z-10 overflow-hidden rounded-[10px] border px-2.5 py-2 text-[11px] shadow-[0_8px_18px_rgba(81,58,39,0.08)] transition-transform hover:-translate-y-0.5 hover:shadow-[0_10px_24px_rgba(81,58,39,0.14)]"
+      className="absolute inset-x-3 z-10 overflow-hidden rounded-[12px] border px-3 py-2.5 text-[12px] shadow-[0_10px_22px_rgba(81,58,39,0.10)] transition-transform hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(81,58,39,0.16)]"
       style={{
         top: `${top}%`,
-        height: `${Math.max(h, 7)}%`,
+        height: `${Math.max(h, 9.25)}%`,
         borderColor: accent.border,
         backgroundColor: accent.bg,
         color: accent.text,
-        minHeight: "48px",
+        minHeight: "72px",
       }}
       title={title}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <div className="truncate text-[12px] font-extrabold leading-tight">{petName}</div>
-          <div className="truncate text-[10px] font-semibold opacity-80">{customerName}</div>
+          <div className="truncate text-[14px] font-extrabold leading-tight">{petName}</div>
+          <div className="mt-0.5 truncate text-[11px] font-semibold opacity-80">{customerName}</div>
         </div>
-        <AnimalIcon species={appt.petSpecies ?? "dog"} size={14} className="mt-0.5 flex-shrink-0 opacity-80" />
+        <AnimalIcon species={appt.petSpecies ?? "dog"} size={17} className="mt-0.5 flex-shrink-0 opacity-80" />
       </div>
-      <div className="mt-1.5 flex items-center justify-between gap-1 text-[10px] font-bold">
+      <div className="mt-2 flex items-center justify-between gap-1 text-[11px] font-bold">
         <span className="truncate">{visitLabel(appt.appointmentType)}</span>
         <span className="shrink-0 opacity-85">{appointmentTime(appt.scheduledAt)}</span>
       </div>
       {appt.status === "pending_approval" && (
-        <div className="mt-1 text-[9px] font-extrabold">ממתין לאישור</div>
+        <div className="mt-1 text-[10px] font-extrabold">ממתין לאישור</div>
       )}
     </div>
   );
@@ -245,7 +245,7 @@ function DayColumn({
 
   if (isSaturday) {
     return (
-      <div className="relative min-w-[136px] flex-1 border-s border-[#EFE6DC] bg-[#FBF8F4]">
+      <div className="relative min-w-[156px] flex-1 border-s border-[#EFE6DC] bg-[#FBF8F4]">
         <div className="absolute inset-0 flex items-center justify-center opacity-60">
           <span className="text-xs text-[var(--faint)]">סגור</span>
         </div>
@@ -256,7 +256,7 @@ function DayColumn({
   return (
     <div
       className={[
-        "relative min-w-[136px] flex-1 border-s border-[#EFE6DC]",
+        "relative min-w-[156px] flex-1 border-s border-[#EFE6DC]",
         isToday ? "bg-[#F8FCF9]" : "bg-white",
       ].join(" ")}
     >
@@ -567,7 +567,7 @@ export default function CalendarPage() {
                 <div
                   key={i}
                   className={[
-                    "min-w-[136px] flex-1 border-s border-[#EFE6DC] py-3 text-center",
+                    "min-w-[156px] flex-1 border-s border-[#EFE6DC] py-3 text-center",
                     isToday ? "bg-[#FDF3EB] text-[var(--brand-700)]" : "text-[var(--ink-2)]",
                     isSat ? "text-[var(--faint)]" : "",
                   ].join(" ")}
@@ -581,7 +581,7 @@ export default function CalendarPage() {
 
           <div
             className="flex overflow-auto bg-white"
-            style={{ height: "660px" }}
+            style={{ height: "780px" }}
           >
             <div className="relative w-16 flex-shrink-0 bg-white">
               {HOURS.map(h => (
