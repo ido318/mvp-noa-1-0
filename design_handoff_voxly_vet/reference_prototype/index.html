@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>VOXLY Vet — דשבורד Get A Vet</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+:root{
+  /* ===== Brand orange (the "a" in GetaVet) — names kept as --teal-* ===== */
+  --teal-900:#7C3F1E;
+  --teal-700:#BC5E2C;
+  --teal-600:#D06B33;
+  --teal-500:#E88858;
+  --teal-400:#EE9E6D;
+  --teal-200:#F6CDAF;
+  --teal-100:#FBE3D2;
+  --teal-50:#FDF3EB;
+
+  /* ===== Coral (the medical cross) ===== */
+  --coral-700:#C9494E;
+  --coral-600:#E0696D;
+  --coral-500:#F0888B;
+  --coral-100:#FBD9DA;
+  --coral-50:#FDEFEF;
+
+  /* ===== Amber (alerts / Tomer accents) ===== */
+  --amber-600:#D97706;
+  --amber-500:#F59E0B;
+  --amber-200:#FCD9A0;
+  --amber-100:#FDEBC8;
+  --amber-50:#FEF6E9;
+
+  /* ===== Urgency reds ===== */
+  --red-700:#B91C1C;
+  --red-600:#DC2626;
+  --red-500:#EF4444;
+  --red-100:#FCE2E2;
+  --red-50:#FEF2F2;
+
+  /* ===== Appointment-type hues ===== */
+  --t-checkup:#3E9C86;   --t-checkup-bg:#E7F4F0;
+  --t-vaccine:#5B7CFA;   --t-vaccine-bg:#EEF1FE;
+  --t-surgery:#E0696D;   --t-surgery-bg:#FBEAEB;
+  --t-followup:#C2891E;  --t-followup-bg:#FBF2DD;
+  --t-grooming:#9B6BD6;  --t-grooming-bg:#F3ECFB;
+
+  /* ===== Warm neutral (taupe/stone) ===== */
+  --ink:#2D2620;
+  --ink-2:#4C4239;
+  --muted:#867667;
+  --faint:#AA9C8D;
+  --line:#EBE3DA;
+  --line-2:#F4EDE6;
+  --bg:#F7F1EA;
+  --surface:#FFFFFF;
+  --surface-2:#FBF6F0;
+
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-xl:22px;
+  --sh-sm:0 1px 2px rgba(16,40,38,.05), 0 1px 3px rgba(16,40,38,.04);
+  --sh-md:0 2px 6px rgba(16,40,38,.06), 0 6px 18px rgba(16,40,38,.05);
+  --sh-lg:0 10px 30px rgba(16,40,38,.10), 0 4px 10px rgba(16,40,38,.05);
+  --sh-pop:0 18px 50px rgba(13,40,38,.18);
+
+  --side-w:248px;
+  --header-h:68px;
+
+  --ease:cubic-bezier(.4,0,.2,1);
+  font-synthesis:none;
+}
+
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;height:100%;}
+body{
+  font-family:"Heebo",system-ui,sans-serif;
+  background:var(--bg);
+  color:var(--ink);
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+  letter-spacing:-.01em;
+}
+#root{height:100%;}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit;}
+input,textarea,select{font-family:inherit;}
+::selection{background:var(--teal-200);}
+
+/* Scrollbar */
+*::-webkit-scrollbar{width:10px;height:10px;}
+*::-webkit-scrollbar-thumb{background:#D5DEDC;border-radius:99px;border:3px solid transparent;background-clip:content-box;}
+*::-webkit-scrollbar-thumb:hover{background:#BCC8C6;background-clip:content-box;}
+*::-webkit-scrollbar-track{background:transparent;}
+
+/* Flip directional icons in RTL */
+.flip-x{transform:scaleX(-1);}
+
+/* ---------- App layout ---------- */
+.app{display:flex;height:100vh;overflow:hidden;}
+
+/* ---------- Animations ---------- */
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:none;}}
+@keyframes fadeIn{from{opacity:0;}to{opacity:1;}}
+@keyframes slideInLeft{from{transform:translateX(-40px);opacity:0;}to{transform:none;opacity:1;}}
+@keyframes scaleIn{from{transform:scale(.96);opacity:0;}to{transform:none;opacity:1;}}
+@keyframes shimmer{0%{background-position:-400px 0;}100%{background-position:400px 0;}}
+@keyframes pulseRing{0%{box-shadow:0 0 0 0 rgba(239,68,68,.35);}70%{box-shadow:0 0 0 10px rgba(239,68,68,0);}100%{box-shadow:0 0 0 0 rgba(239,68,68,0);}}
+@keyframes pawIn{0%{opacity:0;transform:scale(.4) rotate(-12deg);}60%{transform:scale(1.08) rotate(3deg);}100%{opacity:1;transform:none;}}
+@keyframes toastIn{from{opacity:0;transform:translateY(16px) scale(.96);}to{opacity:1;transform:none;}}
+
+.skeleton{
+  background:linear-gradient(90deg,#EEF2F1 25%,#F6F9F8 37%,#EEF2F1 63%);
+  background-size:800px 100%;
+  animation:shimmer 1.4s infinite linear;
+  border-radius:8px;
+}
+
+.page-enter{animation:fadeUp .38s var(--ease) both;}
+
+/* Reduced motion: keep content visible by neutralizing entrance keyframes.
+   Frozen animations would otherwise rest at their hidden `from` state. */
+@media (prefers-reduced-motion: reduce){
+  @keyframes fadeUp{from,to{opacity:1;transform:none;}}
+  @keyframes fadeIn{from,to{opacity:1;}}
+  @keyframes slideInLeft{from,to{opacity:1;transform:none;}}
+  @keyframes scaleIn{from,to{opacity:1;transform:none;}}
+  @keyframes pawIn{from,to{opacity:1;transform:none;}}
+  @keyframes toastIn{from,to{opacity:1;transform:none;}}
+}
+
+/* focus ring */
+:focus-visible{outline:2px solid var(--teal-500);outline-offset:2px;border-radius:6px;}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="data.jsx"></script>
+<script type="text/babel" src="icons.jsx"></script>
+<script type="text/babel" src="ui.jsx"></script>
+<script type="text/babel" src="today.jsx"></script>
+<script type="text/babel" src="calendar.jsx"></script>
+<script type="text/babel" src="calls.jsx"></script>
+<script type="text/babel" src="escalations.jsx"></script>
+<script type="text/babel" src="client.jsx"></script>
+<script type="text/babel" src="visit.jsx"></script>
+<script type="text/babel" src="app.jsx"></script>
+</body>
+</html>
