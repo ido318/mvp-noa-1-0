@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
   appointmentInserts,
@@ -70,6 +70,8 @@ describe("bookAppointment conflict handling", () => {
   beforeEach(() => {
     appointmentInserts.length = 0;
     vi.clearAllMocks();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-20T06:00:00Z"));
 
     mockMaybeSingle.mockResolvedValue({ data: null, error: null });
     mockSingle
@@ -95,6 +97,10 @@ describe("bookAppointment conflict handling", () => {
       ],
       error: null,
     });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("does not confirm the booking and suggests a fresh alternative when the slot was taken", async () => {

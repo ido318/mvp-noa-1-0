@@ -84,6 +84,9 @@ describe("bookAppointment — pending_approval (neutering) must not create notif
     });
 
     expect(result).toContain("תור נקבע");
+    expect(result).not.toContain("✅");
+    expect(result).not.toContain("SMS");
+    expect(result.length).toBeLessThanOrEqual(80);
     // scheduleBookingNotifications MUST be called for normal bookings
     expect(mockSchedule).toHaveBeenCalledOnce();
   });

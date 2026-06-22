@@ -364,14 +364,13 @@ export async function bookAppointment(params: BookAppointmentParams): Promise<st
 
   if (config.requiresApproval) {
     return (
-      `✅ בקשת תור ל${config.labelHe} נרשמה: ${formatDateHe(dateLabel)} בשעה ${slotLabel} ` +
-      `עבור ${params.pet_name}. התור ממתין לאישור נועה — תקבל/י אישור SMS.`
+      `בקשת התור ל${config.labelHe} נרשמה ל-${formatDateHe(dateLabel)} בשעה ${slotLabel} ` +
+      `עבור ${params.pet_name}. התור ממתין לאישור נועה.`
     );
   }
 
   return (
-    `✅ תור נקבע: ${formatDateHe(dateLabel)} בשעה ${slotLabel} ` +
-    `עבור ${params.pet_name}. אשלח תזכורת SMS 24 שעות לפני.`
+    `תור נקבע ל-${formatDateHe(dateLabel)} בשעה ${slotLabel} עבור ${params.pet_name}.`
   );
 }
 
