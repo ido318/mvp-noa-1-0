@@ -82,13 +82,6 @@ function ResolveModal({
   );
 }
 
-function urgencyStyle(value: number) {
-  if (value >= 8) return { fg: "#B91C1C", bg: "#FEF2F2", ring: "#F2B8B8", border: "#EF4444" };
-  if (value >= 6) return { fg: "#C2410C", bg: "#FFF3EB", ring: "#FAC9A3", border: "#F97316" };
-  if (value >= 4) return { fg: "#B45309", bg: "#FEF8EA", ring: "#F6DDA0", border: "#F59E0B" };
-  return { fg: "#2F7D5B", bg: "#E9F5EF", ring: "#BBE3D2", border: "#3E9C86" };
-}
-
 function EscalationCard({
   escalation,
   onResolve,
@@ -97,98 +90,50 @@ function EscalationCard({
   onResolve: (e: Escalation) => void;
 }) {
   const isResolved = Boolean(escalation.resolvedAt);
-  const isCritical = escalation.urgency >= 8 && !isResolved;
-  const us = urgencyStyle(escalation.urgency);
 
   return (
-    <div
-      className={`relative rounded-[var(--r-lg)] bg-[var(--surface)] shadow-[var(--sh-sm)] transition-opacity overflow-hidden ${isResolved ? "opacity-60" : ""}`}
-      style={{
-        border: isCritical ? `1px solid ${us.border}` : "1px solid var(--line)",
-        boxShadow: isCritical ? `0 6px 22px rgba(220,38,38,.10), var(--sh-sm)` : undefined,
-      }}
-    >
-      {/* Critical left accent bar */}
-      {isCritical && (
-        <div
-          style={{
-            position: "absolute",
-            top: 0,
-            bottom: 0,
-            insetInlineStart: 0,
-            width: 4,
-            background: `linear-gradient(180deg, ${us.border}, var(--amber-500))`,
-          }}
-        />
-      )}
-
-      <div className={`p-[18px] ${isCritical ? "ps-[26px]" : ""}`}>
-        <div className="flex items-start justify-between gap-3">
-          {/* Left: icon + details */}
-          <div className="flex items-start gap-3 flex-1 min-w-0">
-            {/* Icon */}
-            <span
-              className="flex-shrink-0 grid place-items-center rounded-[10px]"
-              style={{
-                width: 38, height: 38,
-                background: us.bg,
-                color: us.fg,
-                animation: isCritical ? "pulseRing 2s ease-in-out infinite" : "none",
-              }}
-            >
-              <EscalationIcon size={19} />
-            </span>
-
-            <div className="flex-1 min-w-0">
-              {/* Badges row */}
-              <div className="flex flex-wrap items-center gap-2 mb-2">
-                {isCritical && (
-                  <span
-                    className="text-[11px] font-bold px-2 py-0.5 rounded-full text-white"
-                    style={{ background: us.fg }}
-                  >
-                    קריטי
-                  </span>
-                )}
-                <UrgencyMeter value={escalation.urgency} />
-                {escalation.afterHours && (
-                  <Badge color="amber" dot>אחרי שעות פעילות</Badge>
-                )}
-                {isResolved && <Badge color="green">טופלה</Badge>}
-              </div>
-
-              <p className="text-[14px] font-bold text-[var(--ink)] leading-snug">{escalation.reason}</p>
-
-              <div className="mt-2 flex flex-wrap gap-3 text-[11px] text-[var(--muted)]">
-                <span className="flex items-center gap-1">
-                  <ClockIcon size={11} />
-                  {formatDate(escalation.createdAt)}
-                </span>
-                {escalation.elevenLabsConversationId && (
-                  <span className="flex items-center gap-1">
-                    <PhoneIcon size={11} />
-                    שיחה: {escalation.elevenLabsConversationId.slice(-6)}
-                  </span>
-                )}
-              </div>
-
-              {isResolved && escalation.notes && (
-                <p className="mt-2 text-xs text-[var(--ink-2)] rounded-[var(--r-sm)] bg-[var(--bg)] px-2 py-1">
-                  {escalation.notes}
-                </p>
-              )}
-            </div>
+    <Card className={`transition-opacity ${isResolved ? "opacity-60" : ""}`}>
+      <div className="flex items-start justify-between gap-3">
+        {/* Left: urgency + details */}
+        <div className="flex-1 min-w-0">
+          <div className="flex flex-wrap items-center gap-2 mb-2">
+            <UrgencyMeter value={escalation.urgency} />
+            {escalation.afterHours && (
+              <Badge color="amber" dot>אחרי שעות פעילות</Badge>
+            )}
+            {isResolved && <Badge color="green">טופלה</Badge>}
           </div>
 
-          {/* Right: action */}
-          {!isResolved && (
-            <Btn variant="soft" size="sm" className="flex-shrink-0 mt-1" onClick={() => onResolve(escalation)}>
-              טפל
-            </Btn>
+          <p className="text-[14px] font-bold text-[var(--ink)] leading-snug">{escalation.reason}</p>
+
+          <div className="mt-2 flex flex-wrap gap-3 text-[11px] text-[var(--muted)]">
+            <span className="flex items-center gap-1">
+              <ClockIcon size={11} />
+              {formatDate(escalation.createdAt)}
+            </span>
+            {escalation.elevenLabsConversationId && (
+              <span className="flex items-center gap-1">
+                <PhoneIcon size={11} />
+                שיחה: {escalation.elevenLabsConversationId.slice(-6)}
+              </span>
+            )}
+          </div>
+
+          {isResolved && escalation.notes && (
+            <p className="mt-2 text-xs text-[var(--ink-2)] rounded-[var(--r-sm)] bg-[var(--bg)] px-2 py-1">
+              {escalation.notes}
+            </p>
           )}
         </div>
+
+        {/* Right: action */}
+        {!isResolved && (
+          <Btn variant="soft" size="sm" className="flex-shrink-0" onClick={() => onResolve(escalation)}>
+            טפל
+          </Btn>
+        )}
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -260,7 +205,7 @@ export default function EscalationsPage() {
       ) : items.length === 0 ? (
         <EmptyState
           icon={<EscalationIcon size={32} />}
-          title={filter === "open" ? "אין אסקלציות פתוחות 🐾" : "אין אסקלציות"}
+          title={filter === "open" ? "אין אסקלציות פתוחות" : "אין אסקלציות"}
           subtitle={filter === "open" ? "כשתומר יסמן מקרה כדחוף — הוא יופיע כאן" : ""}
         />
       ) : (

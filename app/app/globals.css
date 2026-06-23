@@ -172,10 +172,8 @@ h1, h2, h3, h4, h5, h6 {
 
 /* ─── Reduced motion — make all entrance animations invisible no-ops ─────── */
 @media (prefers-reduced-motion: reduce) {
-  .page-enter,
-  .modal-enter,
-  .drawer-enter,
-  .toast-enter {
+  .page-enter, .modal-enter, .drawer-enter, .toast-enter,
+  @keyframes fadeUp, @keyframes scaleIn, @keyframes slideInLeft, @keyframes toastIn {
     animation: none !important;
     opacity: 1 !important;
     transform: none !important;
