@@ -5,7 +5,8 @@ import { Badge } from "@/components/dashboard/ui/badge";
 import { EmptyState } from "@/components/dashboard/ui/empty-state";
 import { Skeleton } from "@/components/dashboard/ui/skeleton";
 import { CallStatusBadge } from "@/components/dashboard/ui/call-status";
-import { PhoneIcon, ClockIcon, SparkleIcon, PlayIcon, XIcon } from "@/components/dashboard/icons";
+import { TomerChip } from "@/components/dashboard/ui/avatar";
+import { PhoneIcon, ClockIcon, SparkleIcon, PlayIcon, XIcon, ChevRightIcon } from "@/components/dashboard/icons";
 import { formatIsraelDateTime } from "@/lib/israel-date";
 import type { VoiceCall, TranscriptItem } from "@/types/domain/voice-call";
 
@@ -224,12 +225,29 @@ function CallDrawer({
 
 // ─── Main table ────────────────────────────────────────────────────────────────
 
-type CategoryFilter = "all" | "operation" | "information";
+type StatusFilter = "all" | "completed" | "in_progress" | "failed" | "no_answer";
+
+const STATUS_FILTER_LABELS: Record<StatusFilter, string> = {
+  all:         "הכול",
+  completed:   "הושלמו",
+  in_progress: "פעילות",
+  failed:      "נכשלו",
+  no_answer:   "לא ענו",
+};
+
+function matchesFilter(call: VoiceCall, filter: StatusFilter): boolean {
+  if (filter === "all") return true;
+  if (filter === "completed") return call.status === "completed";
+  if (filter === "in_progress") return call.status === "in_progress" || call.status === "queued" || call.status === "ringing";
+  if (filter === "failed") return call.status === "failed" || call.status === "busy" || call.status === "canceled";
+  if (filter === "no_answer") return call.status === "no_answer";
+  return true;
+}
 
 export default function CallsPage() {
   const [items, setItems] = useState<VoiceCall[]>([]);
   const [loading, setLoading] = useState(true);
-  const [category, setCategory] = useState<CategoryFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [selected, setSelected] = useState<VoiceCall | null>(null);
 
   const fetchData = useCallback(async (showLoading = false) => {
@@ -247,36 +265,38 @@ export default function CallsPage() {
 
   useEffect(() => {
     void fetchData(true);
-    const intervalId = window.setInterval(() => {
-      void fetchData(false);
-    }, 15000);
+    const intervalId = window.setInterval(() => void fetchData(false), 15_000);
     return () => window.clearInterval(intervalId);
   }, [fetchData]);
 
-  const filtered = category === "all"
-    ? items
-    : items.filter(c => c.callCategory === category);
+  const filtered = items.filter(c => matchesFilter(c, statusFilter));
 
   return (
     <div className="p-6 space-y-5">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-extrabold text-[var(--ink)]">שיחות</h1>
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex items-center gap-3">
+          <TomerChip size="md" />
+          <div>
+            <h1 className="text-xl font-extrabold text-[var(--ink)]">שיחות תומר</h1>
+            <p className="text-[12px] text-[var(--muted)]">{items.length} שיחות בסה&quot;כ</p>
+          </div>
+        </div>
 
-        {/* Category filter */}
+        {/* Status filter */}
         <div className="flex rounded-[var(--r-md)] border border-[var(--line)] overflow-hidden">
-          {(["all", "operation", "information"] as CategoryFilter[]).map((f) => (
+          {(Object.keys(STATUS_FILTER_LABELS) as StatusFilter[]).map((f) => (
             <button
               key={f}
-              onClick={() => setCategory(f)}
+              onClick={() => setStatusFilter(f)}
               className={[
                 "px-3 py-1.5 text-xs font-semibold transition-colors",
-                category === f
+                statusFilter === f
                   ? "bg-[var(--brand-600)] text-white"
                   : "text-[var(--ink-2)] hover:bg-[var(--surface-2)]",
               ].join(" ")}
             >
-              {f === "all" ? "הכול" : f === "operation" ? "פעולה" : "מידע"}
+              {STATUS_FILTER_LABELS[f]}
             </button>
           ))}
         </div>
@@ -298,12 +318,13 @@ export default function CallsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-[var(--line)] text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
+                <th className="px-4 py-3 text-start">שעה</th>
                 <th className="px-4 py-3 text-start">מתקשר</th>
-                <th className="px-4 py-3 text-start">תאריך ושעה</th>
                 <th className="px-4 py-3 text-start">משך</th>
-                <th className="px-4 py-3 text-start">סוג</th>
+                <th className="px-4 py-3 text-start">נושא</th>
                 <th className="px-4 py-3 text-start">סטטוס</th>
-                <th className="px-4 py-3 text-start">סיכום</th>
+                <th className="px-4 py-3 text-start">נענה ע&quot;י</th>
+                <th className="px-4 py-3 text-start" />
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--line-2)]">
@@ -313,30 +334,44 @@ export default function CallsPage() {
                   className="cursor-pointer transition-colors hover:bg-[var(--surface-2)]"
                   onClick={() => setSelected(call)}
                 >
-                  <td className="px-4 py-3 font-medium text-[var(--ink)]">
-                    <span className="flex items-center gap-1.5">
+                  {/* Time */}
+                  <td className="px-4 py-3 font-bold tabular-nums text-[var(--ink)]">
+                    {fmtDate(call.startedAt)}
+                  </td>
+                  {/* Caller */}
+                  <td className="px-4 py-3">
+                    <span className="flex items-center gap-1.5 text-[var(--ink)] font-medium ltr-text">
                       <PhoneIcon size={13} className="text-[var(--muted)]" />
                       {call.fromNumber}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-[var(--ink-2)]">{fmtDate(call.startedAt)}</td>
-                  <td className="px-4 py-3 text-[var(--muted)] tabular-nums">{fmtDuration(call.durationSeconds)}</td>
-                  <td className="px-4 py-3">
-                    {call.callCategory ? (
-                      <Badge color={call.callCategory === "operation" ? "brand" : "muted"}>
-                        {call.callCategory === "operation" ? "פעולה" : "מידע"}
-                      </Badge>
-                    ) : "—"}
+                  {/* Duration */}
+                  <td className="px-4 py-3 tabular-nums text-[var(--muted)]">
+                    {fmtDuration(call.durationSeconds)}
                   </td>
-                  <td className="px-4 py-3">
-                    <CallStatusBadge status={call.status} />
-                  </td>
+                  {/* Topic / AI summary snippet */}
                   <td className="px-4 py-3 max-w-[220px]">
                     {call.aiSummary ? (
                       <p className="truncate text-xs text-[var(--ink-2)]">{call.aiSummary}</p>
+                    ) : call.callCategory ? (
+                      <Badge color={call.callCategory === "operation" ? "brand" : "muted"}>
+                        {call.callCategory === "operation" ? "פעולה" : "מידע"}
+                      </Badge>
                     ) : (
                       <span className="text-[var(--faint)]">—</span>
                     )}
+                  </td>
+                  {/* Status */}
+                  <td className="px-4 py-3">
+                    <CallStatusBadge status={call.status} />
+                  </td>
+                  {/* Answered by Tomer */}
+                  <td className="px-4 py-3">
+                    <TomerChip showName size="sm" />
+                  </td>
+                  {/* Arrow */}
+                  <td className="px-4 py-3 text-[var(--faint)]">
+                    <ChevRightIcon size={14} />
                   </td>
                 </tr>
               ))}

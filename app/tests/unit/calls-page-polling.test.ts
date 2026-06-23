@@ -7,7 +7,7 @@ describe("dashboard calls page live refresh", () => {
     const source = readFileSync(join(process.cwd(), "app/dashboard/calls/page.tsx"), "utf8");
 
     expect(source).toContain("setInterval");
-    expect(source).toContain("15000");
+    expect(source).toMatch(/15_?000/);
     expect(source).toContain("clearInterval");
   });
 });
