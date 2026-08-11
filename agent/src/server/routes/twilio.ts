@@ -7,6 +7,15 @@ import { twilioValidate } from "../middleware/twilioValidate.js";
 
 export const twilioRoutes = new Hono();
 
+function escapeXmlAttr(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
 // Singleton — avoid creating a new HTTP client on every call
 let _elevenlabs: ElevenLabsClient | null = null;
 function getElevenLabs(): ElevenLabsClient {
@@ -69,13 +78,12 @@ twilioRoutes.post("/twilio/voice", twilioValidate, async (c) => {
     logger.error({ err, callSid }, "twilio: failed to create live voice call record");
   }
 
-  const xmlUrl = signed_url.replace(/&/g, "&amp;");
   const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Connect>
-    <Stream url="${xmlUrl}">
-      <Parameter name="caller_number" value="${callerPhone}"/>
-      <Parameter name="twilio_call_sid" value="${callSid}"/>
+    <Stream url="${escapeXmlAttr(signed_url)}">
+      <Parameter name="caller_number" value="${escapeXmlAttr(callerPhone)}"/>
+      <Parameter name="twilio_call_sid" value="${escapeXmlAttr(callSid)}"/>
     </Stream>
   </Connect>
 </Response>`;

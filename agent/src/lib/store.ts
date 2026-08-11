@@ -657,12 +657,17 @@ export async function saveVoiceCall(
 
   const twilioCallSid = extractTwilioCallSid(payload);
   if (twilioCallSid) {
-    const { error } = await getSupabase()
+    const { data, error } = await getSupabase()
       .from("voice_calls")
       .update(row)
-      .eq("twilio_call_sid", twilioCallSid);
+      .eq("twilio_call_sid", twilioCallSid)
+      .select("id");
     if (error) throw new Error(`supabase voice_call update failed: ${error.message}`);
-    return;
+    if (data && data.length > 0) return;
+    logger.warn(
+      { twilioCallSid, conversationId },
+      "voice_call: no row matched twilio_call_sid, falling back to upsert by conversation id",
+    );
   }
 
   const { error } = await getSupabase()
