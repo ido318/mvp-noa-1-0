@@ -49,7 +49,7 @@ export default async function VisitSharePage({ params }: Params) {
   const summary = visit.aiVisitSummary ?? visit.manualVisitSummary;
 
   // Best-effort view tracking; never block rendering on it.
-  await shareRepo.recordView(share.id, share.viewCount);
+  await shareRepo.recordView(share.id, share.viewCount).catch(() => undefined);
 
   return (
     <main dir="rtl" className="mx-auto min-h-screen max-w-md bg-zinc-50 p-5 text-zinc-900">

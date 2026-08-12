@@ -104,7 +104,9 @@ export class VisitShareService {
       const { sid } = await sendSms(customer.phone, body);
       await this.visitShareRepository.markSent(created.value.id, sid);
     } catch (error) {
-      // The share row remains (link is valid); surface the delivery failure.
+      // Revoke the just-created share so a failed send never leaves a live,
+      // undelivered link behind; then surface the delivery failure.
+      await this.visitShareRepository.revoke(created.value.id).catch(() => undefined);
       if (error instanceof AppError) return err(error);
       return err(AppError.externalProvider("שליחת ה-SMS נכשלה", error));
     }

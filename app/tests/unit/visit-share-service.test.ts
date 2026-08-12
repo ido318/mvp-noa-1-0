@@ -40,17 +40,24 @@ function makeVisit(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function buildService(visit: ReturnType<typeof makeVisit> | null, prescriptions: unknown[] = []) {
+function buildService(
+  visit: ReturnType<typeof makeVisit> | null,
+  prescriptions: unknown[] = [],
+  customer: { id: string; fullName: string; phone: string | null } | null = {
+    id: "cust-1",
+    fullName: "דנה",
+    phone: "0501234567",
+  },
+) {
   const visitRepository = { findById: vi.fn(async () => ok(visit)) };
   const prescriptionRepository = { listByVisit: vi.fn(async () => ok(prescriptions)) };
-  const customerRepository = {
-    findById: vi.fn(async () => ok({ id: "cust-1", fullName: "דנה", phone: "0501234567" })),
-  };
+  const customerRepository = { findById: vi.fn(async () => ok(customer)) };
   const petRepository = { findById: vi.fn(async () => ok({ id: "pet-1", name: "רקס" })) };
   const created = { id: "share-1", token: "tok" };
   const visitShareRepository = {
     create: vi.fn(async () => ok(created)),
     markSent: vi.fn(async () => ok({ ...created, sentAt: "now" })),
+    revoke: vi.fn(async () => ok({ ...created, revokedAt: "now" })),
   };
   const auditService = { logAction: vi.fn(async () => ok({})) };
 
@@ -108,5 +115,32 @@ describe("VisitShareService.createAndSend", () => {
     if (result.ok) return;
     expect(result.error.status).toBe(403);
     expect(sendSmsMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects when the customer has no phone number", async () => {
+    const { service } = buildService(makeVisit(), [], {
+      id: "cust-1",
+      fullName: "דנה",
+      phone: null,
+    });
+
+    const result = await service.createAndSend(actor, "visit-1", { origin: "https://app.test" });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.status).toBe(400);
+    expect(sendSmsMock).not.toHaveBeenCalled();
+  });
+
+  it("revokes the share and returns an error when SMS delivery fails", async () => {
+    const { service, visitShareRepository } = buildService(makeVisit());
+    sendSmsMock.mockRejectedValueOnce(new Error("twilio down"));
+
+    const result = await service.createAndSend(actor, "visit-1", { origin: "https://app.test" });
+
+    expect(result.ok).toBe(false);
+    expect(visitShareRepository.create).toHaveBeenCalledOnce();
+    expect(visitShareRepository.revoke).toHaveBeenCalledWith("share-1");
+    expect(visitShareRepository.markSent).not.toHaveBeenCalled();
   });
 });
