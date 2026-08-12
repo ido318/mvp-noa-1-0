@@ -12,6 +12,7 @@ import { PrescriptionRepository } from "@/lib/repositories/prescription.reposito
 import { ProfileRepository } from "@/lib/repositories/profile.repository";
 import { VaccinationRepository } from "@/lib/repositories/vaccination.repository";
 import { VisitRepository } from "@/lib/repositories/visit.repository";
+import { VisitShareRepository } from "@/lib/repositories/visit-share.repository";
 import { AIEventService } from "@/lib/services/ai-event.service";
 import { AppointmentService } from "@/lib/services/appointment.service";
 import { AuditService } from "@/lib/services/audit.service";
@@ -24,6 +25,7 @@ import { MedicalRecordService } from "@/lib/services/medical-record.service";
 import { PetService } from "@/lib/services/pet.service";
 import { VisitService } from "@/lib/services/visit.service";
 import { VisitSummaryAssistantService } from "@/lib/services/visit-summary-assistant.service";
+import { VisitShareService } from "@/lib/services/visit-share.service";
 import { VoiceCallService } from "@/lib/services/voice-call.service";
 import { VoiceCallRepository } from "@/lib/repositories/voice-call.repository";
 import { EscalationService } from "@/lib/services/escalation.service";
@@ -44,6 +46,7 @@ export async function createServices() {
   const medicalNoteRepository = new MedicalNoteRepository(supabase);
   const vaccinationRepository = new VaccinationRepository(supabase);
   const prescriptionRepository = new PrescriptionRepository(supabase);
+  const visitShareRepository = new VisitShareRepository(admin);
   const auditLogRepository = new AuditLogRepository(admin);
   const aiEventRepository = new AIEventRepository(admin);
   const auditService = new AuditService(auditLogRepository);
@@ -88,6 +91,14 @@ export async function createServices() {
       petRepository,
       auditService,
       new AIEventService(aiEventRepository),
+    ),
+    visitShare: new VisitShareService(
+      visitRepository,
+      customerRepository,
+      petRepository,
+      prescriptionRepository,
+      visitShareRepository,
+      auditService,
     ),
     voiceCall: new VoiceCallService(voiceCallRepository),
   };

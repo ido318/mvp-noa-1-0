@@ -4,6 +4,7 @@ import { VisitActions } from "@/app/dashboard/visits/visit-actions";
 import { VisitAiSummarySection } from "@/app/dashboard/visits/visit-ai-summary-section";
 import { VisitNotesSection } from "@/app/dashboard/visits/visit-notes-section";
 import { VisitPrescriptionsSection } from "@/app/dashboard/visits/visit-prescriptions-section";
+import { VisitShareSection } from "@/app/dashboard/visits/visit-share-section";
 import { VisitVaccinationsSection } from "@/app/dashboard/visits/visit-vaccinations-section";
 import { formatIsraelDateTime } from "@/lib/israel-date";
 import type { MedicalNote } from "@/types/domain/medical-note";
@@ -147,6 +148,21 @@ export default async function VisitDetailPage({ params }: Params) {
           <VisitPrescriptionsSection
             visitId={visit.id}
             initialPrescriptions={prescriptionsData?.items ?? []}
+          />
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-zinc-200 bg-white p-6">
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">
+          שליחה ללקוח
+        </h3>
+        <div className="mt-3">
+          <VisitShareSection
+            visitId={visit.id}
+            hasSummary={Boolean(visit.aiVisitSummary ?? visit.manualVisitSummary)}
+            hasPrescriptions={
+              (prescriptionsData?.items ?? []).some((p) => p.status === "active")
+            }
           />
         </div>
       </div>
