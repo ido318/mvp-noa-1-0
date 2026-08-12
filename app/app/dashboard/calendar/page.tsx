@@ -433,9 +433,17 @@ export default function CalendarPage() {
   }
 
   async function deleteBlock(blockId: string) {
-    const res = await fetch(`/api/calendar-blocks/${blockId}`, { method: "DELETE" });
-    if (res.ok) {
-      setBlocks(current => current.filter(block => block.id !== blockId));
+    setCalendarError(null);
+    try {
+      const res = await fetch(`/api/calendar-blocks/${blockId}`, { method: "DELETE" });
+      if (res.ok) {
+        setBlocks(current => current.filter(block => block.id !== blockId));
+        return;
+      }
+      const payload = await res.json().catch(() => null) as { error?: { message?: string } } | null;
+      setCalendarError(apiErrorMessage(payload, "מחיקת החסימה נכשלה."));
+    } catch {
+      setCalendarError("מחיקת החסימה נכשלה.");
     }
   }
 
