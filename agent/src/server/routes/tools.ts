@@ -24,6 +24,7 @@ import {
   decideConversationPolicy,
   formatConversationPolicyForVoice,
 } from "../../services/conversation-policy.service.js";
+import { decideHumanHandoff } from "../../services/handoff.service.js";
 
 export const toolsRoutes = new Hono();
 
@@ -147,6 +148,49 @@ toolsRoutes.post("/tools/escalate-to-noa", async (c) => {
   await addEscalation({ reason, urgency });
 
   return c.json({ result: `הועברה לנועה (urgency: ${urgency}/10)` });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /tools/request-human-handoff
+// Transfers the live call to Noa's mobile during business hours; otherwise
+// records an escalation. The actual PSTN transfer is executed by ElevenLabs
+// using the returned `number` when `transfer` is true.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const handoffSchema = z.object({
+  reason: z.string().min(1).optional(),
+  emergency: z.boolean().optional(),
+});
+
+toolsRoutes.post("/tools/request-human-handoff", async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const parsed = handoffSchema.safeParse(body);
+  const reason = parsed.success ? parsed.data.reason : undefined;
+  const emergency = parsed.success ? parsed.data.emergency : undefined;
+
+  const decision = decideHumanHandoff({
+    now: new Date(),
+    targetNumber: getEnv().HUMAN_HANDOFF_NUMBER,
+    emergency,
+  });
+
+  if (decision.escalate) {
+    await addEscalation({
+      reason: reason ?? "בקשת מעבר לנציג אנושי",
+      urgency: decision.urgency ?? 6,
+    });
+  }
+
+  logger.info(
+    { transfer: decision.transfer, escalate: decision.escalate },
+    "tool: request-human-handoff",
+  );
+
+  return c.json({
+    result: decision.result,
+    transfer: decision.transfer,
+    ...(decision.number ? { number: decision.number } : {}),
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

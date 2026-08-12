@@ -310,5 +310,31 @@
         "required": ["reason", "urgency"]
       }
     }
+  },
+  {
+    "type": "webhook",
+    "name": "request-human-handoff",
+    "description": "מעביר את השיחה החיה לנייד של ד\"ר נועה כשהמתקשר מבקש לדבר עם אדם, או במקרה חירום. מעביר רק בשעות הפעילות; מחוץ לשעות — רושם פנייה דחופה. אם בתשובה transfer=true, בצע העברה למספר שחוזר; אם transfer=false, מסור למתקשר את הטקסט מהשדה result.",
+    "api_schema": {
+      "url": "{{AGENT_PUBLIC_URL}}/tools/request-human-handoff",
+      "method": "POST",
+      "request_headers": {
+        "Authorization": "Bearer {{AGENT_JOBS_BEARER_TOKEN}}"
+      },
+      "request_body_schema": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "description": "תיאור קצר של סיבת הבקשה לאדם"
+          },
+          "emergency": {
+            "type": "boolean",
+            "description": "true אם מדובר במצב חירום רפואי"
+          }
+        },
+        "required": []
+      }
+    }
   }
 ]

@@ -28,6 +28,10 @@ const schema = z.object({
   // Clinic routing — which clinic record the agent writes to in the unified schema
   AGENT_CLINIC_ID: z.string().uuid(),
 
+  // Human handoff — Noa's mobile (E.164). When set, Tomer transfers live calls
+  // here during business hours; otherwise it records an escalation instead.
+  HUMAN_HANDOFF_NUMBER: z.string().startsWith("+").optional(),
+
   DEMO_MODE: z
     .enum(["true", "false"])
     .default("true")
