@@ -108,6 +108,18 @@ export default async function VisitDetailPage({ params }: Params) {
       </div>
 
       <div className="rounded-2xl border border-zinc-200 bg-white p-6">
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">
+          מרשמים
+        </h3>
+        <div className="mt-3">
+          <VisitPrescriptionsSection
+            visitId={visit.id}
+            initialPrescriptions={prescriptionsData?.items ?? []}
+          />
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-zinc-200 bg-white p-6">
         <h3 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">פעולות</h3>
         <div className="mt-3">
           <VisitActions
@@ -136,18 +148,6 @@ export default async function VisitDetailPage({ params }: Params) {
             customerId={visit.customerId}
             petId={visit.petId}
             initialVaccinations={vaccinationsData?.items ?? []}
-          />
-        </div>
-      </div>
-
-      <div className="rounded-2xl border border-zinc-200 bg-white p-6">
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">
-          מרשמים
-        </h3>
-        <div className="mt-3">
-          <VisitPrescriptionsSection
-            visitId={visit.id}
-            initialPrescriptions={prescriptionsData?.items ?? []}
           />
         </div>
       </div>
