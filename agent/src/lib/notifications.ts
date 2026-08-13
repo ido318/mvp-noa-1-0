@@ -18,6 +18,7 @@ import { getVisitConfig, type VisitType } from "./appointments.js";
 export type NotificationType =
   | "booking_confirmation"
   | "morning_reminder"
+  | "arrival_reminder"
   | "post_visit_followup"
   | "reschedule_update"
   | "cancellation_update"
@@ -193,6 +194,16 @@ export async function scheduleBookingNotifications(p: BookingNotificationParams)
       type:         "morning_reminder",
       body:         smsTemplates.morning_reminder(base),
       scheduledFor: morning,
+    });
+  }
+
+  const arrivalReminderTime = new Date(new Date(p.scheduledAt).getTime() - 2 * 60 * 60_000);
+  if (arrivalReminderTime > now) {
+    await enqueueNotification({
+      ...shared,
+      type:         "arrival_reminder",
+      body:         smsTemplates.arrival_reminder(base),
+      scheduledFor: arrivalReminderTime,
     });
   }
 

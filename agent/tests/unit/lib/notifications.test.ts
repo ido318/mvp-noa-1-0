@@ -205,10 +205,13 @@ describe("cancelFutureNotifications", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("scheduleBookingNotifications", () => {
-  it("enqueues booking_confirmation, morning_reminder, and post_visit_followup", async () => {
+  it("enqueues booking_confirmation, morning_reminder, arrival_reminder, and post_visit_followup", async () => {
+    // Use a future appointment (14 days ahead) so time-based reminders are enqueued,
+    // regardless of when the test runs.
+    const futureAppt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
     await scheduleBookingNotifications({
       appointmentId:   "appt-1",
-      scheduledAt:     "2026-07-20T08:00:00+03:00", // 08:00 Jerusalem (summer)
+      scheduledAt:     futureAppt,
       durationMinutes: 40,
       visitType:       "checkup",
       clinicId:        "clinic-1",
@@ -218,14 +221,15 @@ describe("scheduleBookingNotifications", () => {
       petName:         "ביסלי",
     });
 
-    // upsert called 3 times (one per notification type)
-    expect(mockUpsert).toHaveBeenCalledTimes(3);
+    // upsert called 4 times (one per notification type)
+    expect(mockUpsert).toHaveBeenCalledTimes(4);
 
     const types = mockUpsert.mock.calls.map(
       (call) => (call[0] as { type: string }).type,
     );
     expect(types).toContain("booking_confirmation");
     expect(types).toContain("morning_reminder");
+    expect(types).toContain("arrival_reminder");
     expect(types).toContain("post_visit_followup");
   });
 
@@ -247,6 +251,7 @@ describe("scheduleBookingNotifications", () => {
       (call) => (call[0] as { type: string }).type,
     );
     expect(types).not.toContain("morning_reminder");
+    expect(types).not.toContain("arrival_reminder");
     expect(types).toContain("booking_confirmation");
     expect(types).toContain("post_visit_followup");
   });

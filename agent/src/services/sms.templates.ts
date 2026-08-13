@@ -96,6 +96,16 @@ export const smsTemplates = {
     );
   },
 
+  arrival_reminder: (d: MorningReminderData) => {
+    requireFields(d, ["time", "location", "visitType"], "arrival_reminder");
+    return (
+      `שלום ${d.customerName}, כאן תומר מ-Get A Vet ⏰\n` +
+      `מזכירים: התור של ${d.petName} היום בשעה ${d.time} | ${d.visitType} | 📍 ${d.location}\n` +
+      `אם לא תוכלו להגיע — חייגו אלינו בהקדם.\n` +
+      `נתראה בקרוב 🐾`
+    );
+  },
+
   post_visit_followup: (d: SmsTemplateData) =>
     `שלום ${d.customerName}, כאן תומר מ-Get A Vet 🐾\n` +
     `רצינו לשאול מה שלום ${d.petName} אחרי הביקור אצל ד"ר נועה — האם המצב משתפר?\n` +
