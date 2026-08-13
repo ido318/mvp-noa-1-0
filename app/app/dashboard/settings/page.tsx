@@ -59,17 +59,21 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let ignore = false;
     void (async () => {
       try {
         const res = await fetch("/api/me");
         if (res.ok) {
           const payload = (await res.json()) as { data: MeResponse };
-          setMe(payload.data);
+          if (!ignore) setMe(payload.data);
         }
       } finally {
-        setLoading(false);
+        if (!ignore) setLoading(false);
       }
     })();
+    return () => {
+      ignore = true;
+    };
   }, []);
 
   const membership = me?.memberships.find((m) => m.clinicId === me.profile.defaultClinicId)
