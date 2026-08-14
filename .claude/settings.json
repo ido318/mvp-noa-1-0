@@ -9,7 +9,12 @@
       "Bash(supabase stop)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(git push)"
+      "Bash(git push)",
+      "Bash(flyctl deploy:*)",
+      "Bash(flyctl secrets:*)",
+      "Bash(flyctl status:*)",
+      "Bash(vercel:*)",
+      "Bash(node --env-file=.env --import tsx/esm scripts/sync-elevenlabs-agent.ts:*)"
     ]
   }
 }
