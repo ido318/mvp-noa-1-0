@@ -124,6 +124,17 @@ describe("generateSlotsForVisitType — checkup (effective 30 min)", () => {
     expect(formatSlotLabel(slots.at(-1)!)).toBe("19:30");
   });
 
+  it("formatSlotLabel — ממיר נכון גם כשה-ISO חוזר מה-DB ב-UTC (regression: לא string slice נאיבי)", () => {
+    // Supabase/PostgREST מחזיר timestamptz מנורמל ל-UTC אחרי insert/select,
+    // גם אם הקוד שלח +03:00 במקור. 11:30 בישראל (קיץ, +03:00) = 08:30Z.
+    expect(formatSlotLabel("2026-08-20T08:30:00.000Z")).toBe("11:30");
+    expect(formatSlotLabel("2026-08-20T08:30:00+00:00")).toBe("11:30");
+    // חורף (+02:00): 10:00 בישראל = 08:00Z.
+    expect(formatSlotLabel("2026-01-15T08:00:00.000Z")).toBe("10:00");
+    // מחרוזת שכבר ב-offset ישראלי מוצגת ללא שינוי.
+    expect(formatSlotLabel("2026-08-20T11:30:00+03:00")).toBe("11:30");
+  });
+
   it("מציג כל חלון פנוי בקפיצות של 10 דקות", () => {
     const slots = generateSlotsForVisitType("2026-06-14", WEEKDAY_HOURS, "checkup", []);
     expect(slots.map(formatSlotLabel).slice(0, 8)).toEqual([

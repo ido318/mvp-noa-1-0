@@ -99,7 +99,7 @@ export function maxBookingDateIso(): string {
   return toIsraelDateIso(new Date(ms));
 }
 
-function toIsraelDateIso(d: Date): string {
+export function toIsraelDateIso(d: Date): string {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: ISRAEL_TZ,
     year: "numeric",
@@ -155,10 +155,24 @@ export function generateSlotsForVisitType(
   return candidateSlots.map((slot) => slot.iso);
 }
 
+/**
+ * Format an ISO datetime as "HH:MM" in Israel local time.
+ *
+ * Timezone-aware (not a raw string slice): Supabase/PostgREST returns
+ * `timestamptz` columns normalised to UTC, so a naive substring extraction
+ * would report the wrong hour whenever the local offset isn't +00:00 (i.e.
+ * always, for Israel). Always convert via the actual instant, never assume
+ * the string's embedded offset is already Israel-local.
+ */
 export function formatSlotLabel(iso: string): string {
-  const match = iso.match(/T(\d{2}):(\d{2})/);
-  if (!match) return iso;
-  return `${match[1]}:${match[2]}`;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: ISRAEL_TZ,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(d);
 }
 
 export function formatSlotOptionForTool(iso: string): string {

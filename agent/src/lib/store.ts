@@ -15,6 +15,7 @@ import {
   isTooLateToCancel,
   maxBookingDateIso,
   toIso,
+  toIsraelDateIso,
 } from "./appointments.js";
 import {
   scheduleBookingNotifications,
@@ -341,7 +342,7 @@ export async function bookAppointment(params: BookAppointmentParams): Promise<st
   const appointmentId = extractId(data);
   const scheduledAt   = typeof data.scheduled_at === "string" ? data.scheduled_at : params.scheduled_at;
   const slotLabel     = formatSlotLabel(scheduledAt);
-  const dateLabel     = scheduledAt.slice(0, 10);
+  const dateLabel     = toIsraelDateIso(new Date(scheduledAt));
 
   // Fire-and-forget SMS notifications — only for confirmed bookings.
   // pending_approval (neutering) must NOT create notifications here;
