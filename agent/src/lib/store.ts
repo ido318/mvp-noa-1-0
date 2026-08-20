@@ -262,7 +262,10 @@ export async function checkAvailability(
   const labels = freeSlots.map(formatSlotOptionForTool).join(", ");
   return (
     `חלונות פנויים ל${typeLabelHe} ב-${formatDateHe(dateIso)} (יום ${getDayNameHe(dateIso)}): ${labels}. ` +
-    "לקביעת תור חובה להשתמש בערך scheduled_at המדויק מאחת האופציות, כולל אזור הזמן."
+    "לקביעת תור חובה להשתמש בערך scheduled_at המדויק מאחת האופציות, כולל אזור הזמן. " +
+    "זו רשימה מלאה למטרות התאמה בלבד — אסור להקריא אותה ללקוח כמות שהיא. " +
+    "הצע בקול רק את 2-3 השעות המוקדמות ביותר, אלא אם הלקוח ציין העדפת זמן אחרת (בוקר/צהריים/אחה\"צ) — " +
+    "ואז הצע 2-3 שעות מהטווח הזה בלבד."
   );
 }
 
