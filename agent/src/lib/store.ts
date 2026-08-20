@@ -8,7 +8,7 @@ import {
   getClinicHours,
   getDayNameHe,
   generateSlotsForVisitType,
-  formatSlotLabel,
+  formatSlotSpokenHe,
   formatSlotOptionForTool,
   formatDateHe,
   isWithin14Days,
@@ -344,7 +344,7 @@ export async function bookAppointment(params: BookAppointmentParams): Promise<st
 
   const appointmentId = extractId(data);
   const scheduledAt   = typeof data.scheduled_at === "string" ? data.scheduled_at : params.scheduled_at;
-  const slotLabel     = formatSlotLabel(scheduledAt);
+  const slotLabel     = formatSlotSpokenHe(scheduledAt);
   const dateLabel     = toIsraelDateIso(new Date(scheduledAt));
 
   // Fire-and-forget SMS notifications — only for confirmed bookings.
@@ -419,7 +419,7 @@ export async function cancelAppointment(phone: string, scheduledAt: string): Pro
     .then(() => processNotifications({ appointmentId: appt.id }))
     .catch((err: unknown) => logger.error({ err, appointmentId: appt.id }, "SMS cancel fire-and-forget failed"));
 
-  const slotLabel = formatSlotLabel(appt.scheduled_at);
+  const slotLabel = formatSlotSpokenHe(appt.scheduled_at);
 
   if (lateCancellation) {
     return (
@@ -473,7 +473,7 @@ export async function rescheduleAppointment(
       throw new Error(`rescheduleAppointment type update failed: ${updateErr.message}`);
     }
 
-    return `✅ סוג התור עודכן ל${getVisitConfig(resolvedType).labelHe} בשעה ${formatSlotLabel(oldAppt.scheduled_at)}.`;
+    return `✅ סוג התור עודכן ל${getVisitConfig(resolvedType).labelHe} בשעה ${formatSlotSpokenHe(oldAppt.scheduled_at)}.`;
   }
 
   const { data: rpcData, error: rpcErr } = await getSupabase().rpc("reschedule_appointment", {
@@ -520,8 +520,8 @@ export async function rescheduleAppointment(
     })();
   }
 
-  const oldLabel = formatSlotLabel(oldAppt.scheduled_at);
-  const newLabel = formatSlotLabel(newScheduledAt);
+  const oldLabel = formatSlotSpokenHe(oldAppt.scheduled_at);
+  const newLabel = formatSlotSpokenHe(newScheduledAt);
   const newDate  = newScheduledAt.slice(0, 10);
   return `✅ התור הוזז בהצלחה מ-${oldLabel} ל-${formatDateHe(newDate)} בשעה ${newLabel}.`;
 }

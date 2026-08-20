@@ -175,8 +175,35 @@ export function formatSlotLabel(iso: string): string {
   }).format(d);
 }
 
+/**
+ * Format an ISO datetime as a natural spoken Israeli time, e.g. "1:00 בצהריים"
+ * instead of the 24-hour "13:00" — a caller says "אחת בצהריים", never "שלוש עשרה".
+ * Clinic hours are always 08:00-20:00, so there's no midnight ambiguity to handle.
+ * Only for LLM-facing / spoken text — formatSlotLabel stays 24-hour for anything
+ * that needs a sortable/comparable "HH:MM" string (e.g. internal tests).
+ */
+export function formatSlotSpokenHe(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: ISRAEL_TZ,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(d);
+  const hour24 = Number(parts.find((p) => p.type === "hour")!.value);
+  const minute = parts.find((p) => p.type === "minute")!.value;
+  const hour12 = hour24 > 12 ? hour24 - 12 : hour24;
+  const suffix =
+    hour24 < 12 ? "בבוקר" :
+    hour24 < 14 ? "בצהריים" :
+    hour24 < 18 ? "אחר הצהריים" :
+    "בערב";
+  return `${hour12}:${minute} ${suffix}`;
+}
+
 export function formatSlotOptionForTool(iso: string): string {
-  return `${formatSlotLabel(iso)} (scheduled_at=${iso})`;
+  return `${formatSlotSpokenHe(iso)} (scheduled_at=${iso})`;
 }
 
 export function formatDateHe(dateIso: string): string {

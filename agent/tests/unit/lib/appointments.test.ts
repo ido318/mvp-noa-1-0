@@ -4,6 +4,7 @@ import {
   getDayNameHe,
   generateSlotsForVisitType,
   formatSlotLabel,
+  formatSlotSpokenHe,
   formatSlotOptionForTool,
   formatDateHe,
   isWithin14Days,
@@ -67,10 +68,28 @@ describe("formatDateHe", () => {
 });
 
 describe("formatSlotOptionForTool", () => {
-  it("כולל שעה קריאה וגם scheduled_at מדויק עם timezone ישראל", () => {
+  it("כולל שעה קריאה בפורמט ישראלי טבעי (לא 24 שעות) וגם scheduled_at מדויק עם timezone ישראל", () => {
     expect(formatSlotOptionForTool("2026-06-14T11:30:00+03:00")).toBe(
-      "11:30 (scheduled_at=2026-06-14T11:30:00+03:00)",
+      "11:30 בבוקר (scheduled_at=2026-06-14T11:30:00+03:00)",
     );
+  });
+});
+
+describe("formatSlotSpokenHe", () => {
+  it("ממיר שעות אחר-הצהריים/ערב לפורמט 12 שעות טבעי במקום 24 שעות (regression: לא עוד 'שלוש עשרה')", () => {
+    expect(formatSlotSpokenHe("2026-08-20T13:00:00+03:00")).toBe("1:00 בצהריים");
+    expect(formatSlotSpokenHe("2026-08-20T14:30:00+03:00")).toBe("2:30 אחר הצהריים");
+    expect(formatSlotSpokenHe("2026-08-20T18:15:00+03:00")).toBe("6:15 בערב");
+  });
+
+  it("שעות בוקר וצהריים מדויקות", () => {
+    expect(formatSlotSpokenHe("2026-08-20T08:00:00+03:00")).toBe("8:00 בבוקר");
+    expect(formatSlotSpokenHe("2026-08-20T12:00:00+03:00")).toBe("12:00 בצהריים");
+  });
+
+  it("ממיר נכון גם כשה-ISO חוזר מה-DB ב-UTC", () => {
+    // 11:00Z בקיץ (+03:00) = 14:00 ישראל = "2:00 אחר הצהריים"
+    expect(formatSlotSpokenHe("2026-08-20T11:00:00.000Z")).toBe("2:00 אחר הצהריים");
   });
 });
 
