@@ -6,6 +6,9 @@ node_modules/
 .env.*
 !.env.example
 
+# Local docs with real infra identifiers — never commit
+docs/*.local.md
+
 # Next.js build output
 .next/
 out/

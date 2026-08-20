@@ -3,6 +3,9 @@
 מסמך זה מרכז **כל מה שצריך ממך** כדי שאפעיל את הסוכן (agent) ואת הדשבורד (app) בפרודקשן.
 ערכים שכבר שלפתי מסומנים ✅. ערכים סודיים שרק אתה יכול להוציא מסומנים 🔒.
 
+> קובץ זה (מתועד ב-git) משתמש ב-placeholders בלבד. הערכים האמיתיים נמצאים ב-
+> `docs/PRODUCTION_SETUP_CHECKLIST.local.md` (מקומי, מוחרג ב-`.gitignore`, לא נכנס לגיט).
+
 > טיפ לשימוש עם תוסף Chrome של קלוד: כל שורה 🔒 כוללת בדיוק לאן להיכנס ומה להעתיק.
 
 ---
@@ -26,18 +29,18 @@ flyctl auth login
 
 | משתנה | ערך | שייך ל |
 |---|---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` / `SUPABASE_URL` | `https://xpsuhtqfxqmnunppnyov.supabase.co` | app + agent |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `sb_publishable_pcbp5JhLyqsy8gbniW6m-Q_h1XIPB_v` (או ה-anon JWT הישן) | app |
-| `AGENT_CLINIC_ID` | `37681721-a59f-40d5-a041-ad15a49ecf29` (Get A Vet) | agent |
-| `PUBLIC_BASE_URL` (agent) | `https://voxly-agent.fly.dev` | agent |
-| `APP_BASE_URL` (app) | `https://voxly-app-chi.vercel.app` | app |
+| `NEXT_PUBLIC_SUPABASE_URL` / `SUPABASE_URL` | `https://<SUPABASE_PROJECT_REF>.supabase.co` | app + agent |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `<SUPABASE_ANON_KEY>` | app |
+| `AGENT_CLINIC_ID` | `<AGENT_CLINIC_ID>` (Get A Vet) | agent |
+| `PUBLIC_BASE_URL` (agent) | `<AGENT_FLY_URL>` | agent |
+| `APP_BASE_URL` (app) | `<APP_VERCEL_URL>` | app |
 
 ---
 
 ## חלק 3 — סודות שצריך להוציא 🔒
 
 ### 3.1 Supabase — לוח בקרה
-🔗 https://supabase.com/dashboard/project/xpsuhtqfxqmnunppnyov/settings/api
+🔗 https://supabase.com/dashboard/project/`<SUPABASE_PROJECT_REF>`/settings/api
 
 | משתנה | איפה בדיוק | פורמט |
 |---|---|---|
@@ -52,7 +55,7 @@ flyctl auth login
 |---|---|---|
 | 🔒 `TWILIO_ACCOUNT_SID` | דף הבית של ה-Console → Account Info | `AC` + 32 תווים |
 | 🔒 `TWILIO_AUTH_TOKEN` | דף הבית → Account Info → "Auth Token" (Show) | מחרוזת ארוכה |
-| `TWILIO_PHONE_NUMBER` (agent) / `TWILIO_CLINIC_PHONE_NUMBER` (app) | Phone Numbers → Active numbers — המספר הישראלי | `+972...` (לפי התיעוד: `+972534674499`) |
+| `TWILIO_PHONE_NUMBER` (agent) / `TWILIO_CLINIC_PHONE_NUMBER` (app) | Phone Numbers → Active numbers — המספר הישראלי | `+972...` |
 
 ### 3.3 ElevenLabs — Conversational AI
 🔗 https://elevenlabs.io/app/conversational-ai
@@ -84,8 +87,8 @@ flyctl auth login
 
 ## חלק 5 — הגדרות חיצוניות (לא env — פעולות בקונסולות)
 
-- [ ] **Twilio:** להפנות את ה-Voice webhook של המספר אל `https://voxly-agent.fly.dev/twilio/voice`
-- [ ] **ElevenLabs:** post-call webhook → `https://voxly-agent.fly.dev/hooks/call-ended` (עם `ELEVENLABS_WEBHOOK_SECRET`)
+- [ ] **Twilio:** להפנות את ה-Voice webhook של המספר אל `<AGENT_FLY_URL>/twilio/voice`
+- [ ] **ElevenLabs:** post-call webhook → `<AGENT_FLY_URL>/hooks/call-ended` (עם `ELEVENLABS_WEBHOOK_SECRET`)
 - [ ] **ElevenLabs:** הגדרת transfer-to-number לפיצ׳ר ההעברה לאדם (הכלי החדש `request-human-handoff` יסונכרן ע״י סקריפט הסנכרון)
 - [ ] **Fly.io:** להוסיף כרטיס אשראי (אחרת המכונה נכבית אחרי 5 דק׳)
 - [ ] **Supabase:** להפעיל pg_cron לתזכורות SMS (ה-SQL קיים ב-CLAUDE.md)
