@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockFrom, mockRpc, updateCalls } = vi.hoisted(() => {
+const { mockFrom, mockRpc, updateCalls, scheduledAtIso } = vi.hoisted(() => {
+  // Always > 4 hours out (LATE_CANCEL_HOURS), regardless of when this test runs.
+  const futureDate = new Date(Date.now() + 10 * 24 * 60 * 60 * 1000);
+  const scheduledAtIso = `${futureDate.toISOString().slice(0, 10)}T14:00:00+03:00`;
+
   const updateCalls: Array<{ table: string; payload: Record<string, unknown> }> = [];
   let currentTable = "";
   let currentOperation: "select" | "update" | null = null;
@@ -29,7 +33,7 @@ const { mockFrom, mockRpc, updateCalls } = vi.hoisted(() => {
       data: [{
         id: "appt-1",
         customer_id: "customer-1",
-        scheduled_at: "2026-06-24T14:00:00+03:00",
+        scheduled_at: scheduledAtIso,
         appointment_type: "checkup",
         duration_minutes: 30,
         customers: { full_name: "עידו" },
@@ -47,7 +51,7 @@ const { mockFrom, mockRpc, updateCalls } = vi.hoisted(() => {
   });
   const mockRpc = vi.fn(() => Promise.resolve({ data: "new-appt-1", error: null }));
 
-  return { mockFrom, mockRpc, updateCalls };
+  return { mockFrom, mockRpc, updateCalls, scheduledAtIso };
 });
 
 vi.mock("../../../src/lib/supabase.js", () => ({
@@ -82,8 +86,8 @@ describe("rescheduleAppointment — same-slot visit type correction", () => {
   it("updates the existing appointment when only the visit type changes", async () => {
     const result = await rescheduleAppointment(
       "0541234567",
-      "2026-06-24T14:00:00+03:00",
-      "2026-06-24T14:00:00+03:00",
+      scheduledAtIso,
+      scheduledAtIso,
       "vaccination",
     );
 
