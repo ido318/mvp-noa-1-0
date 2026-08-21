@@ -8,6 +8,7 @@ import { useToast } from "@/components/dashboard/ui/toast";
 import { LogoutButton } from "@/app/dashboard/logout-button";
 import type { MeResponse } from "@/types/api/me";
 import type { ClinicSettings } from "@/types/domain/clinic";
+import { MAX_BUSINESS_HOURS_ROWS, MAX_VISIT_PRICE_ROWS } from "@/lib/validators/clinic-settings";
 
 const ROLE_LABELS: Record<string, string> = {
   owner: "בעלים",
@@ -60,11 +61,13 @@ function EditRow({
   value,
   onChange,
   onRemove,
+  canRemove,
   placeholders,
 }: {
   value: { a: string; b: string };
   onChange: (next: { a: string; b: string }) => void;
   onRemove: () => void;
+  canRemove: boolean;
   placeholders: [string, string];
 }) {
   return (
@@ -84,7 +87,9 @@ function EditRow({
       <button
         type="button"
         onClick={onRemove}
-        className="flex-shrink-0 text-xs font-semibold text-[var(--red-600)] hover:underline"
+        disabled={!canRemove}
+        title={canRemove ? undefined : "חייבת להישאר לפחות שורה אחת"}
+        className="flex-shrink-0 text-xs font-semibold text-[var(--red-600)] hover:underline disabled:opacity-40 disabled:no-underline"
       >
         הסר
       </button>
@@ -98,6 +103,7 @@ export default function SettingsPage() {
   const [settings, setSettings] = useState<ClinicSettings | null>(null);
   const [draft, setDraft] = useState<ClinicSettings | null>(null);
   const [loading, setLoading] = useState(true);
+  const [settingsLoadFailed, setSettingsLoadFailed] = useState(false);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -113,9 +119,14 @@ export default function SettingsPage() {
           const payload = (await meRes.json()) as { data: MeResponse };
           setMe(payload.data);
         }
-        if (!ignore && settingsRes.ok) {
-          const payload = (await settingsRes.json()) as { data: ClinicSettings };
-          setSettings(payload.data);
+        if (!ignore) {
+          if (settingsRes.ok) {
+            const payload = (await settingsRes.json()) as { data: ClinicSettings };
+            setSettings(payload.data);
+          } else {
+            setSettingsLoadFailed(true);
+            toast("טעינת הגדרות המרפאה נכשלה — נסה/י לרענן את הדף", "error");
+          }
         }
       } finally {
         if (!ignore) setLoading(false);
@@ -124,6 +135,7 @@ export default function SettingsPage() {
     return () => {
       ignore = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const membership = me?.memberships.find((m) => m.clinicId === me.profile.defaultClinicId)
@@ -165,7 +177,7 @@ export default function SettingsPage() {
     }
   }
 
-  const editAction = canEdit ? (
+  const editAction = canEdit && settings ? (
     editing ? (
       <div className="flex gap-2">
         <button
@@ -208,6 +220,12 @@ export default function SettingsPage() {
           </div>
           {!loading ? editAction : null}
         </div>
+
+        {settingsLoadFailed ? (
+          <div className="rounded-[var(--r-md)] border border-[var(--red-100)] bg-[var(--red-50)] px-4 py-3 text-sm font-semibold text-[var(--red-700)]">
+            טעינת הגדרות המרפאה נכשלה. רענן/י את הדף כדי לנסות שוב.
+          </div>
+        ) : null}
 
         {/* Clinic profile */}
         <Card>
@@ -271,6 +289,7 @@ export default function SettingsPage() {
                   key={i}
                   value={{ a: b.day, b: b.hours }}
                   placeholders={["יום", "שעות"]}
+                  canRemove={draft.businessHours.length > 1}
                   onChange={(next) =>
                     setDraft({
                       ...draft,
@@ -289,12 +308,15 @@ export default function SettingsPage() {
               ))}
               <button
                 type="button"
+                disabled={draft.businessHours.length >= MAX_BUSINESS_HOURS_ROWS}
                 onClick={() =>
                   setDraft({ ...draft, businessHours: [...draft.businessHours, { day: "", hours: "" }] })
                 }
-                className="mt-2 text-xs font-semibold text-[var(--brand-600)] hover:underline"
+                className="mt-2 text-xs font-semibold text-[var(--brand-600)] hover:underline disabled:opacity-40 disabled:no-underline"
               >
-                + הוסף שורה
+                {draft.businessHours.length >= MAX_BUSINESS_HOURS_ROWS
+                  ? `הגעת למספר השורות המרבי (${MAX_BUSINESS_HOURS_ROWS})`
+                  : "+ הוסף שורה"}
               </button>
             </div>
           ) : (
@@ -318,6 +340,7 @@ export default function SettingsPage() {
                   key={i}
                   value={{ a: v.label, b: v.detail }}
                   placeholders={["סוג ביקור", "מחיר / פרטים"]}
+                  canRemove={draft.visitPrices.length > 1}
                   onChange={(next) =>
                     setDraft({
                       ...draft,
@@ -336,12 +359,15 @@ export default function SettingsPage() {
               ))}
               <button
                 type="button"
+                disabled={draft.visitPrices.length >= MAX_VISIT_PRICE_ROWS}
                 onClick={() =>
                   setDraft({ ...draft, visitPrices: [...draft.visitPrices, { label: "", detail: "" }] })
                 }
-                className="mt-2 text-xs font-semibold text-[var(--brand-600)] hover:underline"
+                className="mt-2 text-xs font-semibold text-[var(--brand-600)] hover:underline disabled:opacity-40 disabled:no-underline"
               >
-                + הוסף שורה
+                {draft.visitPrices.length >= MAX_VISIT_PRICE_ROWS
+                  ? `הגעת למספר השורות המרבי (${MAX_VISIT_PRICE_ROWS})`
+                  : "+ הוסף שורה"}
               </button>
             </div>
           ) : (

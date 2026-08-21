@@ -1,5 +1,9 @@
 import { z } from "zod";
 
+// Shared with the settings page UI so "+ add row" stops at the same cap the API enforces.
+export const MAX_BUSINESS_HOURS_ROWS = 10;
+export const MAX_VISIT_PRICE_ROWS = 20;
+
 const businessHourEntrySchema = z.object({
   day: z.string().trim().min(1).max(60),
   hours: z.string().trim().min(1).max(60),
@@ -17,8 +21,8 @@ const contactSchema = z.object({
 });
 
 export const updateClinicSettingsSchema = z.object({
-  businessHours: z.array(businessHourEntrySchema).min(1).max(10).optional(),
-  visitPrices: z.array(visitPriceEntrySchema).min(1).max(20).optional(),
+  businessHours: z.array(businessHourEntrySchema).min(1).max(MAX_BUSINESS_HOURS_ROWS).optional(),
+  visitPrices: z.array(visitPriceEntrySchema).min(1).max(MAX_VISIT_PRICE_ROWS).optional(),
   contact: contactSchema.partial().optional(),
 });
 

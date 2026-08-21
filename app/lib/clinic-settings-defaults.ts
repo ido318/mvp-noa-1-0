@@ -26,13 +26,11 @@ export const DEFAULT_CLINIC_SETTINGS: ClinicSettings = {
 export function withClinicSettingsDefaults(
   stored: Partial<ClinicSettings> | null | undefined,
 ): ClinicSettings {
+  // `??` (not a `.length` check) so a deliberately emptied array survives a
+  // round-trip instead of being silently replaced by the defaults again.
   return {
-    businessHours: stored?.businessHours?.length
-      ? stored.businessHours
-      : DEFAULT_CLINIC_SETTINGS.businessHours,
-    visitPrices: stored?.visitPrices?.length
-      ? stored.visitPrices
-      : DEFAULT_CLINIC_SETTINGS.visitPrices,
+    businessHours: stored?.businessHours ?? DEFAULT_CLINIC_SETTINGS.businessHours,
+    visitPrices: stored?.visitPrices ?? DEFAULT_CLINIC_SETTINGS.visitPrices,
     contact: {
       ...DEFAULT_CLINIC_SETTINGS.contact,
       ...stored?.contact,
