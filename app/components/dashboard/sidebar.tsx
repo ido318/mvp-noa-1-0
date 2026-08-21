@@ -69,7 +69,7 @@ export function Sidebar({ openEscalations = 0, userName = "ד״ר נועה כב�
 
   return (
     <aside
-      className="flex flex-col h-full bg-[var(--surface)] border-s border-[var(--line)]"
+      className="flex flex-col h-full bg-[var(--surface)] border-e border-[var(--line)]"
       style={{ width: "var(--side-w)" }}
     >
       {/* Logo */}

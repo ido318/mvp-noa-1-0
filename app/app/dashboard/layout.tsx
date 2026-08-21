@@ -29,8 +29,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   return (
     <ToastProvider>
-      {/* Full-height RTL flex container: content area + sidebar (sidebar on the right in RTL) */}
+      {/* Full-height RTL flex container: sidebar + content area. DOM order matters here —
+          the first flex child sits at the inline-start edge, which is the right side under dir="rtl". */}
       <div className="flex h-screen overflow-hidden bg-[var(--bg)]">
+        {/* Sidebar (right in RTL) */}
+        <Sidebar openEscalations={openEscalations} />
+
         {/* Main content (flex-1, scroll here) */}
         <div className="flex flex-1 flex-col min-w-0 overflow-hidden">
           <Header
@@ -44,9 +48,6 @@ export default async function DashboardLayout({ children }: { children: React.Re
             </div>
           </main>
         </div>
-
-        {/* Sidebar (right in RTL) */}
-        <Sidebar openEscalations={openEscalations} />
       </div>
     </ToastProvider>
   );

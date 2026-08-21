@@ -7,7 +7,8 @@ import type {
 } from "@/types/domain/appointment";
 import type { CalendarBlock } from "@/types/domain/calendar-block";
 import type { AuditLog } from "@/types/domain/audit-log";
-import type { Clinic, ClinicMembership, ClinicRole } from "@/types/domain/clinic";
+import type { Clinic, ClinicMembership, ClinicRole, ClinicSettings } from "@/types/domain/clinic";
+import { withClinicSettingsDefaults } from "@/lib/clinic-settings-defaults";
 import type {
   Customer,
   CustomerStatus,
@@ -52,6 +53,7 @@ export function mapClinicRow(row: {
   name: string;
   slug: string;
   timezone: string;
+  settings?: Partial<ClinicSettings> | null;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
@@ -61,6 +63,7 @@ export function mapClinicRow(row: {
     name: row.name,
     slug: row.slug,
     timezone: row.timezone,
+    settings: withClinicSettingsDefaults(row.settings),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     deletedAt: row.deleted_at,

@@ -1,10 +1,21 @@
 export type ClinicRole = "owner" | "admin" | "staff" | "veterinarian";
 
+export type ClinicBusinessHourEntry = { day: string; hours: string };
+export type ClinicVisitPriceEntry = { label: string; detail: string };
+export type ClinicContactInfo = { address: string; whatsapp: string; email: string };
+
+export type ClinicSettings = {
+  businessHours: ClinicBusinessHourEntry[];
+  visitPrices: ClinicVisitPriceEntry[];
+  contact: ClinicContactInfo;
+};
+
 export type Clinic = {
   id: string;
   name: string;
   slug: string;
   timezone: string;
+  settings: ClinicSettings;
   createdAt: string;
   updatedAt: string;
   deletedAt: string | null;

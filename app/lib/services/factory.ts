@@ -19,6 +19,7 @@ import { AuditService } from "@/lib/services/audit.service";
 import { AuthService } from "@/lib/services/auth.service";
 import { CalendarBlockService } from "@/lib/services/calendar-block.service";
 import { CalendarService } from "@/lib/services/calendar.service";
+import { ClinicSettingsService } from "@/lib/services/clinic-settings.service";
 import { CustomerService } from "@/lib/services/customer.service";
 import { HealthService } from "@/lib/services/health.service";
 import { MedicalRecordService } from "@/lib/services/medical-record.service";
@@ -69,6 +70,7 @@ export async function createServices() {
     ),
     calendar: new CalendarService(appointmentRepository, calendarBlockRepository),
     calendarBlock: new CalendarBlockService(calendarBlockRepository),
+    clinicSettings: new ClinicSettingsService(clinicRepository, auditService),
     visit: new VisitService(
       visitRepository,
       customerRepository,

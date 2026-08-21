@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { AppError, err, ok, type Result } from "@/lib/errors/app-error";
 import { mapClinicRow, mapMembershipRow } from "@/lib/repositories/mappers";
-import type { Clinic, ClinicMembershipWithClinic } from "@/types/domain/clinic";
+import type { Clinic, ClinicMembershipWithClinic, ClinicSettings } from "@/types/domain/clinic";
 
 type ClinicEmbed = {
   id: string;
@@ -39,6 +39,25 @@ export class ClinicRepository {
     }
 
     return ok(data ? mapClinicRow(data) : null);
+  }
+
+  async updateSettings(clinicId: string, settings: ClinicSettings): Promise<Result<Clinic>> {
+    const { data, error } = await this.client
+      .from("clinics")
+      .update({ settings })
+      .eq("id", clinicId)
+      .is("deleted_at", null)
+      .select("*")
+      .maybeSingle();
+
+    if (error) {
+      return err(AppError.externalProvider("Failed to update clinic settings", error));
+    }
+    if (!data) {
+      return err(AppError.notFound("Clinic not found"));
+    }
+
+    return ok(mapClinicRow(data));
   }
 
   async findMembershipsByUserId(
