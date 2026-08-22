@@ -1,5 +1,5 @@
 "use client";
-import React, { createContext, useContext, useCallback, useState, useEffect, useRef } from "react";
+import React, { createContext, useContext, useCallback, useState } from "react";
 import { CheckIcon, EscalationIcon, XIcon } from "@/components/dashboard/icons";
 
 type ToastVariant = "success" | "error" | "warning" | "info";

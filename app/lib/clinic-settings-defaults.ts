@@ -10,7 +10,7 @@ export const DEFAULT_CLINIC_SETTINGS: ClinicSettings = {
     { day: "שבת", hours: "סגור" },
   ],
   visitPrices: [
-    { label: "בדיקה בקליניקה", detail: "150 ₪ · 30 דק׳" },
+    { label: "בדיקה בקליניקה", detail: "150 ₪ · 40 דק׳ כולל באפר" },
     { label: "ביקור בית", detail: "300 ₪ · 60 דק׳ (אזורי שירות)" },
     { label: "חיסונים", detail: "150 ₪ אגרה + עלות החיסון" },
     { label: "ייעוץ טלפוני", detail: "200 ₪ · 20 דק׳" },

@@ -12,7 +12,6 @@ import {
   rescheduleAppointment,
   joinWaitlist,
 } from "../../lib/store.js";
-import { triagePetCase } from "../../triage/triageDecision.js";
 import {
   decideTriage,
   EMERGENCY_SCRIPT,
@@ -34,7 +33,7 @@ export const toolsRoutes = new Hono();
 toolsRoutes.use("/tools/*", async (c, next) => {
   const env = getEnv();
   const authHeader = c.req.header("authorization") ?? "";
-  const expected = `Bearer ${env.JOBS_BEARER_TOKEN}`;
+  const expected = `Bearer ${env.TOOLS_BEARER_TOKEN}`;
 
   let ok = false;
   try {

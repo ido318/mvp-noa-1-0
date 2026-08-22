@@ -4,6 +4,7 @@ const serverSchema = z.object({
   APP_ENV: z.enum(["development", "test", "production"]).default("development"),
   APP_BASE_URL: z.string().url(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
+  HEALTH_CHECK_TOKEN: z.string().min(16).optional(),
 });
 
 const clientSchema = z.object({
@@ -27,6 +28,7 @@ function parseEnv() {
     APP_ENV: process.env.APP_ENV,
     APP_BASE_URL: process.env.APP_BASE_URL,
     SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    HEALTH_CHECK_TOKEN: process.env.HEALTH_CHECK_TOKEN || undefined,
   });
 
   if (!server.success) {

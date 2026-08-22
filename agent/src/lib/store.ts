@@ -99,7 +99,6 @@ export async function addEscalation(entry: EscalationEntry): Promise<void> {
 // Internal helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-type CustomerRow = { id: string };
 type AppointmentRow = {
   id: string;
   scheduled_at: string;
@@ -217,8 +216,7 @@ export async function checkAvailability(
     .select("start_at, end_at, reason")
     .eq("clinic_id", env.AGENT_CLINIC_ID)
     .lt("start_at", dayEnd)
-    .gt("end_at", dayStart)
-    .limit(1);
+    .gt("end_at", dayStart);
 
   if (blockErr) throw new Error(`calendar_blocks query failed: ${blockErr.message}`);
 

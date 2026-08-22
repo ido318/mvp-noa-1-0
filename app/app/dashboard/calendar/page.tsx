@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { Card } from "@/components/dashboard/ui/card";
 import { Badge } from "@/components/dashboard/ui/badge";
 import { Btn } from "@/components/dashboard/ui/btn";
@@ -79,10 +79,6 @@ function apiErrorMessage(
   fallback: string,
 ) {
   return payload?.error?.message ?? fallback;
-}
-
-function fmtDayHeader(d: Date) {
-  return new Intl.DateTimeFormat("he-IL", { timeZone: TZ, day: "numeric", month: "short" }).format(d);
 }
 
 function fmtWeekRange(start: Date, end: Date) {
@@ -228,14 +224,12 @@ function CalendarBlockOverlay({
 
 function DayColumn({
   day,
-  dayIndex,
   appointments,
   blocks,
   isToday,
   onDeleteBlock,
 }: {
   day: Date;
-  dayIndex: number;
   appointments: Appointment[];
   blocks: CalendarBlock[];
   isToday: boolean;
@@ -308,9 +302,13 @@ export default function CalendarPage() {
   const [blockError, setBlockError] = useState<string | null>(null);
   const [calendarError, setCalendarError] = useState<string | null>(null);
 
-  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)) as [Date, Date, Date, Date, Date, Date, Date];
+  const weekDays = useMemo(
+    () => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)) as [Date, Date, Date, Date, Date, Date, Date],
+    [weekStart],
+  );
+  const weekEnd = weekDays[6];
   const from = isoOfDate(weekStart);
-  const to   = isoOfDate(weekDays[6]);
+  const to   = isoOfDate(weekEnd);
 
   const fetchData = useCallback(async (options: { background?: boolean } = {}) => {
     if (!options.background) setLoading(true);
@@ -358,7 +356,11 @@ export default function CalendarPage() {
     }
   }, [from, to]);
 
-  useEffect(() => { void fetchData(); }, [fetchData]);
+  useEffect(() => {
+    queueMicrotask(() => {
+      void fetchData();
+    });
+  }, [fetchData]);
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
@@ -449,7 +451,7 @@ export default function CalendarPage() {
 
   const pendingCount = appointments.filter(a => a.status === "pending_approval").length;
   const HOURS = Array.from({ length: HOUR_SPAN + 1 }, (_, i) => i + HOUR_START);
-  const weekRange = fmtWeekRange(weekStart, weekDays[6]);
+  const weekRange = fmtWeekRange(weekStart, weekEnd);
 
   return (
     <div className="min-h-full bg-[#F7F0E8] p-6">
@@ -614,7 +616,6 @@ export default function CalendarPage() {
                 <DayColumn
                   key={i}
                   day={day}
-                  dayIndex={i}
                   appointments={apptForDay(day)}
                   blocks={blocksForDay(day)}
                   isToday={isoOfDate(day) === today}

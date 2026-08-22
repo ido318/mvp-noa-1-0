@@ -52,11 +52,14 @@ export class CalendarBlockService {
   }
 
   async deleteBlock(actor: ServiceActor, blockId: string): Promise<Result<void>> {
-    const manageableClinicIds = actor.memberships
-      .filter((membership) => membership.role === "owner" || membership.role === "admin")
-      .map((membership) => membership.clinicId);
+    const existing = await this.repository.findById(blockId);
+    if (!existing.ok) return existing;
+    if (!existing.value) return err(AppError.notFound("Calendar block not found"));
+    if (!actor.clinicIds.includes(existing.value.clinicId)) {
+      return err(AppError.forbidden("Calendar block outside actor clinics"));
+    }
 
-    if (manageableClinicIds.length === 0) {
+    if (!canManageCalendarBlocks(actor, existing.value.clinicId)) {
       return err(AppError.forbidden("Only owner or admin can manage calendar blocks"));
     }
 

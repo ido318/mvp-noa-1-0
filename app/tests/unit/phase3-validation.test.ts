@@ -2,12 +2,13 @@ import { describe, expect, it } from "vitest";
 import {
   changeStatusSchema,
   createAppointmentSchema,
+  deleteAppointmentSchema,
   listAppointmentsSchema,
   updateAppointmentSchema,
 } from "@/lib/validators/appointment";
 
 describe("phase3 validators", () => {
-  it("accepts valid create appointment payload with 30 minute default duration", () => {
+  it("accepts valid checkup payload with 40 minute effective duration", () => {
     const result = createAppointmentSchema.safeParse({
       clinicId: "00000000-0000-4000-8000-000000000001",
       customerId: "00000000-0000-4000-8000-000000000010",
@@ -15,7 +16,7 @@ describe("phase3 validators", () => {
       appointmentType: "checkup",
       source: "front_desk",
       scheduledAt: new Date().toISOString(),
-      durationMinutes: 30,
+      durationMinutes: 40,
     });
     expect(result.success).toBe(true);
   });
@@ -53,6 +54,11 @@ describe("phase3 validators", () => {
 
   it("requires update payload and version for updates", () => {
     const result = updateAppointmentSchema.safeParse({ version: 0, data: {} });
+    expect(result.success).toBe(false);
+  });
+
+  it("requires version for appointment deletes", () => {
+    const result = deleteAppointmentSchema.safeParse({});
     expect(result.success).toBe(false);
   });
 

@@ -1,6 +1,7 @@
 import { getActorAndServices } from "@/lib/api/actor";
 import { createRequestId } from "@/lib/api/request-id";
 import { handleRouteError, jsonSuccess } from "@/lib/api/response";
+import { parseOrThrow } from "@/lib/api/validation";
 import { AppError } from "@/lib/errors/app-error";
 import { z } from "zod";
 
@@ -27,7 +28,7 @@ export async function POST(
     }
 
     const { appointmentId } = await params;
-    const body = rejectSchema.parse(await request.json());
+    const body = parseOrThrow(rejectSchema, await request.json());
     const result = await appointment.rejectPendingAppointment(actor, appointmentId, body);
     if (!result.ok) return handleRouteError(result.error, requestId);
     return jsonSuccess(result.value, 200, requestId);

@@ -95,6 +95,18 @@ describe("VisitShareService.createAndSend", () => {
     expect(auditService.logAction).toHaveBeenCalledOnce();
   });
 
+  it("uses APP_BASE_URL when no explicit origin is provided", async () => {
+    const { service } = buildService(makeVisit());
+
+    const result = await service.createAndSend(actor, "visit-1");
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.url).toMatch(/^http:\/\/localhost:3000\/s\//);
+    const [, body] = sendSmsMock.mock.calls[0]!;
+    expect(body).toContain(result.value.url);
+  });
+
   it("rejects when there is no summary and no active prescription", async () => {
     const { service } = buildService(makeVisit({ aiVisitSummary: null, manualVisitSummary: null }), []);
 

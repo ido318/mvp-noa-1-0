@@ -7,11 +7,13 @@ const { mockGetSignedUrl, mockSaveIncomingVoiceCall } = vi.hoisted(() => ({
 }));
 
 vi.mock("elevenlabs", () => ({
-  ElevenLabsClient: vi.fn(() => ({
+  ElevenLabsClient: vi.fn(function ElevenLabsClient() {
+    return {
     conversationalAi: {
       getSignedUrl: mockGetSignedUrl,
     },
-  })),
+    };
+  }),
 }));
 
 vi.mock("../../../src/lib/store.js", async (importOriginal) => {

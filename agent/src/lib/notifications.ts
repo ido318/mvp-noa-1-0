@@ -1,6 +1,4 @@
 import { getSupabase } from "./supabase.js";
-import { getEnv } from "./env.js";
-import { logger } from "./logger.js";
 import {
   smsTemplates,
   formatAppointmentDateTime,

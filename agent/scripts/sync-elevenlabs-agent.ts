@@ -22,13 +22,13 @@ const ELEVENLABS_AGENT_ID = process.env["ELEVENLABS_AGENT_ID"] ?? "";
 // Accept either AGENT_PUBLIC_URL (production) or PUBLIC_BASE_URL (existing .env convention)
 const AGENT_PUBLIC_URL =
   process.env["AGENT_PUBLIC_URL"] ?? process.env["PUBLIC_BASE_URL"] ?? "";
-const JOBS_BEARER_TOKEN = process.env["JOBS_BEARER_TOKEN"] ?? "";
+const TOOLS_BEARER_TOKEN = process.env["TOOLS_BEARER_TOKEN"] ?? "";
 
 const missing: string[] = [];
 if (!ELEVENLABS_API_KEY)  missing.push("ELEVENLABS_API_KEY");
 if (!ELEVENLABS_AGENT_ID) missing.push("ELEVENLABS_AGENT_ID");
 if (!AGENT_PUBLIC_URL)    missing.push("AGENT_PUBLIC_URL or PUBLIC_BASE_URL");
-if (!JOBS_BEARER_TOKEN)   missing.push("JOBS_BEARER_TOKEN");
+if (!TOOLS_BEARER_TOKEN)  missing.push("TOOLS_BEARER_TOKEN");
 
 if (missing.length > 0) {
   console.error(`[sync] Missing required env vars: ${missing.join(", ")}`);
@@ -52,7 +52,7 @@ const toolsTemplate = readFileSync(
 // Substitute placeholders
 const toolsJson = toolsTemplate
   .replaceAll("{{AGENT_PUBLIC_URL}}", AGENT_PUBLIC_URL)
-  .replaceAll("{{AGENT_JOBS_BEARER_TOKEN}}", JOBS_BEARER_TOKEN);
+  .replaceAll("{{AGENT_TOOLS_BEARER_TOKEN}}", TOOLS_BEARER_TOKEN);
 
 type ElevenLabsTool = {
   name: string;

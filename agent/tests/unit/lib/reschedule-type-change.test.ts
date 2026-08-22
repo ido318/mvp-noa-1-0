@@ -35,7 +35,7 @@ const { mockFrom, mockRpc, updateCalls, scheduledAtIso } = vi.hoisted(() => {
         customer_id: "customer-1",
         scheduled_at: scheduledAtIso,
         appointment_type: "checkup",
-        duration_minutes: 30,
+        duration_minutes: 40,
         customers: { full_name: "עידו" },
         pets: { name: "מיקה" },
       }],

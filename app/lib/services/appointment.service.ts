@@ -54,6 +54,14 @@ function normalizeListFilters(
   };
 }
 
+function hasPrivilegedClinicRole(actor: ServiceActor, clinicId: string): boolean {
+  return actor.memberships.some(
+    (membership) =>
+      membership.clinicId === clinicId &&
+      (membership.role === "owner" || membership.role === "admin"),
+  );
+}
+
 export class AppointmentService {
   constructor(
     private readonly appointmentRepository: AppointmentRepository,
@@ -311,6 +319,9 @@ export class AppointmentService {
   ): Promise<Result<Appointment>> {
     const existing = await this.getAppointmentById(actor, appointmentId);
     if (!existing.ok) return existing;
+    if (!hasPrivilegedClinicRole(actor, existing.value.clinicId)) {
+      return err(AppError.forbidden("Only owner or admin can approve appointments"));
+    }
     if (existing.value.status !== "pending_approval") {
       return err(AppError.validation("Only pending_approval appointments can be approved"));
     }
@@ -360,6 +371,9 @@ export class AppointmentService {
   ): Promise<Result<Appointment>> {
     const existing = await this.getAppointmentById(actor, appointmentId);
     if (!existing.ok) return existing;
+    if (!hasPrivilegedClinicRole(actor, existing.value.clinicId)) {
+      return err(AppError.forbidden("Only owner or admin can reject appointments"));
+    }
     if (existing.value.status !== "pending_approval") {
       return err(AppError.validation("Only pending_approval appointments can be rejected"));
     }

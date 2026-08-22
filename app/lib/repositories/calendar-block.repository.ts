@@ -44,6 +44,17 @@ export class CalendarBlockRepository {
     return ok(mapCalendarBlockRow(data));
   }
 
+  async findById(blockId: string): Promise<Result<CalendarBlock | null>> {
+    const { data, error } = await this.client
+      .from("calendar_blocks")
+      .select("*")
+      .eq("id", blockId)
+      .maybeSingle();
+
+    if (error) return err(AppError.externalProvider("Failed to load calendar block", error));
+    return ok(data ? mapCalendarBlockRow(data) : null);
+  }
+
   async delete(blockId: string): Promise<Result<void>> {
     const { error } = await this.client
       .from("calendar_blocks")

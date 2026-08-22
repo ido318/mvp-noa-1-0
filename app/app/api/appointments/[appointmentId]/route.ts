@@ -2,7 +2,11 @@ import { getActorAndServices } from "@/lib/api/actor";
 import { createRequestId } from "@/lib/api/request-id";
 import { handleRouteError, jsonSuccess } from "@/lib/api/response";
 import { parseOrThrow } from "@/lib/api/validation";
-import { changeStatusSchema, updateAppointmentSchema } from "@/lib/validators/appointment";
+import {
+  changeStatusSchema,
+  deleteAppointmentSchema,
+  updateAppointmentSchema,
+} from "@/lib/validators/appointment";
 
 type Params = { params: Promise<{ appointmentId: string }> };
 
@@ -63,9 +67,8 @@ export async function DELETE(request: Request, { params }: Params) {
   try {
     const { actor, appointment } = await getActorAndServices();
     const { appointmentId } = await params;
-    const body = await request.json();
-    const version = Number(body?.version);
-    const result = await appointment.softDelete(actor, appointmentId, version);
+    const body = parseOrThrow(deleteAppointmentSchema, await request.json());
+    const result = await appointment.softDelete(actor, appointmentId, body.version);
     if (!result.ok) return handleRouteError(result.error, requestId);
     return jsonSuccess({ deleted: true }, 200, requestId);
   } catch (error) {

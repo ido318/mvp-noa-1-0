@@ -4,7 +4,7 @@ import { Hono } from "hono";
 function toolHeaders(): Record<string, string> {
   return {
     "Content-Type": "application/json",
-    "Authorization": "Bearer test-bearer-token-1234567",
+    "Authorization": "Bearer test-tools-token-1234567",
   };
 }
 
@@ -39,6 +39,7 @@ function makeApp() {
 
 describe("appointment tools", () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     vi.mocked(checkAvailability).mockResolvedValue("חלונות פנויים: 09:10, 12:20");
     vi.mocked(bookAppointment).mockResolvedValue("✅ תור נקבע");
     vi.mocked(cancelAppointment).mockResolvedValue("✅ התור בוטל בהצלחה.");
@@ -57,6 +58,20 @@ describe("appointment tools", () => {
     const json = await res.json() as { result: string };
     expect(json.result).toContain("09:10");
     expect(vi.mocked(checkAvailability)).toHaveBeenCalledWith("2026-06-14", "checkup");
+  });
+
+  it("POST /tools/check-availability rejects the jobs bearer token", async () => {
+    const res = await makeApp().request("/tools/check-availability", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test-bearer-token-1234567",
+      },
+      body: JSON.stringify({ date_iso: "2026-06-14", visit_type: "checkup" }),
+    });
+
+    expect(res.status).toBe(403);
+    expect(vi.mocked(checkAvailability)).not.toHaveBeenCalled();
   });
 
   it("POST /tools/conversation-policy returns Hebrew next-step guidance", async () => {

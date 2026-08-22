@@ -246,7 +246,9 @@ export default function CallsPage() {
   }, []);
 
   useEffect(() => {
-    void fetchData(true);
+    queueMicrotask(() => {
+      void fetchData(true);
+    });
     const intervalId = window.setInterval(() => {
       void fetchData(false);
     }, 15000);

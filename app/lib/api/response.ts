@@ -27,6 +27,10 @@ export function handleRouteError(error: unknown, requestId?: string) {
     return jsonError(error, requestId);
   }
 
+  if (error instanceof SyntaxError) {
+    return jsonError(AppError.validation("Invalid JSON body"), requestId);
+  }
+
   console.error("[api] unhandled error", error);
   return jsonError(AppError.internal(), requestId);
 }

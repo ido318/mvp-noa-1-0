@@ -1,11 +1,34 @@
 import { createRequestId } from "@/lib/api/request-id";
 import { handleRouteError, jsonSuccess } from "@/lib/api/response";
 import { createAdminServices } from "@/lib/services/factory";
+import { timingSafeEqual } from "node:crypto";
 
-export async function GET() {
+function canReadDetailedHealth(request: Request): boolean {
+  const token = process.env.HEALTH_CHECK_TOKEN;
+  if (!token) return false;
+
+  const authHeader = request.headers.get("authorization") ?? "";
+  const expected = `Bearer ${token}`;
+
+  try {
+    return timingSafeEqual(Buffer.from(authHeader), Buffer.from(expected));
+  } catch {
+    return false;
+  }
+}
+
+export async function GET(request: Request) {
   const requestId = createRequestId();
 
   try {
+    if (!canReadDetailedHealth(request)) {
+      return jsonSuccess(
+        { status: "ok", timestamp: new Date().toISOString() },
+        200,
+        requestId,
+      );
+    }
+
     const { health } = createAdminServices();
     const result = await health.check();
 

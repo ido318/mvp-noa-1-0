@@ -13,6 +13,18 @@ const ownerActor: ServiceActor = {
 function makeRepository(): CalendarBlockRepository {
   return {
     list: vi.fn().mockResolvedValue({ ok: true, value: [] }),
+    findById: vi.fn().mockResolvedValue({
+      ok: true,
+      value: {
+        id: "block-1",
+        clinicId: ownerActor.defaultClinicId!,
+        startAt: "2026-06-22T12:00:00+03:00",
+        endAt: "2026-06-22T20:00:00+03:00",
+        reason: "סיום מוקדם",
+        createdBy: ownerActor.userId,
+        createdAt: "2026-06-19T18:00:00.000Z",
+      },
+    }),
     create: vi.fn().mockResolvedValue({
       ok: true,
       value: {
@@ -84,5 +96,29 @@ describe("CalendarBlockService", () => {
 
     expect(result.ok).toBe(false);
     expect(repository.create).not.toHaveBeenCalled();
+  });
+
+  it("rejects delete when owner role belongs to a different clinic than the block", async () => {
+    const repository = makeRepository();
+    const service = new CalendarBlockService(repository);
+    const mixedActor: ServiceActor = {
+      userId: "00000000-0000-4000-8000-000000000002",
+      clinicIds: [
+        ownerActor.defaultClinicId!,
+        "00000000-0000-4000-8000-000000000099",
+      ],
+      defaultClinicId: ownerActor.defaultClinicId!,
+      memberships: [
+        { clinicId: ownerActor.defaultClinicId!, role: "staff" },
+        { clinicId: "00000000-0000-4000-8000-000000000099", role: "owner" },
+      ],
+    };
+
+    const result = await service.deleteBlock(mixedActor, "block-1");
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.status).toBe(403);
+    expect(repository.delete).not.toHaveBeenCalled();
   });
 });

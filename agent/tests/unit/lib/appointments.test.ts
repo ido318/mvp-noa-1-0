@@ -98,8 +98,8 @@ describe("formatSlotSpokenHe", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("VISIT_TYPE_CONFIG", () => {
-  it("checkup: ברירת מחדל 30 דקות, no approval", () => {
-    expect(effectiveDuration("checkup")).toBe(30);
+  it("checkup: 30+10=40 effective, no approval", () => {
+    expect(effectiveDuration("checkup")).toBe(40);
     expect(VISIT_TYPE_CONFIG.checkup.requiresApproval).toBe(false);
   });
 
@@ -131,16 +131,16 @@ describe("VISIT_TYPE_CONFIG", () => {
 const WEEKDAY_HOURS = { start: { h: 8, m: 0 }, end: { h: 20, m: 0 } };
 const FRIDAY_HOURS  = { start: { h: 8, m: 30 }, end: { h: 13, m: 0 } };
 
-describe("generateSlotsForVisitType — checkup (effective 30 min)", () => {
+describe("generateSlotsForVisitType — checkup (effective 40 min)", () => {
   afterEach(() => {
     vi.useRealTimers();
   });
 
   it("ללא תורים תפוסים — מחזיר את כל ה-slots הפנויים", () => {
     const slots = generateSlotsForVisitType("2026-06-14", WEEKDAY_HOURS, "checkup", []);
-    expect(slots.length).toBe(70);
+    expect(slots.length).toBe(69);
     expect(formatSlotLabel(slots[0]!)).toBe("08:00");
-    expect(formatSlotLabel(slots.at(-1)!)).toBe("19:30");
+    expect(formatSlotLabel(slots.at(-1)!)).toBe("19:20");
   });
 
   it("formatSlotLabel — ממיר נכון גם כשה-ISO חוזר מה-DB ב-UTC (regression: לא string slice נאיבי)", () => {
@@ -187,15 +187,15 @@ describe("generateSlotsForVisitType — checkup (effective 30 min)", () => {
     const slots = generateSlotsForVisitType("2026-06-14", WEEKDAY_HOURS, "checkup", booked);
     const labels = slots.map(formatSlotLabel);
     expect(labels[0]).toBe("08:00");
-    expect(labels.at(-1)).toBe("11:30");
+    expect(labels.at(-1)).toBe("11:20");
     expect(labels).not.toContain("12:00");
   });
 
   it("לא מציע slot שסיומו לאחר סגירת המרפאה", () => {
-    // Latest checkup (30 min eff) can start at 19:30 (ends 20:00)
+    // Latest checkup (40 min eff) can start at 19:20 (ends 20:00)
     const slots = generateSlotsForVisitType("2026-06-14", WEEKDAY_HOURS, "checkup", []);
     const labels = slots.map(formatSlotLabel);
-    expect(labels.every((l) => l <= "19:30")).toBe(true);
+    expect(labels.every((l) => l <= "19:20")).toBe(true);
   });
 });
 

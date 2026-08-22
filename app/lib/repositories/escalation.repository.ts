@@ -40,6 +40,17 @@ export class EscalationRepository {
     return ok(count ?? 0);
   }
 
+  async findById(id: string): Promise<Result<Escalation | null>> {
+    const { data, error } = await this.client
+      .from("escalations")
+      .select("*")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (error) return err(AppError.externalProvider("Failed to load escalation", error));
+    return ok(data ? mapEscalationRow(data as Record<string, unknown>) : null);
+  }
+
   async resolve(id: string, input: ResolveEscalationInput): Promise<Result<Escalation>> {
     const { data, error } = await this.client
       .from("escalations")

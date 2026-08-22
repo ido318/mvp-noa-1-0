@@ -157,7 +157,7 @@ describe.runIf(runIntegration)("phase3 appointments + calendar constraints", () 
       appointmentType: "checkup",
       source: "front_desk",
       scheduledAt,
-      durationMinutes: 30,
+      durationMinutes: 40,
     });
     expect(createdAppointment.ok).toBe(true);
     if (!createdAppointment.ok) return;
@@ -250,7 +250,7 @@ describe.runIf(runIntegration)("phase3 appointments + calendar constraints", () 
         appointmentType: "checkup",
         source: "internal",
         scheduledAt: slot,
-        durationMinutes: 30,
+        durationMinutes: 40,
       },
       ownerUserId,
     );

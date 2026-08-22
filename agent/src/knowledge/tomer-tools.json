@@ -7,7 +7,7 @@
       "url": "{{AGENT_PUBLIC_URL}}/tools/lookup-customer",
       "method": "POST",
       "request_headers": {
-        "Authorization": "Bearer {{AGENT_JOBS_BEARER_TOKEN}}"
+        "Authorization": "Bearer {{AGENT_TOOLS_BEARER_TOKEN}}"
       },
       "request_body_schema": {
         "type": "object",
@@ -29,7 +29,7 @@
       "url": "{{AGENT_PUBLIC_URL}}/tools/conversation-policy",
       "method": "POST",
       "request_headers": {
-        "Authorization": "Bearer {{AGENT_JOBS_BEARER_TOKEN}}"
+        "Authorization": "Bearer {{AGENT_TOOLS_BEARER_TOKEN}}"
       },
       "request_body_schema": {
         "type": "object",
@@ -75,7 +75,7 @@
       "url": "{{AGENT_PUBLIC_URL}}/tools/triage-pet-case",
       "method": "POST",
       "request_headers": {
-        "Authorization": "Bearer {{AGENT_JOBS_BEARER_TOKEN}}"
+        "Authorization": "Bearer {{AGENT_TOOLS_BEARER_TOKEN}}"
       },
       "request_body_schema": {
         "type": "object",
@@ -125,7 +125,7 @@
       "url": "{{AGENT_PUBLIC_URL}}/tools/check-availability",
       "method": "POST",
       "request_headers": {
-        "Authorization": "Bearer {{AGENT_JOBS_BEARER_TOKEN}}"
+        "Authorization": "Bearer {{AGENT_TOOLS_BEARER_TOKEN}}"
       },
       "request_body_schema": {
         "type": "object",
@@ -151,7 +151,7 @@
       "url": "{{AGENT_PUBLIC_URL}}/tools/book-appointment",
       "method": "POST",
       "request_headers": {
-        "Authorization": "Bearer {{AGENT_JOBS_BEARER_TOKEN}}"
+        "Authorization": "Bearer {{AGENT_TOOLS_BEARER_TOKEN}}"
       },
       "request_body_schema": {
         "type": "object",
@@ -201,7 +201,7 @@
       "url": "{{AGENT_PUBLIC_URL}}/tools/cancel-or-reschedule",
       "method": "POST",
       "request_headers": {
-        "Authorization": "Bearer {{AGENT_JOBS_BEARER_TOKEN}}"
+        "Authorization": "Bearer {{AGENT_TOOLS_BEARER_TOKEN}}"
       },
       "request_body_schema": {
         "type": "object",
@@ -239,7 +239,7 @@
       "url": "{{AGENT_PUBLIC_URL}}/tools/join-waitlist",
       "method": "POST",
       "request_headers": {
-        "Authorization": "Bearer {{AGENT_JOBS_BEARER_TOKEN}}"
+        "Authorization": "Bearer {{AGENT_TOOLS_BEARER_TOKEN}}"
       },
       "request_body_schema": {
         "type": "object",
@@ -293,7 +293,7 @@
       "url": "{{AGENT_PUBLIC_URL}}/tools/escalate-to-noa",
       "method": "POST",
       "request_headers": {
-        "Authorization": "Bearer {{AGENT_JOBS_BEARER_TOKEN}}"
+        "Authorization": "Bearer {{AGENT_TOOLS_BEARER_TOKEN}}"
       },
       "request_body_schema": {
         "type": "object",
@@ -319,7 +319,7 @@
       "url": "{{AGENT_PUBLIC_URL}}/tools/request-human-handoff",
       "method": "POST",
       "request_headers": {
-        "Authorization": "Bearer {{AGENT_JOBS_BEARER_TOKEN}}"
+        "Authorization": "Bearer {{AGENT_TOOLS_BEARER_TOKEN}}"
       },
       "request_body_schema": {
         "type": "object",

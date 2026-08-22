@@ -80,7 +80,9 @@ flyctl auth login
 | משתנה | מה זה | איך משיגים |
 |---|---|---|
 | `HUMAN_HANDOFF_NUMBER` (agent) | הנייד של נועה, שאליו תומר יעביר שיחות בשעות הפעילות | הנייד של נועה בפורמט `+9725...` |
-| `JOBS_BEARER_TOKEN` (agent) | סוד שמגן על נתיבי ה-`/jobs` וה-`/tools` (מינימום 16 תווים) | ליצור אקראי: `openssl rand -hex 24` |
+| `JOBS_BEARER_TOKEN` (agent) | סוד שמגן על נתיבי ה-`/jobs` (מינימום 16 תווים) | ליצור אקראי: `openssl rand -hex 24` |
+| `TOOLS_BEARER_TOKEN` (agent) | סוד נפרד שמגן על נתיבי ה-`/tools` של ElevenLabs (מינימום 16 תווים) | ליצור אקראי שונה: `openssl rand -hex 24` |
+| `HEALTH_CHECK_TOKEN` (app, אופציונלי) | מאפשר `/api/health` מפורט עם DB/env דרך `Authorization: Bearer ...`; בלי הטוקן ה-endpoint מחזיר liveness ציבורי בלבד | ליצור אקראי שונה: `openssl rand -hex 24` |
 | `DEV_USER_EMAIL` / משתמש התחברות לדשבורד | המשתמש שנועה תתחבר איתו | אם אין — אני יכול ליצור משתמש דרך Supabase Auth |
 
 ---

@@ -26,7 +26,7 @@ export type VisitTypeConfig = {
 // effectiveDuration = durationMin + bufferMin; stored in duration_minutes so
 // the GIST constraint in the DB automatically enforces inter-appointment gaps.
 export const VISIT_TYPE_CONFIG: Record<VisitType, VisitTypeConfig> = {
-  checkup:            { durationMin: 30, bufferMin:  0, requiresApproval: false, labelHe: "בדיקה בקליניקה" },
+  checkup:            { durationMin: 30, bufferMin: 10, requiresApproval: false, labelHe: "בדיקה בקליניקה" },
   home_visit:         { durationMin: 60, bufferMin: 30, requiresApproval: false, labelHe: "ביקור בית" },
   vaccination:        { durationMin: 20, bufferMin: 10, requiresApproval: false, labelHe: "חיסונים" },
   phone_consultation: { durationMin: 20, bufferMin:  0, requiresApproval: false, labelHe: "ייעוץ טלפוני" },

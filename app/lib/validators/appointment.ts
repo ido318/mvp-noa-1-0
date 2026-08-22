@@ -77,6 +77,10 @@ export const changeStatusSchema = z.object({
   cancellationReason: z.string().trim().max(400).optional().nullable(),
 });
 
+export const deleteAppointmentSchema = z.object({
+  version: z.number().int().min(0),
+});
+
 export const listAppointmentsSchema = z.object({
   clinicId: z.string().uuid().optional(),
   date: z.string().date().optional(),

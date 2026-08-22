@@ -202,7 +202,7 @@ describe.runIf(runIntegration)("phase4 medical records", () => {
       appointmentType: "checkup",
       source: "front_desk",
       scheduledAt,
-      durationMinutes: 30,
+      durationMinutes: 40,
     });
     expect(appointment.ok).toBe(true);
     if (!appointment.ok) return;

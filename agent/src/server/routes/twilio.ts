@@ -99,7 +99,7 @@ twilioRoutes.post("/twilio/voice", twilioValidate, async (c) => {
  * completed, etc.). We log the transition for observability; the authoritative
  * call record is written by /hooks/call-ended (ElevenLabs post-call webhook).
  */
-twilioRoutes.post("/twilio/status", async (c) => {
+twilioRoutes.post("/twilio/status", twilioValidate, async (c) => {
   const body = await c.req.parseBody();
   logger.info(
     {

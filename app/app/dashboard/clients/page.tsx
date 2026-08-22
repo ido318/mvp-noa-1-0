@@ -48,7 +48,7 @@ function PetCard({ pet }: { pet: Pet }) {
             {pet.sex === "male" ? " · זכר" : pet.sex === "female" ? " · נקבה" : ""}
           </p>
           {pet.weight && (
-            <p className="mt-0.5 text-xs text-[var(--muted)]">{pet.weight} ק"ג</p>
+            <p className="mt-0.5 text-xs text-[var(--muted)]">{`${pet.weight} ק"ג`}</p>
           )}
           {pet.chronicConditions && (
             <p className="mt-1 text-xs text-[var(--red-700)] bg-[var(--red-50)] rounded px-1.5 py-0.5 inline-block">
@@ -262,7 +262,11 @@ export default function ClientsPage() {
     }
   }, []);
 
-  useEffect(() => { void fetchData(""); }, [fetchData]);
+  useEffect(() => {
+    queueMicrotask(() => {
+      void fetchData("");
+    });
+  }, [fetchData]);
 
   // Debounce search
   useEffect(() => {

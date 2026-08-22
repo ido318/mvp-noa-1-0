@@ -159,7 +159,11 @@ export default function EscalationsPage() {
     }
   }, [filter]);
 
-  useEffect(() => { void fetchData(); }, [fetchData]);
+  useEffect(() => {
+    queueMicrotask(() => {
+      void fetchData();
+    });
+  }, [fetchData]);
 
   const openCount = items.filter(e => !e.resolvedAt).length;
 

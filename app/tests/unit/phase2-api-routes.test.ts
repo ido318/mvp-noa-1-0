@@ -29,6 +29,26 @@ describe("phase2 API routes", () => {
     expect(response.status).toBe(400);
   });
 
+  it("POST /api/customers returns 400 on malformed JSON", async () => {
+    const { POST } = await import("@/app/api/customers/route");
+    mockGetActorAndServices.mockResolvedValue({
+      actor: { userId: "u1", clinicIds: ["c1"], defaultClinicId: "c1" },
+      customer: { createCustomer: vi.fn() },
+    });
+
+    const response = await POST(
+      new Request("http://localhost/api/customers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{",
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.error.code).toBe("VALIDATION_ERROR");
+  });
+
   it("GET /api/customers returns service items", async () => {
     const { GET } = await import("@/app/api/customers/route");
     const listCustomers = vi.fn().mockResolvedValue({
@@ -58,5 +78,21 @@ describe("phase2 API routes", () => {
       new Request("http://localhost/api/search?entity=unknown&q=abc"),
     );
     expect(response.status).toBe(400);
+  });
+
+  it("GET /api/pets returns 400 on invalid customerId", async () => {
+    const { GET } = await import("@/app/api/pets/route");
+    const listPets = vi.fn();
+    mockGetActorAndServices.mockResolvedValue({
+      actor: { userId: "u1", clinicIds: ["c1"], defaultClinicId: "c1" },
+      pet: { listPets },
+    });
+
+    const response = await GET(
+      new Request("http://localhost/api/pets?customerId=not-a-uuid"),
+    );
+
+    expect(response.status).toBe(400);
+    expect(listPets).not.toHaveBeenCalled();
   });
 });

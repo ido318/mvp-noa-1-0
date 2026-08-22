@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Hono } from "hono";
 
-// Must match JOBS_BEARER_TOKEN set in tests/setup.ts
+// Must match TOOLS_BEARER_TOKEN set in tests/setup.ts
 function toolHeaders(): Record<string, string> {
   return {
     "Content-Type": "application/json",
-    "Authorization": "Bearer test-bearer-token-1234567",
+    "Authorization": "Bearer test-tools-token-1234567",
   };
 }
 // Alias used throughout this file
