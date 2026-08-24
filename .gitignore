@@ -33,6 +33,9 @@ supabase/.branches/
 .idea/
 *.code-workspace
 
+# Vercel CLI project link
+.vercel/
+
 # Claude Code local settings (may contain tokens)
 .claude/settings.local.json
 
