@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import Image from "next/image";
 import {
   TodayIcon, CalendarIcon, CallsIcon, EscalationIcon,
-  ClientsIcon, PetsIcon, RecordsIcon, SettingsIcon,
+  ClientsIcon, PetsIcon, RecordsIcon, SettingsIcon, ClockIcon,
 } from "@/components/dashboard/icons";
 
 interface NavItem {
@@ -61,6 +61,7 @@ export function Sidebar({ openEscalations = 0, userName = "ד״ר נועה כב�
     { href: "/dashboard/calendar",   label: "יומן",         icon: CalendarIcon },
     { href: "/dashboard/calls",      label: "שיחות",        icon: CallsIcon },
     { href: "/dashboard/escalations",label: "אסקלציות",     icon: EscalationIcon, badge: openEscalations },
+    { href: "/dashboard/waitlist",    label: "המתנה",        icon: ClockIcon },
     { href: "/dashboard/clients",    label: "לקוחות",       icon: ClientsIcon },
     { href: "/dashboard/pets",       label: "חיות מחמד",    icon: PetsIcon },
     { href: "/dashboard/records",    label: "תיקים רפואיים",icon: RecordsIcon },

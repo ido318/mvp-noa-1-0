@@ -13,6 +13,7 @@ import { ISRAEL_TIMEZONE, formatIsraelDate, formatIsraelTime, israelDateIso } fr
 import type { Appointment } from "@/types/domain/appointment";
 import type { Escalation } from "@/types/domain/escalation";
 import type { VoiceCall } from "@/types/domain/voice-call";
+import type { WaitlistEntry } from "@/types/domain/waitlist";
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -264,6 +265,7 @@ export default function TodayPage() {
   const [appointments, setAppointments] = useState<EnrichedAppointment[]>([]);
   const [escalations, setEscalations] = useState<Escalation[]>([]);
   const [todayCalls, setTodayCalls] = useState<VoiceCall[]>([]);
+  const [waitlistCount, setWaitlistCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState<{ mode: "approve" | "reject"; appt: EnrichedAppointment } | null>(null);
 
@@ -271,10 +273,11 @@ export default function TodayPage() {
 
   const fetchData = useCallback(async () => {
     try {
-      const [apptRes, escRes, callRes] = await Promise.all([
+      const [apptRes, escRes, callRes, waitlistRes] = await Promise.all([
         fetch(`/api/appointments?date=${today}`),
         fetch("/api/escalations?status=open"),
         fetch(`/api/voice/calls?from=${today}&to=${today}`),
+        fetch("/api/waitlist"),
       ]);
 
       if (apptRes.ok) {
@@ -291,6 +294,10 @@ export default function TodayPage() {
         const d = await callRes.json() as { data: { items: VoiceCall[] } };
         setTodayCalls(d.data.items ?? []);
       }
+      if (waitlistRes.ok) {
+        const d = await waitlistRes.json() as { data: { items: WaitlistEntry[] } };
+        setWaitlistCount((d.data.items ?? []).length);
+      }
     } finally {
       setLoading(false);
     }
@@ -305,7 +312,8 @@ export default function TodayPage() {
   if (loading) {
     return (
       <div className="p-6 space-y-6">
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-4 gap-4">
+          <Skeleton className="h-24" />
           <Skeleton className="h-24" />
           <Skeleton className="h-24" />
           <Skeleton className="h-24" />
@@ -328,12 +336,13 @@ export default function TodayPage() {
       </div>
 
       {/* Stat tiles */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-4 gap-4">
         <StatTile label="תורים היום" value={todayAppts.length} sub={`${todayAppts.filter(a => a.status === "completed").length} הושלמו`} />
         <StatTile label="שיחות היום" value={completedCalls} sub="שיחות שהסתיימו" />
         <StatTile label="אסקלציות פתוחות" value={escalations.length}
           accent={escalations.length > 0 ? "border-[var(--red-200)] bg-[var(--red-50)]" : ""}
         />
+        <StatTile label="ממתינים" value={waitlistCount} />
       </div>
 
       {/* Pending approval banner */}
