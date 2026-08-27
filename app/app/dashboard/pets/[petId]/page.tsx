@@ -51,7 +51,7 @@ export default async function PetProfilePage({ params }: Params) {
   return (
     <section className="space-y-6">
       <div>
-        <Link href={`/dashboard/customers/${pet.customerId}`} className="text-sm text-emerald-700">
+        <Link href={`/dashboard/clients?customerId=${pet.customerId}`} className="text-sm text-emerald-700">
           חזרה ללקוח
         </Link>
         <h2 className="mt-2 text-xl font-semibold text-zinc-900">{pet.name}</h2>

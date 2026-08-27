@@ -85,7 +85,7 @@ export default async function VoiceCallDetailPage({
           <p>
             <span className="font-medium text-zinc-700">לקוח:</span>{" "}
             <Link
-              href={`/dashboard/customers/${call.customerId}`}
+              href={`/dashboard/clients?customerId=${call.customerId}`}
               className="text-emerald-700 hover:underline"
             >
               הצג לקוח
