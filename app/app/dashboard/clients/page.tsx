@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Card } from "@/components/dashboard/ui/card";
 import { Badge } from "@/components/dashboard/ui/badge";
@@ -10,6 +11,7 @@ import { SearchIcon, PhoneIcon, MailIcon, PinIcon, XIcon, ChevRightIcon } from "
 import type { Customer } from "@/types/domain/customer";
 import type { Pet } from "@/types/domain/pet";
 import type { Appointment } from "@/types/domain/appointment";
+import type { Visit } from "@/types/domain/visit";
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -75,6 +77,8 @@ function ClientProfile({
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [petsLoading, setPetsLoading] = useState(true);
   const [apptLoading, setApptLoading] = useState(true);
+  const [visits, setVisits] = useState<Visit[]>([]);
+  const [visitsLoading, setVisitsLoading] = useState(true);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -104,6 +108,17 @@ function ClientProfile({
         setAppointments(sorted);
       }
       setApptLoading(false);
+    })();
+  }, [customer.id]);
+
+  useEffect(() => {
+    void (async () => {
+      const res = await fetch(`/api/visits?customerId=${customer.id}&limit=10`);
+      if (res.ok) {
+        const d = await res.json() as { data: { items: Visit[] } };
+        setVisits(d.data.items ?? []);
+      }
+      setVisitsLoading(false);
     })();
   }, [customer.id]);
 
@@ -204,6 +219,44 @@ function ClientProfile({
                       {APPT_STATUS_LABELS[appt.status] ?? appt.status}
                     </span>
                   </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Visit history */}
+          <div>
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
+              ביקורים רפואיים ({visitsLoading ? "…" : visits.length})
+            </p>
+            {visitsLoading ? (
+              <Skeleton className="h-24" />
+            ) : visits.length === 0 ? (
+              <p className="text-sm text-[var(--faint)]">אין ביקורים רשומים</p>
+            ) : (
+              <div className="rounded-[var(--r-lg)] border border-[var(--line)] divide-y divide-[var(--line-2)]">
+                {visits.map(visit => (
+                  <Link
+                    key={visit.id}
+                    href={`/dashboard/visits/${visit.id}`}
+                    className="flex items-center justify-between px-3 py-2.5 hover:bg-[var(--surface-2)] transition-colors"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-[13px] font-semibold text-[var(--ink)]">{fmtDate(visit.startedAt)}</p>
+                      <p className="truncate text-xs text-[var(--muted)]">{visit.chiefComplaint ?? "ללא תלונה ראשית"}</p>
+                    </div>
+                    <div className="flex flex-shrink-0 items-center gap-1.5">
+                      {visit.aiVisitSummary && <Badge color="brand">AI</Badge>}
+                      <span className={[
+                        "text-[11px] font-semibold px-2 py-0.5 rounded-full",
+                        visit.status === "completed" ? "bg-[#E9F5EF] text-[#2F7D5B]"
+                          : visit.status === "cancelled" ? "bg-[var(--line-2)] text-[var(--muted)]"
+                          : "bg-[var(--brand-50)] text-[var(--brand-700)]",
+                      ].join(" ")}>
+                        {visit.status === "completed" ? "הושלם" : visit.status === "cancelled" ? "בוטל" : "בטיפול"}
+                      </span>
+                    </div>
+                  </Link>
                 ))}
               </div>
             )}
