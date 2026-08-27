@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { SearchIcon, BellIcon } from "@/components/dashboard/icons";
 import { formatSearchResults, type SearchResultRow } from "@/lib/search/format-search-results";
+import { useToast } from "@/components/dashboard/ui/toast";
 import type { Customer } from "@/types/domain/customer";
 import type { Pet } from "@/types/domain/pet";
 
@@ -19,17 +20,25 @@ export function Header({
   openEscalations = 0,
 }: HeaderProps) {
   const router = useRouter();
+  const { toast } = useToast();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResultRow[]>([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const requestIdRef = useRef(0);
 
   useEffect(() => {
     const trimmed = query.trim();
+    // Bump the token on every run so a slower, earlier-started fetch can
+    // recognize it's been superseded and skip updating state when it resolves.
+    requestIdRef.current += 1;
+    const currentRequestId = requestIdRef.current;
+
     if (trimmed.length < 2) {
       setResults([]);
       setOpen(false);
+      setLoading(false);
       return;
     }
 
@@ -41,22 +50,27 @@ export function Header({
             fetch(`/api/search?entity=customers&q=${encodeURIComponent(trimmed)}`),
             fetch(`/api/search?entity=pets&q=${encodeURIComponent(trimmed)}`),
           ]);
-          const customersData = customersRes.ok
-            ? (await customersRes.json()) as { data: { customers: Customer[] } }
-            : { data: { customers: [] } };
-          const petsData = petsRes.ok
-            ? (await petsRes.json()) as { data: { pets: Pet[] } }
-            : { data: { pets: [] } };
+          if (!customersRes.ok || !petsRes.ok) {
+            throw new Error("search request failed");
+          }
+          const customersData = (await customersRes.json()) as { data: { customers: Customer[] } };
+          const petsData = (await petsRes.json()) as { data: { pets: Pet[] } };
+          if (requestIdRef.current !== currentRequestId) return; // a newer search superseded this one
           setResults(formatSearchResults(customersData.data.customers, petsData.data.pets));
           setOpen(true);
+        } catch {
+          if (requestIdRef.current !== currentRequestId) return;
+          setResults([]);
+          setOpen(false);
+          toast("החיפוש נכשל, נסי שוב", "error");
         } finally {
-          setLoading(false);
+          if (requestIdRef.current === currentRequestId) setLoading(false);
         }
       })();
     }, 300);
 
     return () => clearTimeout(t);
-  }, [query]);
+  }, [query, toast]);
 
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {
@@ -67,6 +81,13 @@ export function Header({
     document.addEventListener("mousedown", onClickOutside);
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [open]);
 
   const goToResult = useCallback((row: SearchResultRow) => {
     setOpen(false);
