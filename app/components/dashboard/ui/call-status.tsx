@@ -5,11 +5,11 @@ export type CallStatus = "done" | "missed" | "escalated" | "active" | "completed
 const STATUS_MAP: Record<CallStatus, { label: string; fg: string; bg: string; pulse?: boolean }> = {
   done:        { label: "הושלמה",   fg: "#2F7D5B", bg: "#E9F5EF" },
   completed:   { label: "הושלמה",   fg: "#2F7D5B", bg: "#E9F5EF" },
-  missed:      { label: "נכשלה",    fg: "#867667", bg: "#F2EDE7" },
-  failed:      { label: "נכשלה",    fg: "#867667", bg: "#F2EDE7" },
+  missed:      { label: "נכשלה",    fg: "#6B7785", bg: "#EEF2F5" },
+  failed:      { label: "נכשלה",    fg: "#6B7785", bg: "#EEF2F5" },
   escalated:   { label: "הוסלמה",   fg: "#B91C1C", bg: "#FEF2F2" },
-  active:      { label: "בתהליך",   fg: "#C2410C", bg: "#FFF3EB", pulse: true },
-  in_progress: { label: "בתהליך",   fg: "#C2410C", bg: "#FFF3EB", pulse: true },
+  active:      { label: "בתהליך",   fg: "#D97706", bg: "#FEF6E9", pulse: true },
+  in_progress: { label: "בתהליך",   fg: "#D97706", bg: "#FEF6E9", pulse: true },
 };
 
 interface CallStatusBadgeProps {
