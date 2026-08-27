@@ -2,15 +2,15 @@
 
 /* ─── Design Tokens — Get A Vet dashboard ──────────────────────────────── */
 :root {
-  /* Brand (orange — from the "a" in the logo) */
-  --brand-900: #7C3F1E;
-  --brand-700: #BC5E2C;
-  --brand-600: #D06B33;
-  --brand-500: #E88858;
-  --brand-400: #EE9E6D;
-  --brand-200: #F6CDAF;
-  --brand-100: #FBE3D2;
-  --brand-50:  #FDF3EB;
+  /* Brand (teal — professional/clinical) */
+  --brand-900: #0B4F4A;
+  --brand-700: #0F766E;
+  --brand-600: #14877D;
+  --brand-500: #2DA89D;
+  --brand-400: #5CC0B6;
+  --brand-200: #A9E0D9;
+  --brand-100: #D3EEEA;
+  --brand-50:  #EEF8F6;
 
   /* Coral (Tomer identity — the medical cross in the logo) */
   --coral-700: #C9494E;
@@ -33,16 +33,16 @@
   --red-100: #FCE2E2;
   --red-50:  #FEF2F2;
 
-  /* Warm neutrals (taupe/stone) */
-  --ink:       #2D2620;
-  --ink-2:     #4C4239;
-  --muted:     #867667;
-  --faint:     #AA9C8D;
-  --line:      #EBE3DA;
-  --line-2:    #F4EDE6;
-  --bg:        #F7F1EA;
+  /* Cool neutrals (slate) */
+  --ink:       #1F2933;
+  --ink-2:     #42505E;
+  --muted:     #6B7785;
+  --faint:     #97A2AD;
+  --line:      #E2E8ED;
+  --line-2:    #EEF2F5;
+  --bg:        #F4F6F8;
   --surface:   #FFFFFF;
-  --surface-2: #FBF6F0;
+  --surface-2: #F9FAFB;
 
   /* Layout */
   --side-w:   248px;
@@ -55,20 +55,20 @@
   --r-xl: 22px;
 
   /* Shadows */
-  --sh-sm:  0 1px 2px rgba(16,40,38,.05), 0 1px 3px rgba(16,40,38,.04);
-  --sh-md:  0 2px 8px rgba(16,40,38,.07), 0 1px 4px rgba(16,40,38,.05);
-  --sh-lg:  0 6px 24px rgba(16,40,38,.10);
-  --sh-pop: 0 18px 50px rgba(13,40,38,.18);
+  --sh-sm:  0 1px 2px rgba(16,40,56,.05), 0 1px 3px rgba(16,40,56,.04);
+  --sh-md:  0 2px 8px rgba(16,40,56,.07), 0 1px 4px rgba(16,40,56,.05);
+  --sh-lg:  0 6px 24px rgba(16,40,56,.10);
+  --sh-pop: 0 18px 50px rgba(13,40,56,.18);
 
   /* Easing */
   --ease: cubic-bezier(.4,0,.2,1);
 
   /* Appointment type colors */
-  --type-checkup-fg:  #3E9C86; --type-checkup-bg:  #E7F4F0;
+  --type-checkup-fg:  #0F766E; --type-checkup-bg:  #EEF8F6;
   --type-vaccine-fg:  #5B7CFA; --type-vaccine-bg:  #EEF1FE;
   --type-surgery-fg:  #E0696D; --type-surgery-bg:  #FBEAEB;
   --type-neutering-fg: #E0696D; --type-neutering-bg: #FBEAEB;
-  --type-home_visit-fg: #D06B33; --type-home_visit-bg: #FDF3EB;
+  --type-home_visit-fg: #2DA89D; --type-home_visit-bg: #EEF8F6;
   --type-phone_consultation-fg: #5B7CFA; --type-phone_consultation-bg: #EEF1FE;
   --type-followup-fg: #C2891E; --type-followup-bg: #FBF2DD;
 }

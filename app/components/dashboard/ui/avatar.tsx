@@ -8,7 +8,7 @@ interface AnimalAvatarProps {
   className?: string;
 }
 
-export function AnimalAvatar({ species, color = "#E88858", size = 36, className = "" }: AnimalAvatarProps) {
+export function AnimalAvatar({ species, color = "#2DA89D", size = 36, className = "" }: AnimalAvatarProps) {
   const bg = color + "1A"; // 10% opacity
   return (
     <span

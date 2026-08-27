@@ -103,7 +103,7 @@ const VISIT_LABELS: Record<string, string> = {
 
 type AppointmentAccent = { bg: string; border: string; text: string; dot: string };
 
-const DEFAULT_ACCENT: AppointmentAccent = { bg: "#F4EDE6", border: "#CDBBA8", text: "#756554", dot: "#A99582" };
+const DEFAULT_ACCENT: AppointmentAccent = { bg: "#F4F6F8", border: "#E2E8ED", text: "#6B7785", dot: "#97A2AD" };
 
 const VISIT_ACCENTS: Record<string, AppointmentAccent> = {
   checkup: { bg: "#E7F4F0", border: "#72B9A7", text: "#237665", dot: "#3E9C86" },
@@ -112,7 +112,7 @@ const VISIT_ACCENTS: Record<string, AppointmentAccent> = {
   vaccine: { bg: "#EEF1FE", border: "#8EA0FF", text: "#4A63D9", dot: "#5B7CFA" },
   neutering: { bg: "#FBEAEB", border: "#EF8C90", text: "#B94E52", dot: "#E0696D" },
   urgent: { bg: "#FEF2F2", border: "#F87171", text: "#B91C1C", dot: "#EF4444" },
-  home_visit: { bg: "#FDF3EB", border: "#EE9E6D", text: "#BC5E2C", dot: "#D06B33" },
+  home_visit: { bg: "#EEF8F6", border: "#5CC0B6", text: "#0F766E", dot: "#14877D" },
   phone_consultation: { bg: "#EEF1FE", border: "#8EA0FF", text: "#4A63D9", dot: "#5B7CFA" },
   follow_up: { bg: "#FBF2DD", border: "#E4B54D", text: "#9A6A10", dot: "#C2891E" },
   followup: { bg: "#FBF2DD", border: "#E4B54D", text: "#9A6A10", dot: "#C2891E" },
@@ -120,11 +120,11 @@ const VISIT_ACCENTS: Record<string, AppointmentAccent> = {
 };
 
 const CALENDAR_LEGEND: Array<{ label: string; color: string }> = [
-  { label: "בדיקה", color: "#3E9C86" },
+  { label: "בדיקה", color: "#0F766E" },
   { label: "חיסון", color: "#5B7CFA" },
   { label: "ניתוח", color: "#E0696D" },
   { label: "מעקב", color: "#C2891E" },
-  { label: "טיפול", color: "#D06B33" },
+  { label: "טיפול", color: "#14877D" },
 ];
 
 function visitLabel(type: string) {
@@ -155,7 +155,7 @@ function ApptBlock({ appt }: { appt: Appointment }) {
 
   return (
     <div
-      className="absolute inset-x-3 z-10 overflow-hidden rounded-[12px] border px-3 py-2.5 text-[12px] shadow-[0_10px_22px_rgba(81,58,39,0.10)] transition-transform hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(81,58,39,0.16)]"
+      className="absolute inset-x-3 z-10 overflow-hidden rounded-[12px] border px-3 py-2.5 text-[12px] shadow-[0_10px_22px_rgba(31,41,51,0.10)] transition-transform hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(31,41,51,0.16)]"
       style={{
         top: `${top}px`,
         height: `${Math.max(h, 72)}px`,
@@ -196,7 +196,7 @@ function CalendarBlockOverlay({
 
   return (
     <div
-      className="absolute inset-x-2 overflow-hidden rounded-[10px] border border-[#D9D0C5] bg-[#EFE8DF] px-2 py-1.5 text-[10px] text-[var(--muted)] shadow-[inset_3px_0_0_#B8A99A]"
+      className="absolute inset-x-2 overflow-hidden rounded-[10px] border border-[#E2E8ED] bg-[#F9FAFB] px-2 py-1.5 text-[10px] text-[var(--muted)] shadow-[inset_3px_0_0_#97A2AD]"
       style={{
         top: `${Math.max(0, top)}px`,
         height: `${Math.max(h, 48)}px`,
@@ -241,7 +241,7 @@ function DayColumn({
 
   if (isSaturday) {
     return (
-      <div className="relative min-w-[156px] flex-1 border-s border-[#EFE6DC] bg-[#FBF8F4]">
+      <div className="relative min-w-[156px] flex-1 border-s border-[#E2E8ED] bg-[#F9FAFB]">
         <div className="absolute inset-0 flex items-center justify-center opacity-60">
           <span className="text-xs text-[var(--faint)]">סגור</span>
         </div>
@@ -252,15 +252,15 @@ function DayColumn({
   return (
     <div
       className={[
-        "relative min-w-[156px] flex-1 border-s border-[#EFE6DC]",
-        isToday ? "bg-[#F8FCF9]" : "bg-white",
+        "relative min-w-[156px] flex-1 border-s border-[#E2E8ED]",
+        isToday ? "bg-white" : "bg-white",
       ].join(" ")}
     >
       {/* Hour gridlines */}
       {Array.from({ length: HOUR_SPAN + 1 }, (_, i) => i + HOUR_START).map(h => (
         <div
           key={h}
-          className="absolute inset-x-0 border-t border-[#F1E8DE]"
+          className="absolute inset-x-0 border-t border-[#EEF2F5]"
           style={{ top: `${(h - HOUR_START) * HOUR_HEIGHT_PX}px` }}
         />
       ))}
@@ -454,7 +454,7 @@ export default function CalendarPage() {
   const weekRange = fmtWeekRange(weekStart, weekEnd);
 
   return (
-    <div className="min-h-full bg-[#F7F0E8] p-6">
+    <div className="min-h-full bg-[#F4F6F8] p-6">
       <div className="mx-auto max-w-[1280px] space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
@@ -477,7 +477,7 @@ export default function CalendarPage() {
             <PlusIcon size={15} />
             תור חדש
           </Link>
-          <div className="flex h-10 items-center overflow-hidden rounded-[12px] border border-[#E9DCCE] bg-white shadow-[var(--sh-sm)]">
+          <div className="flex h-10 items-center overflow-hidden rounded-[12px] border border-[#E2E8ED] bg-white shadow-[var(--sh-sm)]">
             <button
               type="button"
               className="flex h-full w-11 items-center justify-center text-[var(--ink-2)] transition-colors hover:bg-[var(--surface-2)]"
@@ -485,7 +485,7 @@ export default function CalendarPage() {
             >
               <ChevRightIcon size={14} />
             </button>
-            <span className="min-w-[112px] border-x border-[#EFE6DC] px-4 text-center text-sm font-extrabold text-[var(--ink)]">
+            <span className="min-w-[112px] border-x border-[#E2E8ED] px-4 text-center text-sm font-extrabold text-[var(--ink)]">
               השבוע
             </span>
             <button
@@ -502,7 +502,7 @@ export default function CalendarPage() {
         </div>
       </div>
 
-      <Card className="space-y-3 border-[#E9DCCE] bg-white/82 shadow-[0_14px_34px_rgba(81,58,39,0.07)]">
+      <Card className="space-y-3 border-[#E2E8ED] bg-white/82 shadow-[0_14px_34px_rgba(31,41,51,0.07)]">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="text-sm font-bold text-[var(--ink)]">חסימת יומן</h2>
@@ -555,8 +555,8 @@ export default function CalendarPage() {
       {loading ? (
         <Skeleton className="h-[560px]" />
       ) : (
-        <Card noPad className="overflow-hidden rounded-[18px] border-[#E4D7C8] bg-white shadow-[0_18px_50px_rgba(81,58,39,0.10)]">
-          <div className="flex items-center justify-between gap-3 border-b border-[#EFE6DC] bg-white px-6 py-4">
+        <Card noPad className="overflow-hidden rounded-[18px] border-[#E2E8ED] bg-white shadow-[0_18px_50px_rgba(31,41,51,0.10)]">
+          <div className="flex items-center justify-between gap-3 border-b border-[#E2E8ED] bg-white px-6 py-4">
             <div className="flex flex-wrap items-center gap-4 text-[11px] font-bold text-[var(--muted)]">
               {CALENDAR_LEGEND.map(({ label, color }) => (
                 <span key={label} className="inline-flex items-center gap-1.5">
@@ -570,7 +570,7 @@ export default function CalendarPage() {
             </span>
           </div>
 
-          <div className="flex border-b border-[#E7DCCE] bg-white">
+          <div className="flex border-b border-[#E2E8ED] bg-white">
             <div className="w-16 flex-shrink-0" />
             {weekDays.map((day, i) => {
               const isToday = isoOfDate(day) === today;
@@ -579,8 +579,8 @@ export default function CalendarPage() {
                 <div
                   key={i}
                   className={[
-                    "min-w-[156px] flex-1 border-s border-[#EFE6DC] py-3 text-center",
-                    isToday ? "bg-[#FDF3EB] text-[var(--brand-700)]" : "text-[var(--ink-2)]",
+                    "min-w-[156px] flex-1 border-s border-[#EEF2F5] py-3 text-center",
+                    isToday ? "bg-[#EEF8F6] text-[var(--brand-700)]" : "text-[var(--ink-2)]",
                     isSat ? "text-[var(--faint)]" : "",
                   ].join(" ")}
                 >

@@ -36,13 +36,13 @@ const VISIT_COLORS: Record<VisitType, { fg: string; bg: string }> = {
   vaccination:        { fg: "#5B7CFA", bg: "#EEF1FE" },
   surgery:            { fg: "#E0696D", bg: "#FBEAEB" },
   neutering:          { fg: "#E0696D", bg: "#FBEAEB" },
-  home_visit:         { fg: "#D06B33", bg: "#FDF3EB" },
+  home_visit:         { fg: "#14877D", bg: "#EEF8F6" },
   phone_consultation: { fg: "#5B7CFA", bg: "#EEF1FE" },
   followup:           { fg: "#C2891E", bg: "#FBF2DD" },
   follow_up:          { fg: "#C2891E", bg: "#FBF2DD" },
-  consultation:       { fg: "#3E9C86", bg: "#E7F4F0" },
+  consultation:       { fg: "#0F766E", bg: "#EEF8F6" },
   urgent:             { fg: "#B91C1C", bg: "#FEF2F2" },
-  other:              { fg: "#867667", bg: "#F4EDE6" },
+  other:              { fg: "#6B7785", bg: "#EEF2F5" },
 };
 
 interface TypePillProps {
@@ -53,7 +53,7 @@ interface TypePillProps {
 
 export function TypePill({ type, showHomeIcon, className = "" }: TypePillProps) {
   const t = type as VisitType;
-  const { fg, bg } = VISIT_COLORS[t] ?? { fg: "#867667", bg: "#F4EDE6" };
+  const { fg, bg } = VISIT_COLORS[t] ?? { fg: "#6B7785", bg: "#EEF2F5" };
   const label = VISIT_LABELS[t] ?? type;
   const isHome = type === "home_visit" || showHomeIcon;
 
