@@ -1,0 +1,93 @@
+import { getSupabase } from "./supabase.js";
+import { smsTemplates } from "../services/sms.templates.js";
+import { logger } from "./logger.js";
+
+const REMINDER_WINDOW_DAYS = 14;
+
+type DueVaccinationRow = {
+  id: string;
+  vaccine_name: string;
+  next_due_at: string;
+  pet: { name: string } | { name: string }[] | null;
+  customer: { id: string; full_name: string; phone: string | null } | { id: string; full_name: string; phone: string | null }[] | null;
+  clinic_id: string;
+};
+
+export type EnqueueVaccinationRemindersResult = {
+  scanned: number;
+  enqueued: number;
+  skippedNoPhone: number;
+};
+
+/**
+ * Scans vaccinations due within REMINDER_WINDOW_DAYS and enqueues a
+ * vaccination_reminder SMS for each one that doesn't already have one
+ * (idempotent via the notifications_log_vaccination_type_unique constraint).
+ */
+export async function enqueueDueVaccinationReminders(): Promise<EnqueueVaccinationRemindersResult> {
+  const result: EnqueueVaccinationRemindersResult = { scanned: 0, enqueued: 0, skippedNoPhone: 0 };
+
+  const today = new Date();
+  const todayIso = today.toISOString().slice(0, 10);
+  const windowEnd = new Date(today.getTime() + REMINDER_WINDOW_DAYS * 24 * 60 * 60_000);
+  const windowEndIso = windowEnd.toISOString().slice(0, 10);
+
+  const { data, error } = await getSupabase()
+    .from("vaccinations")
+    .select(`
+      id, vaccine_name, next_due_at, clinic_id,
+      pet:pets!vaccinations_pet_clinic_fk(name),
+      customer:customers!vaccinations_customer_clinic_fk(id, full_name, phone)
+    `)
+    .gte("next_due_at", todayIso)
+    .lte("next_due_at", windowEndIso)
+    .is("deleted_at", null)
+    .returns<DueVaccinationRow[]>();
+
+  if (error) throw new Error(`enqueueDueVaccinationReminders: failed to query vaccinations: ${error.message}`);
+  if (!data) return result;
+
+  result.scanned = data.length;
+
+  for (const row of data) {
+    const pet = Array.isArray(row.pet) ? row.pet[0] : row.pet;
+    const customer = Array.isArray(row.customer) ? row.customer[0] : row.customer;
+    if (!pet || !customer) continue;
+
+    if (!customer.phone) {
+      result.skippedNoPhone++;
+      logger.warn({ vaccinationId: row.id, customerId: customer.id }, "vaccination reminder skipped — no phone on file");
+      continue;
+    }
+
+    const body = smsTemplates.vaccination_reminder({
+      customerName: customer.full_name,
+      petName: pet.name,
+      vaccineName: row.vaccine_name,
+    });
+
+    const { error: insertErr } = await getSupabase()
+      .from("notifications_log")
+      .upsert(
+        {
+          clinic_id:       row.clinic_id,
+          customer_id:     customer.id,
+          vaccination_id:  row.id,
+          phone:           customer.phone,
+          type:            "vaccination_reminder",
+          body,
+          scheduled_for:   new Date().toISOString(),
+          status:          "pending",
+        },
+        { onConflict: "vaccination_id,type", ignoreDuplicates: true },
+      );
+
+    if (insertErr) {
+      logger.error({ vaccinationId: row.id, error: insertErr.message }, "failed to enqueue vaccination reminder");
+      continue;
+    }
+    result.enqueued++;
+  }
+
+  return result;
+}
