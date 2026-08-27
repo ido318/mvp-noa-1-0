@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, FormEvent } from "react";
+import React, { useState, useEffect, FormEvent } from "react";
 import { Modal } from "@/components/dashboard/ui/modal";
 import { Btn } from "@/components/dashboard/ui/btn";
 import { useToast } from "@/components/dashboard/ui/toast";
@@ -27,6 +27,12 @@ export function NewCustomerModal({ open, onClose, onCreated }: NewCustomerModalP
     setPhone("");
     setEmail("");
   }
+
+  // Clear stale input whenever the modal closes, whether via cancel, the X
+  // button, Escape, or a backdrop click -- not just on a successful submit.
+  useEffect(() => {
+    if (!open) reset();
+  }, [open]);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -57,7 +63,6 @@ export function NewCustomerModal({ open, onClose, onCreated }: NewCustomerModalP
 
       const created = (await res.json()) as { data: Customer };
       toast("הלקוח נוסף בהצלחה", "success");
-      reset();
       onCreated(created.data);
       onClose();
     } catch {
