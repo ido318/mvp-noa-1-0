@@ -10,6 +10,7 @@ export interface SmsTemplateData {
   oldDate?: string;
   newDate?: string;
   newTime?: string;
+  vaccineName?: string;
 }
 
 // Clinic address constant — used for location in all non-home-visit appointments.
@@ -23,6 +24,7 @@ export type BookingConfirmationData = Require<SmsTemplateData, "dayName" | "date
 export type MorningReminderData     = Require<SmsTemplateData, "time" | "location" | "visitType">;
 export type RescheduleUpdateData    = Require<SmsTemplateData, "oldDate" | "newDate" | "newTime" | "location">;
 export type CancellationUpdateData  = Require<SmsTemplateData, "oldDate">;
+export type VaccinationReminderData = Require<SmsTemplateData, "vaccineName" | "petName">;
 
 // Runtime guard — throws before a malformed SMS is sent.
 function requireFields<T extends SmsTemplateData>(d: T, fields: (keyof T)[], template: string): void {
@@ -139,6 +141,16 @@ export const smsTemplates = {
       `שלום ${d.customerName}, מאשרים: התור של ${d.petName} מיום ${d.oldDate} בוטל לבקשתכם.\n` +
       `נשמח לראותכם שוב — לקביעת תור חדש חייגו אלינו בכל עת.\n` +
       `תומר, Get A Vet 🐾`
+    );
+  },
+
+  vaccination_reminder: (d: VaccinationReminderData) => {
+    requireFields(d, ["vaccineName", "petName"], "vaccination_reminder");
+    return (
+      `שלום ${d.customerName}, כאן תומר מ-Get A Vet 💉\n` +
+      `הגיע הזמן לחיסון הבא של ${d.petName} (${d.vaccineName}) — מומלץ לתאם בקרוב לשמירה על הבריאות.\n` +
+      `לתיאום תור נוח — חייגו אלינו בכל עת.\n` +
+      `בריאות ל${d.petName} 🐾 תומר, Get A Vet`
     );
   },
 };

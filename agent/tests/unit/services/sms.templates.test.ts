@@ -41,6 +41,12 @@ const SAMPLE_CANCEL: Parameters<typeof smsTemplates.cancellation_update>[0] = {
   oldDate: "17.6.2026",
 };
 
+const SAMPLE_VACCINATION: Parameters<typeof smsTemplates.vaccination_reminder>[0] = {
+  customerName: "שרה לוי",
+  petName: "ביסלי",
+  vaccineName: "כלבת",
+};
+
 describe("smsTemplates snapshots", () => {
   it("booking_confirmation — clinic", () => {
     expect(smsTemplates.booking_confirmation(SAMPLE_CLINIC)).toMatchInlineSnapshot(`
@@ -101,6 +107,15 @@ describe("smsTemplates snapshots", () => {
       תומר, Get A Vet 🐾"
     `);
   });
+
+  it("vaccination_reminder", () => {
+    expect(smsTemplates.vaccination_reminder(SAMPLE_VACCINATION)).toMatchInlineSnapshot(`
+      "שלום שרה לוי, כאן תומר מ-Get A Vet 💉
+      הגיע הזמן לחיסון הבא של ביסלי (כלבת) — מומלץ לתאם בקרוב לשמירה על הבריאות.
+      לתיאום תור נוח — חייגו אלינו בכל עת.
+      בריאות לביסלי 🐾 תומר, Get A Vet"
+    `);
+  });
 });
 
 describe("requireFields runtime guard", () => {
@@ -125,6 +140,15 @@ describe("requireFields runtime guard", () => {
         location: CLINIC_LOCATION,
       } as any),
     ).toThrow("reschedule_update: missing required fields: oldDate");
+  });
+
+  it("vaccination_reminder throws when vaccineName is missing", () => {
+    expect(() =>
+      smsTemplates.vaccination_reminder({
+        customerName: "שרה",
+        petName: "ביסלי",
+      } as any),
+    ).toThrow("vaccination_reminder: missing required fields: vaccineName");
   });
 });
 
