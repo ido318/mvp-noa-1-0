@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useState, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import { Card } from "@/components/dashboard/ui/card";
 import { Badge } from "@/components/dashboard/ui/badge";
 import { EmptyState } from "@/components/dashboard/ui/empty-state";
@@ -273,6 +274,20 @@ export default function ClientsPage() {
     const t = setTimeout(() => { void fetchData(query); }, 300);
     return () => clearTimeout(t);
   }, [query, fetchData]);
+
+  // Deep-link: /dashboard/clients?customerId=<id> opens that customer's profile directly
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    const customerId = searchParams.get("customerId");
+    if (!customerId) return;
+    void (async () => {
+      const res = await fetch(`/api/customers/${customerId}`);
+      if (res.ok) {
+        const d = await res.json() as { data: Customer };
+        setSelected(d.data);
+      }
+    })();
+  }, [searchParams]);
 
   return (
     <div className="p-6 space-y-5">
