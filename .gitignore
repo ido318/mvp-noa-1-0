@@ -49,3 +49,6 @@ npm-debug.log*
 # npm cache
 .npm-cache/
 .codex/
+
+# Claude Code brainstorming visual companion
+.superpowers/
