@@ -23,7 +23,7 @@ Read `app/app/dashboard/clients/page.tsx` in full (330 lines) — the `ClientPro
 **Files:**
 - Modify: `app/app/dashboard/clients/page.tsx`
 
-- [ ] **Step 1: Add visit state and fetch to `ClientProfile`**
+- [x] **Step 1: Add visit state and fetch to `ClientProfile`**
 
 In `app/app/dashboard/clients/page.tsx`, the `ClientProfile` component currently has (around lines 73-107):
 
@@ -62,7 +62,7 @@ Add a third `useEffect`, placed after the existing appointments-fetching one:
   }, [customer.id]);
 ```
 
-- [ ] **Step 2: Render the visit-history section**
+- [x] **Step 2: Render the visit-history section**
 
 In the drawer body, after the existing "Appointment history" `<div>` block (which ends right before the "Notes" section), add a new section following the exact same structural pattern as the pets/appointments sections above it:
 
@@ -109,7 +109,7 @@ In the drawer body, after the existing "Appointment history" `<div>` block (whic
 
 This needs `Link` from `next/link` — check the top of the file; `ClientsPage` (the default export, different component in the same file) may already import it for the "new customer" affordance, or it may not be imported at all yet in this file. Add `import Link from "next/link";` at the top if it isn't already there.
 
-- [ ] **Step 3: Run typecheck and the full test suite**
+- [x] **Step 3: Run typecheck and the full test suite**
 
 ```bash
 cd app && npm run typecheck && npm run test
@@ -117,11 +117,11 @@ cd app && npm run typecheck && npm run test
 
 Expected: both clean/passing — this is a UI-only addition with no new pure logic, so no new unit test is expected (consistent with how the existing pets/appointments sections in this same component have no dedicated tests either).
 
-- [ ] **Step 4: Drive the real UI to confirm the visit section renders**
+- [x] **Step 4: Drive the real UI to confirm the visit section renders**
 
 A dev server may already be running on port 3001 — check `lsof -i :3001` first. Log in (ask the controller for credentials — do not guess), go to `/dashboard/clients`, click a customer who has at least one visit (query Supabase or check the app if you need to find one), confirm the drawer now shows a "ביקורים רפואיים" section between the appointment history and the notes, with clickable rows linking to `/dashboard/visits/[id]`. If no customer in this clinic's data has any visits, confirm instead that the section renders its correct empty state ("אין ביקורים רשומים") rather than crashing or staying blank. Report DONE_WITH_CONCERNS if you cannot complete this — do not claim success without seeing it.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/app/dashboard/clients/page.tsx
@@ -143,7 +143,7 @@ git commit -m "feat(dashboard): add visit history to customer profile drawer"
 
 **Do NOT delete** `app/app/dashboard/pets/page.tsx`, `app/app/dashboard/pets/[petId]/page.tsx`, `app/app/dashboard/records/page.tsx`, or any `app/app/dashboard/visits/*` page — only their sidebar nav entries for pets/records are being removed in this task; the pages themselves stay live and reachable (e.g. via the new visit-history links added in Task 1, or direct URL) since other code may still depend on them and auditing every possible reference is out of this plan's scope.
 
-- [ ] **Step 1: Remove the pets and records nav items**
+- [x] **Step 1: Remove the pets and records nav items**
 
 In `app/components/dashboard/sidebar.tsx`, the `navItems` array currently has (after Plan 2 added the waitlist entry):
 
@@ -163,7 +163,7 @@ In `app/components/dashboard/sidebar.tsx`, the `navItems` array currently has (a
 
 Remove the `"/dashboard/pets"` and `"/dashboard/records"` lines. Also remove the now-unused `PetsIcon`/`RecordsIcon` from the icon import line at the top of the file if nothing else in this file uses them (check first — they shouldn't be used anywhere else in this file).
 
-- [ ] **Step 2: Delete the dead customers pages**
+- [x] **Step 2: Delete the dead customers pages**
 
 ```bash
 git rm app/app/dashboard/customers/page.tsx
@@ -174,7 +174,7 @@ git rm app/app/dashboard/customers/new/page.tsx
 
 If `git rm` leaves an empty `app/app/dashboard/customers/` directory, that's fine — empty directories aren't tracked by git and won't appear in `git status`.
 
-- [ ] **Step 3: Repoint the two broken links**
+- [x] **Step 3: Repoint the two broken links**
 
 In `app/app/dashboard/pets/[petId]/page.tsx:54`, change:
 ```tsx
@@ -196,7 +196,7 @@ href={`/dashboard/clients?customerId=${call.customerId}`}
 
 (Leave the rest of both files untouched — their styling is out of scope for this task, only the broken link target is being fixed.)
 
-- [ ] **Step 4: Run the full test suite, typecheck, and build**
+- [x] **Step 4: Run the full test suite, typecheck, and build**
 
 ```bash
 cd app && npm run test && npm run typecheck && npm run build
@@ -204,11 +204,11 @@ cd app && npm run test && npm run typecheck && npm run build
 
 Expected: all pass. The build step is the important one here — it will fail loudly if any other file still imports something from the deleted `app/dashboard/customers/*` files, which would mean this task missed a reference.
 
-- [ ] **Step 5: Drive the real UI to confirm nothing broke**
+- [x] **Step 5: Drive the real UI to confirm nothing broke**
 
 Log in, confirm the sidebar no longer shows "חיות מחמד" or "תיקים רפואיים", confirm `/dashboard/pets/[petId]` (open any pet from a customer's profile drawer) still loads and its "בעלים" / owner link now goes to `/dashboard/clients?customerId=...` and correctly opens that customer's drawer (this reuses the deep-link behavior already built in Plan 1's search task), and confirm `/dashboard/customers` now 404s (expected — it's deleted) rather than crashing the whole app.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add -A
