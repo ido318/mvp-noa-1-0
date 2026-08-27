@@ -26,7 +26,7 @@ Read `app/components/dashboard/ui/modal.tsx` (the reusable `Modal` component) an
 - Create: `app/components/dashboard/new-customer-modal.tsx`
 - Modify: `app/app/dashboard/clients/page.tsx`
 
-- [ ] **Step 1: Create the modal component**
+- [x] **Step 1: Create the modal component**
 
 ```tsx
 // app/components/dashboard/new-customer-modal.tsx
@@ -144,7 +144,7 @@ export function NewCustomerModal({ open, onClose, onCreated }: NewCustomerModalP
 }
 ```
 
-- [ ] **Step 2: Wire the modal into the clients page**
+- [x] **Step 2: Wire the modal into the clients page**
 
 In `app/app/dashboard/clients/page.tsx`, import the new component:
 
@@ -176,7 +176,7 @@ At the end of the component's returned JSX, next to the existing `{selected && <
       />
 ```
 
-- [ ] **Step 3: Run typecheck and the full test suite**
+- [x] **Step 3: Run typecheck and the full test suite**
 
 ```bash
 cd app && npm run typecheck && npm run test && npm run build
@@ -184,11 +184,11 @@ cd app && npm run typecheck && npm run test && npm run build
 
 Expected: all pass/succeed.
 
-- [ ] **Step 4: Drive the real UI to confirm the flow works end-to-end**
+- [x] **Step 4: Drive the real UI to confirm the flow works end-to-end**
 
 A dev server may already be running on port 3001 — check `lsof -i :3001` first. Log in (ask the controller for credentials — do not guess), go to `/dashboard/clients`, click "לקוח חדש", fill in a full name (e.g. a clearly-marked test name like "בדיקה אוטומטית"), submit, confirm a success toast appears, the modal closes, and the new customer appears in the list without a manual page refresh. Report DONE_WITH_CONCERNS if you cannot complete this — do not claim success without seeing it. If you do create a test customer this way, tell the controller its name so it can be identified/cleaned up later if needed — do not delete it yourself (no delete UI/API exists for customers in this codebase).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/components/dashboard/new-customer-modal.tsx app/app/dashboard/clients/page.tsx
