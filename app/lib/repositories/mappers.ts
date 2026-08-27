@@ -27,6 +27,7 @@ import type {
   TranscriptItem,
 } from "@/types/domain/voice-call";
 import type { Escalation } from "@/types/domain/escalation";
+import type { WaitlistEntry } from "@/types/domain/waitlist";
 
 export function mapProfileRow(row: {
   id: string;
@@ -480,5 +481,41 @@ export function mapPrescriptionRow(row: {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     deletedAt: row.deleted_at,
+  };
+}
+
+export function mapWaitlistRow(row: {
+  id: string;
+  clinic_id: string;
+  customer_id: string;
+  pet_id: string | null;
+  customer?: { full_name: string | null; phone: string | null } | { full_name: string | null; phone: string | null }[] | null;
+  pet?: { name: string | null } | { name: string | null }[] | null;
+  visit_type: string;
+  preferred_start: string | null;
+  preferred_end: string | null;
+  status: string;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}): WaitlistEntry {
+  const customer = Array.isArray(row.customer) ? row.customer[0] : row.customer;
+  const pet = Array.isArray(row.pet) ? row.pet[0] : row.pet;
+
+  return {
+    id: row.id,
+    clinicId: row.clinic_id,
+    customerId: row.customer_id,
+    petId: row.pet_id,
+    customerName: customer?.full_name ?? null,
+    customerPhone: customer?.phone ?? null,
+    petName: pet?.name ?? null,
+    visitType: row.visit_type,
+    preferredStart: row.preferred_start,
+    preferredEnd: row.preferred_end,
+    status: row.status,
+    notes: row.notes,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
   };
 }

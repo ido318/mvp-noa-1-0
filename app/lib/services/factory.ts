@@ -13,6 +13,7 @@ import { ProfileRepository } from "@/lib/repositories/profile.repository";
 import { VaccinationRepository } from "@/lib/repositories/vaccination.repository";
 import { VisitRepository } from "@/lib/repositories/visit.repository";
 import { VisitShareRepository } from "@/lib/repositories/visit-share.repository";
+import { WaitlistRepository } from "@/lib/repositories/waitlist.repository";
 import { AIEventService } from "@/lib/services/ai-event.service";
 import { AppointmentService } from "@/lib/services/appointment.service";
 import { AuditService } from "@/lib/services/audit.service";
@@ -28,6 +29,7 @@ import { VisitService } from "@/lib/services/visit.service";
 import { VisitSummaryAssistantService } from "@/lib/services/visit-summary-assistant.service";
 import { VisitShareService } from "@/lib/services/visit-share.service";
 import { VoiceCallService } from "@/lib/services/voice-call.service";
+import { WaitlistService } from "@/lib/services/waitlist.service";
 import { VoiceCallRepository } from "@/lib/repositories/voice-call.repository";
 import { EscalationService } from "@/lib/services/escalation.service";
 import { DashboardNotificationsService } from "@/lib/services/dashboard-notifications.service";
@@ -42,6 +44,7 @@ export async function createServices() {
   const petRepository = new PetRepository(supabase);
   const appointmentRepository = new AppointmentRepository(supabase);
   const calendarBlockRepository = new CalendarBlockRepository(supabase);
+  const waitlistRepository = new WaitlistRepository(supabase);
   const visitRepository = new VisitRepository(supabase);
   const voiceCallRepository = new VoiceCallRepository(supabase);
   const medicalNoteRepository = new MedicalNoteRepository(supabase);
@@ -70,6 +73,7 @@ export async function createServices() {
     ),
     calendar: new CalendarService(appointmentRepository, calendarBlockRepository),
     calendarBlock: new CalendarBlockService(calendarBlockRepository),
+    waitlist: new WaitlistService(waitlistRepository),
     clinicSettings: new ClinicSettingsService(clinicRepository, auditService),
     visit: new VisitService(
       visitRepository,
