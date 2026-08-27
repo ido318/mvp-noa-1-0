@@ -29,7 +29,7 @@ Confirm the dev server can run: `cd app && PORT=3001 npm run dev` (must be port 
 
 The current palette is a warm terracotta/orange brand (`--brand-*`) with warm-neutral grays (`--ink`, `--muted`, `--line`, `--bg`, etc). Replace it with a cool slate/teal palette. Keep every **token name** identical — only change the hex values — so every other file in the codebase (which references `var(--brand-600)` etc. via Tailwind arbitrary values) picks up the new look with zero other changes.
 
-- [ ] **Step 1: Replace the `:root` token block**
+- [x] **Step 1: Replace the `:root` token block**
 
 Open `app/app/globals.css` and replace lines 4–74 (from `:root {` through the closing `}` right before `/* ─── Tailwind theme extension ─── */`) with:
 
@@ -107,7 +107,7 @@ Open `app/app/globals.css` and replace lines 4–74 (from `:root {` through the 
 }
 ```
 
-- [ ] **Step 2: Confirm no other file hardcodes the old hex values**
+- [x] **Step 2: Confirm no other file hardcodes the old hex values**
 
 ```bash
 cd app && grep -rn "7C3F1E\|BC5E2C\|D06B33\|E88858\|EE9E6D\|F6CDAF\|FBE3D2\|FDF3EB" --include="*.tsx" --include="*.ts" --include="*.css" . | grep -v node_modules
@@ -115,7 +115,7 @@ cd app && grep -rn "7C3F1E\|BC5E2C\|D06B33\|E88858\|EE9E6D\|F6CDAF\|FBE3D2\|FDF3
 
 Expected: no output (every component references the CSS variables, not raw hex — if this prints anything, that file hardcodes an old brand color and needs the same hex swap applied by hand before continuing).
 
-- [ ] **Step 3: Visually verify with the running dev server**
+- [x] **Step 3: Visually verify with the running dev server**
 
 ```bash
 cd app && PORT=3001 npm run dev &
@@ -125,7 +125,7 @@ curl -s -o /dev/null -w "%{http_code}\n" http://localhost:3001/dashboard
 
 Expected: `307` (redirect to login — confirms the server started cleanly). Then open `http://localhost:3001/dashboard` in a real browser (or drive it with Playwright per the `run` skill), log in, and confirm the sidebar/header/KPI cards/badges now render in the cool teal/slate palette instead of orange.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add app/app/globals.css
@@ -146,7 +146,7 @@ The header's search `<input>` currently has no `onChange`, no state, and does no
 
 The one piece of real logic worth unit-testing in isolation is merging the two separate search calls (customers + pets, each pet needing its owner's name for display) into one flat, ranked list of dropdown rows — everything else is plain fetch/state/render wiring with no established component-test pattern in this codebase (`tests/` only covers `.test.ts` logic files under a Node vitest environment — there are zero `.tsx`/jsdom component tests anywhere in this repo despite `@testing-library/react` being installed unused; introducing that harness is out of scope for this task). Verify the UI wiring itself by driving the running app.
 
-- [ ] **Step 1: Write the failing test for result formatting**
+- [x] **Step 1: Write the failing test for result formatting**
 
 ```typescript
 // app/tests/unit/format-search-results.test.ts
@@ -222,7 +222,7 @@ describe("formatSearchResults", () => {
 });
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 ```bash
 cd app && npx vitest run tests/unit/format-search-results.test.ts
@@ -230,7 +230,7 @@ cd app && npx vitest run tests/unit/format-search-results.test.ts
 
 Expected: FAIL — `Cannot find module '@/lib/search/format-search-results'`.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 ```typescript
 // app/lib/search/format-search-results.ts
@@ -268,7 +268,7 @@ export function formatSearchResults(customers: Customer[], pets: Pet[]): SearchR
 }
 ```
 
-- [ ] **Step 4: Run the test to verify it passes**
+- [x] **Step 4: Run the test to verify it passes**
 
 ```bash
 cd app && npx vitest run tests/unit/format-search-results.test.ts
@@ -276,14 +276,14 @@ cd app && npx vitest run tests/unit/format-search-results.test.ts
 
 Expected: PASS (3 tests).
 
-- [ ] **Step 5: Commit the tested logic**
+- [x] **Step 5: Commit the tested logic**
 
 ```bash
 git add app/lib/search/format-search-results.ts app/tests/unit/format-search-results.test.ts
 git commit -m "feat(dashboard): add global search result formatting"
 ```
 
-- [ ] **Step 6: Wire the header UI to the search API**
+- [x] **Step 6: Wire the header UI to the search API**
 
 Replace the entire contents of `app/components/dashboard/header.tsx` with:
 
@@ -441,7 +441,7 @@ export function Header({
 }
 ```
 
-- [ ] **Step 7: Make the clients page open a customer's profile when linked to via `?customerId=`**
+- [x] **Step 7: Make the clients page open a customer's profile when linked to via `?customerId=`**
 
 In `app/app/dashboard/clients/page.tsx`, add the `useSearchParams` import at the top (next to the existing `react` import on line 2):
 
@@ -467,7 +467,7 @@ Then inside `export default function ClientsPage()` (currently starting at line 
   }, [searchParams]);
 ```
 
-- [ ] **Step 8: Run the full unit test suite to confirm nothing broke**
+- [x] **Step 8: Run the full unit test suite to confirm nothing broke**
 
 ```bash
 cd app && npm run test
@@ -475,7 +475,7 @@ cd app && npm run test
 
 Expected: all existing tests still PASS, plus the 3 new `format-search-results` tests.
 
-- [ ] **Step 9: Drive the real UI to confirm the search works end-to-end**
+- [x] **Step 9: Drive the real UI to confirm the search works end-to-end**
 
 ```bash
 cd app && PORT=3001 npm run dev &
@@ -485,7 +485,7 @@ curl -s -o /dev/null -w "%{http_code}\n" http://localhost:3001/dashboard
 
 Then, in a real browser (or via Playwright per the `run` skill) at `http://localhost:3001/dashboard`: log in, type at least 2 characters of a real customer or pet name into the header search box, confirm a dropdown appears within ~300ms with matching results, click one, and confirm it navigates to `/dashboard/clients?customerId=...` with that customer's profile drawer already open.
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ```bash
 git add app/components/dashboard/header.tsx app/app/dashboard/clients/page.tsx
