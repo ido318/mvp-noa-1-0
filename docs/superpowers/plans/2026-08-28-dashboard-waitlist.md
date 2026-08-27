@@ -30,7 +30,7 @@ Read `app/lib/repositories/calendar-block.repository.ts`, `app/lib/services/cale
 - Test: `app/tests/unit/waitlist.service.test.ts`
 - Modify: `app/lib/services/factory.ts` (register the new repository/service)
 
-- [ ] **Step 1: Create the domain type**
+- [x] **Step 1: Create the domain type**
 
 ```typescript
 // app/types/domain/waitlist.ts
@@ -56,7 +56,7 @@ export type WaitlistListFilters = {
 };
 ```
 
-- [ ] **Step 2: Add the row mapper**
+- [x] **Step 2: Add the row mapper**
 
 Append to the end of `app/lib/repositories/mappers.ts`:
 
@@ -100,7 +100,7 @@ export function mapWaitlistRow(row: {
 
 Add the import at the top of `mappers.ts` if a `WaitlistEntry` type import isn't already grouped with the other domain type imports there — check the existing import block at the top of the file and add `import type { WaitlistEntry } from "@/types/domain/waitlist";` following the same pattern as the other domain type imports in that file.
 
-- [ ] **Step 3: Create the repository**
+- [x] **Step 3: Create the repository**
 
 ```typescript
 // app/lib/repositories/waitlist.repository.ts
@@ -129,7 +129,7 @@ export class WaitlistRepository {
 }
 ```
 
-- [ ] **Step 4: Write the failing service test**
+- [x] **Step 4: Write the failing service test**
 
 ```typescript
 // app/tests/unit/waitlist.service.test.ts
@@ -187,7 +187,7 @@ describe("WaitlistService", () => {
 });
 ```
 
-- [ ] **Step 5: Run the test to verify it fails**
+- [x] **Step 5: Run the test to verify it fails**
 
 ```bash
 cd app && npx vitest run tests/unit/waitlist.service.test.ts
@@ -195,7 +195,7 @@ cd app && npx vitest run tests/unit/waitlist.service.test.ts
 
 Expected: FAIL — `Cannot find module '@/lib/services/waitlist.service'`.
 
-- [ ] **Step 6: Write the service**
+- [x] **Step 6: Write the service**
 
 ```typescript
 // app/lib/services/waitlist.service.ts
@@ -213,7 +213,7 @@ export class WaitlistService {
 }
 ```
 
-- [ ] **Step 7: Run the test to verify it passes**
+- [x] **Step 7: Run the test to verify it passes**
 
 ```bash
 cd app && npx vitest run tests/unit/waitlist.service.test.ts
@@ -221,7 +221,7 @@ cd app && npx vitest run tests/unit/waitlist.service.test.ts
 
 Expected: PASS (1 test).
 
-- [ ] **Step 8: Register in the service factory**
+- [x] **Step 8: Register in the service factory**
 
 In `app/lib/services/factory.ts`:
 1. Add `import { WaitlistRepository } from "@/lib/repositories/waitlist.repository";` grouped with the other repository imports (alphabetically, after `VoiceCallRepository`... actually place it alphabetically near `VisitShareRepository`/`VisitRepository` — just keep the existing alphabetical grouping convention in that import block).
@@ -229,7 +229,7 @@ In `app/lib/services/factory.ts`:
 3. Inside `createServices()`, add `const waitlistRepository = new WaitlistRepository(supabase);` next to the other repository instantiations (e.g. right after `const calendarBlockRepository = ...` line).
 4. Inside the returned object, add `waitlist: new WaitlistService(waitlistRepository),` next to `calendarBlock: new CalendarBlockService(calendarBlockRepository),`.
 
-- [ ] **Step 9: Run the full test suite and typecheck**
+- [x] **Step 9: Run the full test suite and typecheck**
 
 ```bash
 cd app && npm run test && npm run typecheck
@@ -237,7 +237,7 @@ cd app && npm run test && npm run typecheck
 
 Expected: all tests pass (including the new one), typecheck clean.
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ```bash
 git add app/types/domain/waitlist.ts app/lib/repositories/mappers.ts app/lib/repositories/waitlist.repository.ts app/lib/services/waitlist.service.ts app/tests/unit/waitlist.service.test.ts app/lib/services/factory.ts
@@ -254,7 +254,7 @@ git commit -m "feat(dashboard): add waitlist repository and service"
 - Modify: `app/components/dashboard/sidebar.tsx`
 - Modify: `app/app/dashboard/page.tsx` (add a 4th stat tile)
 
-- [ ] **Step 1: Create the API route**
+- [x] **Step 1: Create the API route**
 
 ```typescript
 // app/app/api/waitlist/route.ts
@@ -276,7 +276,7 @@ export async function GET() {
 }
 ```
 
-- [ ] **Step 2: Create the dashboard page**
+- [x] **Step 2: Create the dashboard page**
 
 ```tsx
 // app/app/dashboard/waitlist/page.tsx
@@ -378,7 +378,7 @@ export default function WaitlistPage() {
 }
 ```
 
-- [ ] **Step 3: Add the sidebar nav item**
+- [x] **Step 3: Add the sidebar nav item**
 
 In `app/components/dashboard/sidebar.tsx`, import `ClockIcon` alongside the other icon imports (add it to the existing `import { TodayIcon, CalendarIcon, ... } from "@/components/dashboard/icons";` line), then add a new entry to the `navItems` array, right after the `"אסקלציות"` entry and before `"לקוחות"`:
 
@@ -386,7 +386,7 @@ In `app/components/dashboard/sidebar.tsx`, import `ClockIcon` alongside the othe
 { href: "/dashboard/waitlist",    label: "המתנה",        icon: ClockIcon },
 ```
 
-- [ ] **Step 4: Add a 4th stat tile to the Today page**
+- [x] **Step 4: Add a 4th stat tile to the Today page**
 
 In `app/app/dashboard/page.tsx`, add state for the waitlist count and a 4th `StatTile`. Find the existing `fetchData` callback (the one that fetches appointments/escalations/calls) and add a parallel fetch for `/api/waitlist`, following the exact same `if (res.ok) { ... }` pattern already used for the other three fetches in that function. Add `const [waitlistCount, setWaitlistCount] = useState(0);` next to the other `useState` declarations near the top of the component, and inside `fetchData`, alongside the existing `apptRes`/`escRes`/`callRes` fetches, add a fourth parallel fetch to `/api/waitlist` and on success call `setWaitlistCount((d.data.items ?? []).length)`.
 
@@ -396,7 +396,7 @@ Then change the stat tile grid from `grid-cols-3` to `grid-cols-4` and add a 4th
 <StatTile label="ממתינים" value={waitlistCount} />
 ```
 
-- [ ] **Step 5: Run the full test suite and typecheck**
+- [x] **Step 5: Run the full test suite and typecheck**
 
 ```bash
 cd app && npm run test && npm run typecheck && npm run build
@@ -404,11 +404,11 @@ cd app && npm run test && npm run typecheck && npm run build
 
 Expected: all pass, production build succeeds (confirms the new route/page compile correctly).
 
-- [ ] **Step 6: Drive the real UI to confirm the waitlist screen renders**
+- [x] **Step 6: Drive the real UI to confirm the waitlist screen renders**
 
 A dev server may already be running on port 3001 — check `lsof -i :3001` before starting a new one; if not running, `cd app && PORT=3001 npm run dev &`. Log in (ask the controller for credentials — do not guess), click "המתנה" in the sidebar, confirm the page loads without error (either showing real waitlist entries or the empty state if there are none), and confirm the Today page's stat-tile row now shows 4 tiles including "ממתינים". Report DONE_WITH_CONCERNS if you cannot complete this verification — do not claim success without having seen it.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add app/app/api/waitlist/route.ts app/app/dashboard/waitlist/page.tsx app/components/dashboard/sidebar.tsx app/app/dashboard/page.tsx
