@@ -102,7 +102,7 @@ describe("enqueueDueVaccinationReminders", () => {
     expect(payload.body).toContain("משושה");
     expect(options).toEqual({ onConflict: "vaccination_id,type", ignoreDuplicates: true });
 
-    expect(result).toEqual({ scanned: 1, enqueued: 1, skippedNoPhone: 0 });
+    expect(result).toEqual({ scanned: 1, enqueued: 1, skippedNoPhone: 0, failed: 0 });
   });
 
   it("skips a vaccination whose linked customer has no phone number", async () => {
@@ -119,7 +119,7 @@ describe("enqueueDueVaccinationReminders", () => {
     const result = await enqueueDueVaccinationReminders();
 
     expect(mockUpsert).not.toHaveBeenCalled();
-    expect(result).toEqual({ scanned: 1, enqueued: 0, skippedNoPhone: 1 });
+    expect(result).toEqual({ scanned: 1, enqueued: 0, skippedNoPhone: 1, failed: 0 });
   });
 
   it("handles a mix of due vaccinations, enqueuing only the ones with a phone", async () => {
@@ -135,7 +135,7 @@ describe("enqueueDueVaccinationReminders", () => {
     const result = await enqueueDueVaccinationReminders();
 
     expect(mockUpsert).toHaveBeenCalledTimes(1);
-    expect(result).toEqual({ scanned: 2, enqueued: 1, skippedNoPhone: 1 });
+    expect(result).toEqual({ scanned: 2, enqueued: 1, skippedNoPhone: 1, failed: 0 });
   });
 
   it("throws when the vaccinations query returns an error", async () => {
@@ -162,6 +162,6 @@ describe("enqueueDueVaccinationReminders", () => {
     const result = await enqueueDueVaccinationReminders();
 
     expect(mockUpsert).not.toHaveBeenCalled();
-    expect(result).toEqual({ scanned: 0, enqueued: 0, skippedNoPhone: 0 });
+    expect(result).toEqual({ scanned: 0, enqueued: 0, skippedNoPhone: 0, failed: 0 });
   });
 });

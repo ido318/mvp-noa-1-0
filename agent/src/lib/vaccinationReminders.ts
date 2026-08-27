@@ -1,6 +1,7 @@
 import { getSupabase } from "./supabase.js";
 import { smsTemplates } from "../services/sms.templates.js";
 import { logger } from "./logger.js";
+import { israelDateIso } from "./notifications.js";
 
 const REMINDER_WINDOW_DAYS = 14;
 
@@ -17,6 +18,7 @@ export type EnqueueVaccinationRemindersResult = {
   scanned: number;
   enqueued: number;
   skippedNoPhone: number;
+  failed: number;
 };
 
 /**
@@ -25,12 +27,12 @@ export type EnqueueVaccinationRemindersResult = {
  * (idempotent via the notifications_log_vaccination_type_unique constraint).
  */
 export async function enqueueDueVaccinationReminders(): Promise<EnqueueVaccinationRemindersResult> {
-  const result: EnqueueVaccinationRemindersResult = { scanned: 0, enqueued: 0, skippedNoPhone: 0 };
+  const result: EnqueueVaccinationRemindersResult = { scanned: 0, enqueued: 0, skippedNoPhone: 0, failed: 0 };
 
   const today = new Date();
-  const todayIso = today.toISOString().slice(0, 10);
+  const todayIso = israelDateIso(today);
   const windowEnd = new Date(today.getTime() + REMINDER_WINDOW_DAYS * 24 * 60 * 60_000);
-  const windowEndIso = windowEnd.toISOString().slice(0, 10);
+  const windowEndIso = israelDateIso(windowEnd);
 
   const { data, error } = await getSupabase()
     .from("vaccinations")
@@ -83,6 +85,7 @@ export async function enqueueDueVaccinationReminders(): Promise<EnqueueVaccinati
       );
 
     if (insertErr) {
+      result.failed++;
       logger.error({ vaccinationId: row.id, error: insertErr.message }, "failed to enqueue vaccination reminder");
       continue;
     }
