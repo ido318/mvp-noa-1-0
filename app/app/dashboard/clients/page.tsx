@@ -4,10 +4,12 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Card } from "@/components/dashboard/ui/card";
 import { Badge } from "@/components/dashboard/ui/badge";
+import { Btn } from "@/components/dashboard/ui/btn";
 import { EmptyState } from "@/components/dashboard/ui/empty-state";
 import { Skeleton } from "@/components/dashboard/ui/skeleton";
 import { PersonAvatar, AnimalAvatar } from "@/components/dashboard/ui/avatar";
 import { SearchIcon, PhoneIcon, MailIcon, PinIcon, XIcon, ChevRightIcon } from "@/components/dashboard/icons";
+import { NewCustomerModal } from "@/components/dashboard/new-customer-modal";
 import type { Customer } from "@/types/domain/customer";
 import type { Pet } from "@/types/domain/pet";
 import type { Appointment } from "@/types/domain/appointment";
@@ -300,6 +302,7 @@ export default function ClientsPage() {
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<Customer | null>(null);
   const [searching, setSearching] = useState(false);
+  const [showNewCustomer, setShowNewCustomer] = useState(false);
 
   const fetchData = useCallback(async (q: string) => {
     setSearching(true);
@@ -348,6 +351,7 @@ export default function ClientsPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-extrabold text-[var(--ink)]">לקוחות</h1>
         <span className="text-sm text-[var(--muted)]">{items.length} רשומים</span>
+        <Btn size="sm" onClick={() => setShowNewCustomer(true)}>לקוח חדש</Btn>
       </div>
 
       {/* Search */}
@@ -392,6 +396,12 @@ export default function ClientsPage() {
       {selected && (
         <ClientProfile customer={selected} onClose={() => setSelected(null)} />
       )}
+
+      <NewCustomerModal
+        open={showNewCustomer}
+        onClose={() => setShowNewCustomer(false)}
+        onCreated={() => { void fetchData(query); }}
+      />
     </div>
   );
 }
