@@ -10,8 +10,8 @@ Unified monorepo. Two packages, one Supabase project.
 
 | Package | Directory | Runtime | Deploy |
 |---|---|---|---|
-| **agent** | `agent/` | Node.js 20 + Hono | Vercel (voxly-agent) |
-| **app** | `app/` | Next.js 16 | Vercel (voxly-app) |
+| **agent** | `agent/` | Node.js 22 + Hono | Fly.io (`voxly-agent`) |
+| **app** | `app/` | Next.js 16 | Vercel (`get-a-vrt-d` / `voxly-app-chi`) |
 
 Shared: `supabase/` migrations, `docs/`.
 
@@ -58,8 +58,22 @@ npm run dev                    # http://localhost:3001
 
 ```bash
 npm run test:all       # both agent and app
-npm run test:agent     # agent only (3 unit tests)
-npm run test:app       # app only (19 unit + integration tests)
+npm run test:agent     # agent only
+npm run test:app       # app unit tests
+```
+
+### Production Deployments
+
+Current deployment status is tracked in
+[`docs/DEPLOYMENT_STATUS.md`](docs/DEPLOYMENT_STATUS.md).
+
+```bash
+# Dashboard preview deploy (Vercel, project root is app/)
+vercel deploy
+
+# Agent production deploy (Fly.io)
+cd agent
+flyctl deploy --app voxly-agent
 ```
 
 ---
@@ -106,7 +120,8 @@ See `agent/.env.example` and `app/.env.example`.
 
 Migrations in `supabase/migrations/`. Run in order (filename = timestamp).
 
-Latest: `20260611000012_agent_schema.sql` — adds `escalations` table, `elevenlabs_conversation_id` + `agent_name` to `voice_calls`.
+Latest: `20260828000031_vaccination_reminder_id_required.sql` — requires
+`vaccination_id` on vaccination reminder notification rows.
 
 ---
 

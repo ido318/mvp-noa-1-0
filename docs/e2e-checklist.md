@@ -1,8 +1,8 @@
 # E2E Readiness Checklist — Tomer Voice Agent
 
-**Last updated:** 2026-06-12  
-**Agent:** https://voxly-agent.fly.dev  
-**Dashboard:** https://voxly-app-chi.vercel.app  
+**Last updated:** 2026-08-28
+**Agent:** https://voxly-agent.fly.dev
+**Dashboard:** https://voxly-app-chi.vercel.app
 **Supabase:** xpsuhtqfxqmnunppnyov (eu-central-1)
 
 ---
@@ -10,13 +10,16 @@
 ## Pre-flight (infrastructure)
 
 - [x] `voxly-agent` deployed to Fly.io (Node 22, 1 machine, fra)
-- [x] All 16 fly secrets set (ELEVENLABS_WEBHOOK_SECRET updated 2026-06-12)
-- [x] 7 ElevenLabs tools synced → fly.dev URLs
-- [x] HMAC: signed requests → 200; unsigned → 401/403
-- [x] `voxly-app` deployed to Vercel — login page returns 200
-- [x] pg_cron job `process-sms-notifications` active (every 15 min)
-- [x] Twilio Voice webhook → `https://voxly-agent.fly.dev/twilio/voice`
-- [x] ElevenLabs post-call webhook → `https://voxly-agent.fly.dev/hooks/call-ended`
+- [x] Fly health check passes at `https://voxly-agent.fly.dev/health`
+- [x] Fly runtime uses `NODE_ENV=production`
+- [x] Fly secrets required by the app are present (names verified, values not logged)
+- [ ] Verify ElevenLabs tools still point to fly.dev URLs
+- [ ] Verify HMAC behavior with signed/unsigned tool/webhook requests
+- [x] `voxly-app` deployed to Vercel — latest preview is READY
+- [x] Supabase migration history aligned with local migrations
+- [ ] Verify or activate pg_cron jobs after final production decision
+- [ ] Confirm Twilio Voice webhook → `https://voxly-agent.fly.dev/twilio/voice`
+- [ ] Confirm ElevenLabs post-call webhook → `https://voxly-agent.fly.dev/hooks/call-ended`
 - [ ] **Fly.io billing** — add credit card to prevent 5-min trial shutdowns
 
 ---
@@ -96,7 +99,7 @@
 
 ## תרחיש 7 — טריאז' חירום (red flag)
 
-1. לקוח מתאר תסמין חירום (כ-16 red flags בקובץ)  
+1. לקוח מתאר תסמין חירום (כ-16 red flags בקובץ)
    דוגמה: "הכלב שלי מאבד הכרה"
 2. תומר מפעיל `triage-pet-case`
 3. החלטה: `emergency_referral` → תומר אומר script חירום מילה במילה
@@ -138,13 +141,14 @@
 | בעיה | השפעה | פתרון |
 |------|--------|--------|
 | Fly.io trial — machine stops after 5 min | agent לא זמין | הוסף כרטיס אשראי |
-| `APP_BASE_URL` לא מוגדר בזמן build | redirect URLs בסיסמת Supabase | כבר הוגדר post-deploy; ל-redeploy קצר יסגור |
-| `/twilio/status` לא מאמת Twilio sig | Twilio יכול לקבל זבל | נמוך-סיכון; לתקן בספרינט 5 |
+| Vercel preview עדיין לא קודם ל-production | הדומיין הקבוע עדיין מצביע לגרסת production הקודמת | לקדם ל-production אחרי בדיקה ידנית |
+| ElevenLabs/Twilio webhooks לא אומתו מחדש | שיחות עלולות להגיע לגרסה/URL לא נכונים | לאמת בקונסולות לפי הכתובות במסמך |
+| pg_cron לא אומת מחדש | SMS אוטומטי עלול לא לרוץ | לאמת או להפעיל אחרי אישור התנהגות production |
 
 ---
 
 ## אחרי E2E מוצלח
 
 1. הגדר `SUPABASE_REDIRECT_URL` ב-Vercel לאחר קביעת דומיין סופי
-2. הפעל pg_cron אחרי Fly billing מאושר  
+2. הפעל/אמת pg_cron אחרי Fly billing מאושר
 3. בדוק `cron.job_run_details` אין שגיאות 24 שעות אחרי

@@ -1,6 +1,7 @@
 # צ׳ק-ליסט הפעלה לפרודקשן — Tomer + Dashboard
 
 מסמך זה מרכז **כל מה שצריך ממך** כדי שאפעיל את הסוכן (agent) ואת הדשבורד (app) בפרודקשן.
+סטטוס הפריסה המעודכן נמצא גם ב-`docs/DEPLOYMENT_STATUS.md`.
 ערכים שכבר שלפתי מסומנים ✅. ערכים סודיים שרק אתה יכול להוציא מסומנים 🔒.
 
 > קובץ זה (מתועד ב-git) משתמש ב-placeholders בלבד. הערכים האמיתיים נמצאים ב-
@@ -92,7 +93,7 @@ flyctl auth login
 - [ ] **Twilio:** להפנות את ה-Voice webhook של המספר אל `<AGENT_FLY_URL>/twilio/voice`
 - [ ] **ElevenLabs:** post-call webhook → `<AGENT_FLY_URL>/hooks/call-ended` (עם `ELEVENLABS_WEBHOOK_SECRET`)
 - [ ] **ElevenLabs:** הגדרת transfer-to-number לפיצ׳ר ההעברה לאדם (הכלי החדש `request-human-handoff` יסונכרן ע״י סקריפט הסנכרון)
-- [ ] **Fly.io:** להוסיף כרטיס אשראי (אחרת המכונה נכבית אחרי 5 דק׳)
+- [ ] **Fly.io:** להוסיף כרטיס אשראי אם החשבון עדיין במסלול Trial
 - [ ] **Supabase:** להפעיל pg_cron לתזכורות SMS (ה-SQL קיים ב-CLAUDE.md)
 
 ---
@@ -105,7 +106,7 @@ flyctl auth login
 
 ## הסדר שבו נעבוד
 
-1. אתה: `vercel login` + `flyctl auth login`, ומעביר לי את הסודות מחלק 3 + הערכים מחלק 4.
-2. אני: מגדיר את כל משתני הסביבה ב-Vercel וב-Fly, מפריס את שני החלקים, ומריץ את סנכרון ה-ElevenLabs.
-3. אתה: מסדר את חלק 5 בקונסולות (חלקן דורשות הרשאות שלך).
+1. בוצע: קוד תוקן, נבדק, נדחף ל-GitHub, ונפרס ל-Vercel/Fly.
+2. פתוח: לקדם את ה-preview של Vercel ל-production אם רוצים שהדומיין הקבוע יקבל את הגרסה החדשה.
+3. פתוח: לאמת בקונסולות ש-Twilio ו-ElevenLabs מצביעים ל-`https://voxly-agent.fly.dev`.
 4. יחד: שיחת בדיקה מקצה-לקצה (9 התרחישים במסמך ה-E2E).
