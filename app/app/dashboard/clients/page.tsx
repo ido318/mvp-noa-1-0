@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/dashboard/ui/skeleton";
 import { PersonAvatar, AnimalAvatar } from "@/components/dashboard/ui/avatar";
 import { SearchIcon, PhoneIcon, MailIcon, PinIcon, XIcon, ChevRightIcon } from "@/components/dashboard/icons";
 import { NewCustomerModal } from "@/components/dashboard/new-customer-modal";
+import { NewPetModal } from "@/components/dashboard/new-pet-modal";
 import type { Customer } from "@/types/domain/customer";
 import type { Pet } from "@/types/domain/pet";
 import type { Appointment } from "@/types/domain/appointment";
@@ -40,29 +41,31 @@ function initials(name: string): string {
 function PetCard({ pet }: { pet: Pet }) {
   const age = petAge(pet.birthDate);
   return (
-    <Card>
-      <div className="flex items-start gap-3">
-        <AnimalAvatar species={pet.species} size={36} />
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <p className="font-bold text-[14px] text-[var(--ink)]">{pet.name}</p>
-            {pet.isNeutered && <Badge color="muted">מעוקר/ת</Badge>}
-          </div>
-          <p className="text-xs text-[var(--muted)]">
-            {pet.species}{pet.breed ? ` · ${pet.breed}` : ""}{age ? ` · ${age}` : ""}
-            {pet.sex === "male" ? " · זכר" : pet.sex === "female" ? " · נקבה" : ""}
-          </p>
-          {pet.weight && (
-            <p className="mt-0.5 text-xs text-[var(--muted)]">{`${pet.weight} ק"ג`}</p>
-          )}
-          {pet.chronicConditions && (
-            <p className="mt-1 text-xs text-[var(--red-700)] bg-[var(--red-50)] rounded px-1.5 py-0.5 inline-block">
-              {pet.chronicConditions}
+    <Link href={`/dashboard/pets/${pet.id}`} className="block">
+      <Card hover>
+        <div className="flex items-start gap-3">
+          <AnimalAvatar species={pet.species} size={36} />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <p className="font-bold text-[14px] text-[var(--ink)]">{pet.name}</p>
+              {pet.isNeutered && <Badge color="muted">מעוקר/ת</Badge>}
+            </div>
+            <p className="text-xs text-[var(--muted)]">
+              {pet.species}{pet.breed ? ` · ${pet.breed}` : ""}{age ? ` · ${age}` : ""}
+              {pet.sex === "male" ? " · זכר" : pet.sex === "female" ? " · נקבה" : ""}
             </p>
-          )}
+            {pet.weight && (
+              <p className="mt-0.5 text-xs text-[var(--muted)]">{`${pet.weight} ק"ג`}</p>
+            )}
+            {pet.chronicConditions && (
+              <p className="mt-1 text-xs text-[var(--red-700)] bg-[var(--red-50)] rounded px-1.5 py-0.5 inline-block">
+                {pet.chronicConditions}
+              </p>
+            )}
+          </div>
         </div>
-      </div>
-    </Card>
+      </Card>
+    </Link>
   );
 }
 
@@ -81,6 +84,7 @@ function ClientProfile({
   const [apptLoading, setApptLoading] = useState(true);
   const [visits, setVisits] = useState<Visit[]>([]);
   const [visitsLoading, setVisitsLoading] = useState(true);
+  const [showNewPet, setShowNewPet] = useState(false);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -88,16 +92,19 @@ function ClientProfile({
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  useEffect(() => {
-    void (async () => {
-      const res = await fetch(`/api/pets?customerId=${customer.id}`);
-      if (res.ok) {
-        const d = await res.json() as { data: { items: Pet[] } };
-        setPets(d.data.items ?? []);
-      }
-      setPetsLoading(false);
-    })();
+  const fetchPets = useCallback(async () => {
+    setPetsLoading(true);
+    const res = await fetch(`/api/pets?customerId=${customer.id}`);
+    if (res.ok) {
+      const d = await res.json() as { data: { items: Pet[] } };
+      setPets(d.data.items ?? []);
+    }
+    setPetsLoading(false);
   }, [customer.id]);
+
+  useEffect(() => {
+    void fetchPets();
+  }, [fetchPets]);
 
   useEffect(() => {
     void (async () => {
@@ -179,9 +186,12 @@ function ClientProfile({
 
           {/* Pets */}
           <div>
-            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
-              חיות מחמד ({petsLoading ? "…" : pets.length})
-            </p>
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
+                חיות מחמד ({petsLoading ? "…" : pets.length})
+              </p>
+              <Btn size="sm" variant="ghost" onClick={() => setShowNewPet(true)}>+ הוסף חיה</Btn>
+            </div>
             {petsLoading ? (
               <Skeleton className="h-24" />
             ) : pets.length === 0 ? (
@@ -273,6 +283,13 @@ function ClientProfile({
           )}
         </div>
       </div>
+
+      <NewPetModal
+        open={showNewPet}
+        onClose={() => setShowNewPet(false)}
+        customerId={customer.id}
+        onCreated={() => { void fetchPets(); }}
+      />
     </>
   );
 }
