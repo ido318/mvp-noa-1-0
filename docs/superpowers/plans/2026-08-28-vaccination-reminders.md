@@ -37,7 +37,7 @@ Confirm current DB state before writing the migration: `notifications_log_appt_t
 - Modify: `agent/src/services/sms.templates.ts`
 - Test: `agent/tests/unit/sms.templates.test.ts` (create if it doesn't already exist — check first)
 
-- [ ] **Step 1: Write the migration**
+- [x] **Step 1: Write the migration**
 
 ```sql
 -- supabase/migrations/20260828000030_vaccination_reminders.sql
@@ -68,7 +68,7 @@ alter table public.notifications_log add constraint notifications_log_type_check
   ]));
 ```
 
-- [ ] **Step 2: Apply the migration to the live Supabase project**
+- [x] **Step 2: Apply the migration to the live Supabase project**
 
 Use the Supabase MCP tool (`apply_migration`) with project id `xpsuhtqfxqmnunppnyov`, name `vaccination_reminders`, and the SQL above. After applying, verify directly:
 
@@ -78,7 +78,7 @@ select conname, pg_get_constraintdef(oid) as def from pg_constraint where conrel
 
 Expect to see both the new FK and the new unique constraint. Also confirm the file at `supabase/migrations/20260828000030_vaccination_reminders.sql` exists on disk with the exact SQL that was applied (migrations must be committed to git too, not just applied live — this repo's convention per `docs/PRODUCTION_SETUP_CHECKLIST.md` and existing migration files is that the file IS the source of truth, applied migrations without a matching committed file are a drift risk).
 
-- [ ] **Step 3: Add the SMS template**
+- [x] **Step 3: Add the SMS template**
 
 Check if `agent/tests/unit/sms.templates.test.ts` already exists — if so, read it to match its existing test style exactly. If not, this is a new test file.
 
@@ -106,7 +106,7 @@ Add the template function to the `smsTemplates` object (place it after `client_c
 
 Write a test (new file `agent/tests/unit/sms.templates.test.ts` if none exists, otherwise add to the existing one) asserting the rendered string contains the customer name, pet name, vaccine name, and the exact opening line `"שלום X, כאן תומר מ-Get A Vet 💉"` — follow whatever assertion style the rest of the test suite already uses for other templates if a test file exists; if creating fresh, simple `expect(result).toContain(...)` assertions are fine.
 
-- [ ] **Step 4: Run the agent test suite and typecheck**
+- [x] **Step 4: Run the agent test suite and typecheck**
 
 ```bash
 cd agent && npm run test && npm run typecheck
@@ -114,7 +114,7 @@ cd agent && npm run test && npm run typecheck
 
 Expected: all pass.
 
-- [ ] **Step 5: Commit — exact files only, never `git add -A`**
+- [x] **Step 5: Commit — exact files only, never `git add -A`**
 
 ```bash
 git status --short
@@ -139,14 +139,14 @@ If `git status --short` shows OTHER modified/untracked files you didn't touch, d
 - Create: `agent/src/server/routes/vaccinationReminders.ts`
 - Modify: `agent/src/server/app.ts`
 
-- [ ] **Step 1: Write the failing test for the enqueue query logic**
+- [x] **Step 1: Write the failing test for the enqueue query logic**
 
 Read `agent/tests/unit/lib/notifications.test.ts` first for the existing mocking convention for `getSupabase()` in this test suite, then write `agent/tests/unit/lib/vaccinationReminders.test.ts` following that exact convention. Test that `enqueueDueVaccinationReminders`:
 1. Queries `vaccinations` for rows where `next_due_at` is between today and 14 days from now.
 2. For each due vaccination, builds the SMS body via `smsTemplates.vaccination_reminder` and calls the same upsert-with-`ignoreDuplicates` pattern as `enqueueNotification`, but targeting `vaccination_id` instead of `appointment_id`.
 3. Skips any vaccination whose linked customer has no phone number (can't SMS a null phone).
 
-- [ ] **Step 2: Run it, confirm it fails, then implement**
+- [x] **Step 2: Run it, confirm it fails, then implement**
 
 ```bash
 cd agent && npx vitest run tests/unit/lib/vaccinationReminders.test.ts
@@ -252,13 +252,13 @@ export async function enqueueDueVaccinationReminders(): Promise<EnqueueVaccinati
 
 The FK constraint names above (`vaccinations_pet_clinic_fk`, `vaccinations_customer_clinic_fk`) were confirmed directly against the live DB on 2026-08-28 — they're composite keys (`(pet_id, clinic_id)` and `(customer_id, clinic_id)` respectively, same convention as `appointments_customer_clinic_fk`), already correct as written above. No need to re-verify, but do a sanity check if the query errors unexpectedly.
 
-- [ ] **Step 3: Run the test, confirm it passes**
+- [x] **Step 3: Run the test, confirm it passes**
 
 ```bash
 cd agent && npx vitest run tests/unit/lib/vaccinationReminders.test.ts
 ```
 
-- [ ] **Step 4: Add the job route (new file, do NOT touch `jobs.ts`)**
+- [x] **Step 4: Add the job route (new file, do NOT touch `jobs.ts`)**
 
 ```typescript
 // agent/src/server/routes/vaccinationReminders.ts
@@ -305,7 +305,7 @@ app.route("/jobs", vaccinationReminderRoutes);
 
 (Hono supports mounting multiple routers at the same prefix as long as their internal paths don't collide — `jobsRoutes` has `/process-notifications` and `/analyze-conversations`; this adds `/send-vaccination-reminders`, no collision.)
 
-- [ ] **Step 5: Run the full agent test suite, typecheck, and build**
+- [x] **Step 5: Run the full agent test suite, typecheck, and build**
 
 ```bash
 cd agent && npm run test && npm run typecheck && npm run build
@@ -313,11 +313,11 @@ cd agent && npm run test && npm run typecheck && npm run build
 
 Expected: all pass.
 
-- [ ] **Step 6: Verify against the live database (read-only query, safe)**
+- [x] **Step 6: Verify against the live database (read-only query, safe)**
 
 Query Supabase directly (via whatever DB access is available) to confirm there's at least one real vaccination with a `next_due_at` inside the next 14 days, so you know the manual trigger test below will actually exercise the enqueue path rather than silently finding nothing. If none exist, note that in your report — that's fine, it just means Step 7 below will report `enqueued: 0`, which is still a valid, correct result to verify (not a failure).
 
-- [ ] **Step 7: Manually trigger the new endpoint against the LOCAL dev agent server (not production) to verify it works end to end**
+- [x] **Step 7: Manually trigger the new endpoint against the LOCAL dev agent server (not production) to verify it works end to end**
 
 Do not call this against the deployed Fly.io agent — this is local-only verification. Start the agent locally if not already running (`cd agent && npm run dev`, requires `.env` — check with the controller if you don't have one, do not guess or fabricate env values), then:
 
@@ -328,7 +328,7 @@ curl -s -X POST http://localhost:3000/jobs/send-vaccination-reminders \
 
 Report the exact JSON response. If you cannot get a local agent server running (missing `.env`), report DONE_WITH_CONCERNS and explain exactly what's blocking it — do not fabricate a result.
 
-- [ ] **Step 8: Commit — exact files only**
+- [x] **Step 8: Commit — exact files only**
 
 ```bash
 git status --short
@@ -348,7 +348,7 @@ git commit -m "feat(agent): add vaccination reminder enqueue job"
 **Files:**
 - Modify: `app/app/dashboard/pets/[petId]/page.tsx`
 
-- [ ] **Step 1: Add the due date to each vaccination row**
+- [x] **Step 1: Add the due date to each vaccination row**
 
 This file currently renders (around line 142):
 
@@ -373,17 +373,17 @@ Change it to also show `nextDueAt` when present, following this file's own exist
 ))}
 ```
 
-- [ ] **Step 2: Run typecheck, tests, and build**
+- [x] **Step 2: Run typecheck, tests, and build**
 
 ```bash
 cd app && npm run typecheck && npm run test && npm run build
 ```
 
-- [ ] **Step 3: Drive the real UI to confirm**
+- [x] **Step 3: Drive the real UI to confirm**
 
 Log in (ask the controller for credentials), navigate to a pet detail page for a pet with at least one vaccination that has `next_due_at` set, confirm the "הבא: <date>" text appears next to that vaccination. If no such pet/vaccination exists in this clinic's real data, confirm instead that vaccinations without a due date render without the extra text (no crash, no "הבא: null" or similar). Report DONE_WITH_CONCERNS if you cannot verify this in a real browser.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git status --short
