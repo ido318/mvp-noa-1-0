@@ -92,15 +92,18 @@ export function NewPetModal({ open, onClose, clinicId, customerId, onCreated }: 
         </div>
         <div>
           <label htmlFor="petSpecies" className={labelClass}>סוג חיה *</label>
-          <input
+          <select
             id="petSpecies"
             value={species}
             onChange={(e) => setSpecies(e.target.value)}
             className={inputClass}
-            placeholder="כלב, חתול..."
             required
-            minLength={1}
-          />
+          >
+            <option value="" disabled>בחר סוג חיה</option>
+            <option value="dog">כלב</option>
+            <option value="cat">חתול</option>
+            <option value="other">אחר</option>
+          </select>
         </div>
         <div>
           <label htmlFor="petBreed" className={labelClass}>גזע</label>

@@ -92,8 +92,8 @@ function ClientProfile({
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  const fetchPets = useCallback(async () => {
-    setPetsLoading(true);
+  const fetchPets = useCallback(async (showLoading = true) => {
+    if (showLoading) setPetsLoading(true);
     const res = await fetch(`/api/pets?customerId=${customer.id}`);
     if (res.ok) {
       const d = await res.json() as { data: { items: Pet[] } };
@@ -289,7 +289,7 @@ function ClientProfile({
         onClose={() => setShowNewPet(false)}
         clinicId={customer.clinicId}
         customerId={customer.id}
-        onCreated={() => { void fetchPets(); }}
+        onCreated={() => { void fetchPets(false); }}
       />
     </>
   );
