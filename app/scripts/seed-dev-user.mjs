@@ -48,6 +48,20 @@ if (!user) {
     process.exit(1);
   }
   user = created.user;
+} else {
+  const { data: updated, error: updateError } = await admin.auth.admin.updateUserById(
+    user.id,
+    {
+      password,
+      email_confirm: true,
+      user_metadata: { ...(user.user_metadata ?? {}), full_name: "Dev Owner" },
+    },
+  );
+  if (updateError) {
+    console.error("updateUserById failed:", updateError);
+    process.exit(1);
+  }
+  user = updated.user;
 }
 
 if (!user) {

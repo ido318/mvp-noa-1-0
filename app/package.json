@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:integration": "RUN_INTEGRATION_TESTS=true vitest run tests/integration",
+    "test:integration": "RUN_INTEGRATION_TESTS=true bash scripts/with-supabase-env.sh vitest run tests/integration",
     "db:reset": "supabase db reset",
     "db:start": "supabase start",
     "seed:dev-user": "bash scripts/with-supabase-env.sh node scripts/seed-dev-user.mjs",
