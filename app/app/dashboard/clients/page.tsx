@@ -287,6 +287,7 @@ function ClientProfile({
       <NewPetModal
         open={showNewPet}
         onClose={() => setShowNewPet(false)}
+        clinicId={customer.clinicId}
         customerId={customer.id}
         onCreated={() => { void fetchPets(); }}
       />

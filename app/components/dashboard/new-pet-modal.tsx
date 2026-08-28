@@ -12,11 +12,12 @@ const labelClass = "mb-1 block text-xs font-semibold text-[var(--ink-2)]";
 interface NewPetModalProps {
   open: boolean;
   onClose: () => void;
+  clinicId: string;
   customerId: string;
   onCreated: (pet: Pet) => void;
 }
 
-export function NewPetModal({ open, onClose, customerId, onCreated }: NewPetModalProps) {
+export function NewPetModal({ open, onClose, clinicId, customerId, onCreated }: NewPetModalProps) {
   const { toast } = useToast();
   const [name, setName] = useState("");
   const [species, setSpecies] = useState("");
@@ -50,12 +51,6 @@ export function NewPetModal({ open, onClose, customerId, onCreated }: NewPetModa
 
     setLoading(true);
     try {
-      const meRes = await fetch("/api/me");
-      if (!meRes.ok) throw new Error();
-      const me = (await meRes.json()) as { data: { memberships: { clinicId: string }[] } };
-      const clinicId = me.data.memberships[0]?.clinicId;
-      if (!clinicId) throw new Error();
-
       const res = await fetch("/api/pets", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
