@@ -95,4 +95,69 @@ describe("phase2 API routes", () => {
     expect(response.status).toBe(400);
     expect(listPets).not.toHaveBeenCalled();
   });
+
+  it("POST /api/pets returns 201 with created pet on success", async () => {
+    const { POST } = await import("@/app/api/pets/route");
+    const createdPet = {
+      id: "pet1",
+      clinicId: "33333333-3333-4333-8333-333333333333",
+      customerId: "11111111-1111-4111-8111-111111111111",
+      name: "Rex",
+      species: "dog",
+    };
+    const createPet = vi.fn().mockResolvedValue({ ok: true, value: createdPet });
+    mockGetActorAndServices.mockResolvedValue({
+      actor: {
+        userId: "u1",
+        clinicIds: ["33333333-3333-4333-8333-333333333333"],
+        defaultClinicId: "33333333-3333-4333-8333-333333333333",
+      },
+      pet: { createPet },
+    });
+
+    const response = await POST(
+      new Request("http://localhost/api/pets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          clinicId: "33333333-3333-4333-8333-333333333333",
+          customerId: "11111111-1111-4111-8111-111111111111",
+          name: "Rex",
+          species: "dog",
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(201);
+    const body = await response.json();
+    expect(body.data).toEqual(createdPet);
+    expect(createPet).toHaveBeenCalledTimes(1);
+  });
+
+  it("POST /api/pets returns 400 when name and species are missing", async () => {
+    const { POST } = await import("@/app/api/pets/route");
+    const createPet = vi.fn();
+    mockGetActorAndServices.mockResolvedValue({
+      actor: {
+        userId: "u1",
+        clinicIds: ["11111111-1111-4111-8111-111111111111"],
+        defaultClinicId: "11111111-1111-4111-8111-111111111111",
+      },
+      pet: { createPet },
+    });
+
+    const response = await POST(
+      new Request("http://localhost/api/pets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          clinicId: "11111111-1111-4111-8111-111111111111",
+          customerId: "22222222-2222-4222-8222-222222222222",
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    expect(createPet).not.toHaveBeenCalled();
+  });
 });
