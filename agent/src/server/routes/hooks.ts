@@ -5,6 +5,7 @@ import { verifyElevenLabsSignature } from "../../lib/elevenLabsAuth.js";
 import { saveVoiceCall } from "../../lib/store.js";
 import { classifyCallCategory } from "../../lib/callClassifier.js";
 import { getSupabase } from "../../lib/supabase.js";
+import { logConversation } from "../../lib/learning/logConversation.js";
 
 export const hooksRoutes = new Hono();
 
@@ -69,6 +70,14 @@ hooksRoutes.post("/hooks/call-ended", async (c) => {
     aiSummary,
     callCategory,
   });
+
+  // Prompt learning loop: log evaluation-criteria results (fire-and-forget; non-blocking)
+  void logConversation(conversationId, env.AGENT_CLINIC_ID, payload).catch((err: unknown) =>
+    logger.error(
+      { errMsg: err instanceof Error ? err.message : String(err), conversationId },
+      "hook: logConversation failed",
+    ),
+  );
 
   // Fetch and store recording asynchronously (fire-and-forget; failure is non-blocking)
   const hasAudio = payload["has_audio"] === true;

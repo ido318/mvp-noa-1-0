@@ -195,6 +195,28 @@ SELECT cron.schedule(
 
 לביטול: `SELECT cron.unschedule('process-sms-notifications');`
 
+**cron שני — לולאת שיפור פרומפט (prompt learning loop), שבועי:**
+
+```sql
+SELECT cron.schedule(
+  'analyze-tomer-conversations',
+  '0 6 * * 0',
+  $$
+  SELECT extensions.http_post(
+    url     := 'https://<AGENT_PUBLIC_URL>/jobs/analyze-conversations',
+    headers := jsonb_build_object(
+      'Authorization', 'Bearer <JOBS_BEARER_TOKEN>',
+      'Content-Type', 'application/json'
+    ),
+    body    := '{}'
+  );
+  $$
+);
+```
+
+דורש `ANTHROPIC_API_KEY` מוגדר ב-agent/ (אופציונלי — אם חסר, ה-job מחזיר שגיאה ברורה ולא נופל בשקט).
+לביטול: `SELECT cron.unschedule('analyze-tomer-conversations');`
+
 ---
 
 ## משימות פתוחות

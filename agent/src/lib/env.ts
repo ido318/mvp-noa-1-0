@@ -42,6 +42,10 @@ const schema = z.object({
 
   // Bearer token securing ElevenLabs POST /tools/* calls
   TOOLS_BEARER_TOKEN: z.string().min(16),
+
+  // Prompt learning loop (optional — must never block Tomer's boot if unset).
+  // Used only by POST /jobs/analyze-conversations.
+  ANTHROPIC_API_KEY: z.string().min(1).optional(),
 });
 
 export type Env = z.infer<typeof schema>;

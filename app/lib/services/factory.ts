@@ -9,6 +9,7 @@ import { CustomerRepository } from "@/lib/repositories/customer.repository";
 import { MedicalNoteRepository } from "@/lib/repositories/medical-note.repository";
 import { PetRepository } from "@/lib/repositories/pet.repository";
 import { PrescriptionRepository } from "@/lib/repositories/prescription.repository";
+import { PromptSuggestionRepository } from "@/lib/repositories/prompt-suggestion.repository";
 import { ProfileRepository } from "@/lib/repositories/profile.repository";
 import { VaccinationRepository } from "@/lib/repositories/vaccination.repository";
 import { VisitRepository } from "@/lib/repositories/visit.repository";
@@ -27,6 +28,7 @@ import { MedicalRecordService } from "@/lib/services/medical-record.service";
 import { PetService } from "@/lib/services/pet.service";
 import { VisitService } from "@/lib/services/visit.service";
 import { VisitSummaryAssistantService } from "@/lib/services/visit-summary-assistant.service";
+import { PromptSuggestionService } from "@/lib/services/prompt-suggestion.service";
 import { VisitShareService } from "@/lib/services/visit-share.service";
 import { VoiceCallService } from "@/lib/services/voice-call.service";
 import { WaitlistService } from "@/lib/services/waitlist.service";
@@ -51,6 +53,7 @@ export async function createServices() {
   const vaccinationRepository = new VaccinationRepository(supabase);
   const prescriptionRepository = new PrescriptionRepository(supabase);
   const visitShareRepository = new VisitShareRepository(admin);
+  const promptSuggestionRepository = new PromptSuggestionRepository(admin);
   const auditLogRepository = new AuditLogRepository(admin);
   const aiEventRepository = new AIEventRepository(admin);
   const auditService = new AuditService(auditLogRepository);
@@ -107,6 +110,7 @@ export async function createServices() {
       auditService,
     ),
     voiceCall: new VoiceCallService(voiceCallRepository),
+    promptSuggestion: new PromptSuggestionService(promptSuggestionRepository),
   };
 }
 

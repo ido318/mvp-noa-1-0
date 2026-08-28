@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { getEnv } from "../../lib/env.js";
 import { processNotifications } from "../../services/notification.processor.js";
+import { analyzeConversations } from "../../lib/learning/analyzeConversations.js";
 import { logger } from "../../lib/logger.js";
 
 export const jobsRoutes = new Hono();
@@ -24,6 +25,29 @@ jobsRoutes.post("/process-notifications", async (c) => {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     logger.error({ error: message }, "processNotifications failed");
+    return c.json({ error: message }, 500);
+  }
+});
+
+jobsRoutes.post("/analyze-conversations", async (c) => {
+  const env = getEnv();
+  const authHeader = c.req.header("Authorization");
+  const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+
+  if (!token || token !== env.JOBS_BEARER_TOKEN) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  const body = await c.req.json().catch(() => ({}));
+  const clinicId = typeof body.clinicId === "string" ? body.clinicId : env.AGENT_CLINIC_ID;
+
+  try {
+    const result = await analyzeConversations(clinicId);
+    logger.info(result, "analyzeConversations complete");
+    return c.json(result);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    logger.error({ error: message }, "analyzeConversations failed");
     return c.json({ error: message }, 500);
   }
 });

@@ -11,7 +11,12 @@ vi.mock("../../../src/services/notification.processor.js", () => ({
   }),
 }));
 
+vi.mock("../../../src/lib/learning/analyzeConversations.js", () => ({
+  analyzeConversations: vi.fn().mockResolvedValue({ ranAnalysis: false, flaggedCallCount: 0 }),
+}));
+
 import { processNotifications } from "../../../src/services/notification.processor.js";
+import { analyzeConversations } from "../../../src/lib/learning/analyzeConversations.js";
 
 // JOBS_BEARER_TOKEN is set in tests/setup.ts: "test-bearer-token-1234567"
 const VALID_TOKEN = "test-bearer-token-1234567";
@@ -25,6 +30,7 @@ function makeApp() {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(processNotifications).mockResolvedValue({ processed: 1, sent: 1, failed: 0, deferred: 0 });
+  vi.mocked(analyzeConversations).mockResolvedValue({ ranAnalysis: false, flaggedCallCount: 0 });
 });
 
 describe("POST /jobs/process-notifications", () => {
@@ -104,5 +110,58 @@ describe("POST /jobs/process-notifications", () => {
     expect(res.status).toBe(500);
     const body = await res.json() as { error: string };
     expect(body.error).toBe("DB down");
+  });
+});
+
+describe("POST /jobs/analyze-conversations", () => {
+  it("returns 401 with no Authorization header", async () => {
+    const app = makeApp();
+    const res = await app.request("/jobs/analyze-conversations", { method: "POST" });
+    expect(res.status).toBe(401);
+    expect(analyzeConversations).not.toHaveBeenCalled();
+  });
+
+  it("returns 401 with wrong token", async () => {
+    const app = makeApp();
+    const res = await app.request("/jobs/analyze-conversations", {
+      method:  "POST",
+      headers: { Authorization: "Bearer wrong-token" },
+    });
+    expect(res.status).toBe(401);
+    expect(analyzeConversations).not.toHaveBeenCalled();
+  });
+
+  it("returns 200 and calls analyzeConversations with valid token", async () => {
+    const app = makeApp();
+    const res = await app.request("/jobs/analyze-conversations", {
+      method:  "POST",
+      headers: { Authorization: `Bearer ${VALID_TOKEN}`, "Content-Type": "application/json" },
+      body:    JSON.stringify({}),
+    });
+    expect(res.status).toBe(200);
+    expect(analyzeConversations).toHaveBeenCalledOnce();
+  });
+
+  it("passes clinicId from body to analyzeConversations", async () => {
+    const app = makeApp();
+    await app.request("/jobs/analyze-conversations", {
+      method:  "POST",
+      headers: { Authorization: `Bearer ${VALID_TOKEN}`, "Content-Type": "application/json" },
+      body:    JSON.stringify({ clinicId: "clinic-456" }),
+    });
+    expect(analyzeConversations).toHaveBeenCalledWith("clinic-456");
+  });
+
+  it("returns 500 when analyzeConversations throws", async () => {
+    vi.mocked(analyzeConversations).mockRejectedValueOnce(new Error("ANTHROPIC_API_KEY is not configured"));
+    const app = makeApp();
+    const res = await app.request("/jobs/analyze-conversations", {
+      method:  "POST",
+      headers: { Authorization: `Bearer ${VALID_TOKEN}`, "Content-Type": "application/json" },
+      body:    JSON.stringify({}),
+    });
+    expect(res.status).toBe(500);
+    const body = await res.json() as { error: string };
+    expect(body.error).toBe("ANTHROPIC_API_KEY is not configured");
   });
 });
