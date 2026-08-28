@@ -1,8 +1,8 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { timingSafeEqual } from "node:crypto";
 import { logger, maskPhone } from "../../lib/logger.js";
 import { getEnv } from "../../lib/env.js";
+import { isValidBearerToken } from "../middleware/bearerAuth.js";
 import {
   findCustomerByPhone,
   addEscalation,
@@ -32,17 +32,7 @@ export const toolsRoutes = new Hono();
 // configured in each tool's api_schema.request_headers (set by sync-elevenlabs-agent.ts).
 toolsRoutes.use("/tools/*", async (c, next) => {
   const env = getEnv();
-  const authHeader = c.req.header("authorization") ?? "";
-  const expected = `Bearer ${env.TOOLS_BEARER_TOKEN}`;
-
-  let ok = false;
-  try {
-    ok = timingSafeEqual(Buffer.from(authHeader), Buffer.from(expected));
-  } catch {
-    ok = false;
-  }
-
-  if (!ok) {
+  if (!isValidBearerToken(c.req.header("authorization"), env.TOOLS_BEARER_TOKEN)) {
     logger.warn({ path: c.req.path }, "tools: unauthorized");
     return c.json({ error: "forbidden" }, 403);
   }

@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, FormEvent } from "react";
+import React, { useState, useEffect, FormEvent, useTransition } from "react";
 import { Modal } from "@/components/dashboard/ui/modal";
 import { Btn } from "@/components/dashboard/ui/btn";
 import { useToast } from "@/components/dashboard/ui/toast";
@@ -24,6 +24,7 @@ export function NewPetModal({ open, onClose, clinicId, customerId, onCreated }: 
   const [breed, setBreed] = useState("");
   const [sex, setSex] = useState("");
   const [loading, setLoading] = useState(false);
+  const [, startTransition] = useTransition();
 
   function reset() {
     setName("");
@@ -35,8 +36,10 @@ export function NewPetModal({ open, onClose, clinicId, customerId, onCreated }: 
   // Clear stale input whenever the modal closes, whether via cancel, the X
   // button, Escape, or a backdrop click -- not just on a successful submit.
   useEffect(() => {
-    if (!open) reset();
-  }, [open]);
+    if (!open) {
+      startTransition(reset);
+    }
+  }, [open, startTransition]);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { SearchIcon, BellIcon } from "@/components/dashboard/icons";
@@ -25,6 +25,7 @@ export function Header({
   const [results, setResults] = useState<SearchResultRow[]>([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [, startTransition] = useTransition();
   const containerRef = useRef<HTMLDivElement>(null);
   const requestIdRef = useRef(0);
 
@@ -36,13 +37,17 @@ export function Header({
     const currentRequestId = requestIdRef.current;
 
     if (trimmed.length < 2) {
-      setResults([]);
-      setOpen(false);
-      setLoading(false);
+      startTransition(() => {
+        setResults([]);
+        setOpen(false);
+        setLoading(false);
+      });
       return;
     }
 
-    setLoading(true);
+    startTransition(() => {
+      setLoading(true);
+    });
     const t = setTimeout(() => {
       void (async () => {
         try {
@@ -70,7 +75,7 @@ export function Header({
     }, 300);
 
     return () => clearTimeout(t);
-  }, [query, toast]);
+  }, [query, toast, startTransition]);
 
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {

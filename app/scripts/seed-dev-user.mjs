@@ -77,5 +77,4 @@ if (membershipError) {
 
 console.log("Dev user ready:");
 console.log(`  email: ${email}`);
-console.log(`  password: ${password}`);
 console.log(`  clinic_id: ${clinicId}`);

@@ -10,7 +10,7 @@ import type { VisitShareRepository } from "@/lib/repositories/visit-share.reposi
 import type { AuditService } from "@/lib/services/audit.service";
 import type { ServiceActor } from "@/lib/services/service-context";
 
-const SHARE_TTL_DAYS = 30;
+const SHARE_TTL_DAYS = 7;
 
 export type CreateAndSendResult = {
   url: string;

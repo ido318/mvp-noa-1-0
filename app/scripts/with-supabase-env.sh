@@ -13,13 +13,19 @@ fi
 
 # Grab the env block, strip the noisy `Stopped services` line and surrounding
 # double quotes around values, then source it into this shell.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 TMP="$(mktemp)"
 trap 'rm -f "$TMP"' EXIT
 
-supabase status -o env 2>/dev/null \
+if ! (cd "$REPO_ROOT" && supabase status -o env 2>/dev/null) \
   | grep -E '^[A-Z_]+=' \
   | sed -E 's/^([A-Z_]+)="?(.*)"$/\1=\2/' \
-  > "$TMP"
+  > "$TMP"; then
+  echo "Error: failed to read local Supabase env from '$REPO_ROOT'." >&2
+  echo "Is Supabase running? Try: supabase start" >&2
+  exit 1
+fi
 
 # shellcheck disable=SC1090
 set -o allexport

@@ -18,7 +18,6 @@ vi.mock("@/lib/learning/elevenlabsTesting", () => ({
 }));
 
 const TARGET_CLINIC = "clinic-target";
-const OTHER_CLINIC = "clinic-other";
 
 const staffActor: ServiceActor = {
   userId: "user-1",

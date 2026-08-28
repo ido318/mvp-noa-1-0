@@ -78,6 +78,25 @@ beforeEach(() => {
 });
 
 describe("VisitShareService.createAndSend", () => {
+  it("creates share links that expire after 7 days", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-28T10:00:00.000Z"));
+    try {
+      const { service, visitShareRepository } = buildService(makeVisit());
+
+      const result = await service.createAndSend(actor, "visit-1", { origin: "https://app.test" });
+
+      expect(result.ok).toBe(true);
+      expect(visitShareRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          expiresAt: "2026-09-04T10:00:00.000Z",
+        }),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("creates a share, sends an SMS with the link, and returns the url", async () => {
     const { service, visitShareRepository, auditService } = buildService(makeVisit());
 

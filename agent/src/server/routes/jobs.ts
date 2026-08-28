@@ -3,14 +3,12 @@ import { getEnv } from "../../lib/env.js";
 import { processNotifications } from "../../services/notification.processor.js";
 import { analyzeConversations } from "../../lib/learning/analyzeConversations.js";
 import { logger } from "../../lib/logger.js";
+import { isValidBearerToken } from "../middleware/bearerAuth.js";
 
 export const jobsRoutes = new Hono();
 
 jobsRoutes.post("/process-notifications", async (c) => {
-  const authHeader = c.req.header("Authorization");
-  const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
-
-  if (!token || token !== getEnv().JOBS_BEARER_TOKEN) {
+  if (!isValidBearerToken(c.req.header("Authorization"), getEnv().JOBS_BEARER_TOKEN)) {
     return c.json({ error: "Unauthorized" }, 401);
   }
 
@@ -31,10 +29,8 @@ jobsRoutes.post("/process-notifications", async (c) => {
 
 jobsRoutes.post("/analyze-conversations", async (c) => {
   const env = getEnv();
-  const authHeader = c.req.header("Authorization");
-  const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
 
-  if (!token || token !== env.JOBS_BEARER_TOKEN) {
+  if (!isValidBearerToken(c.req.header("Authorization"), env.JOBS_BEARER_TOKEN)) {
     return c.json({ error: "Unauthorized" }, 401);
   }
 

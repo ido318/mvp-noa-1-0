@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useTransition } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Card } from "@/components/dashboard/ui/card";
@@ -85,6 +85,7 @@ function ClientProfile({
   const [visits, setVisits] = useState<Visit[]>([]);
   const [visitsLoading, setVisitsLoading] = useState(true);
   const [showNewPet, setShowNewPet] = useState(false);
+  const [, startTransition] = useTransition();
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -103,8 +104,10 @@ function ClientProfile({
   }, [customer.id]);
 
   useEffect(() => {
-    void fetchPets();
-  }, [fetchPets]);
+    startTransition(() => {
+      void fetchPets();
+    });
+  }, [fetchPets, startTransition]);
 
   useEffect(() => {
     void (async () => {
