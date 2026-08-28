@@ -2,6 +2,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { AppError, err, ok, type Result } from "@/lib/errors/app-error";
 import type { PromptSuggestion, PromptSuggestionStatus } from "@/types/domain/prompt-suggestion";
 
+function isNoRowsMatchedError(error: unknown): boolean {
+  return (error as { code?: string } | null)?.code === "PGRST116";
+}
+
 function mapPromptSuggestionRow(row: Record<string, unknown>): PromptSuggestion {
   return {
     id: row.id as string,
@@ -50,6 +54,7 @@ export class PromptSuggestionRepository {
     return ok(data ? mapPromptSuggestionRow(data as Record<string, unknown>) : null);
   }
 
+  /** Guarded by `.eq("status", "pending")` — a concurrent review already in flight loses this race cleanly. */
   async markRejected(id: string, reviewedByUserId: string): Promise<Result<PromptSuggestion>> {
     const { data, error } = await this.client
       .from("prompt_suggestions")
@@ -59,13 +64,22 @@ export class PromptSuggestionRepository {
         reviewed_at: new Date().toISOString(),
       })
       .eq("id", id)
+      .eq("status", "pending")
       .select("*")
       .single();
-    if (error) return err(AppError.externalProvider("Failed to reject prompt suggestion", error));
+    if (error) {
+      if (isNoRowsMatchedError(error)) {
+        return err(AppError.conflict("Prompt suggestion was already reviewed by someone else"));
+      }
+      return err(AppError.externalProvider("Failed to reject prompt suggestion", error));
+    }
     return ok(mapPromptSuggestionRow(data));
   }
 
-  /** Regression ran but the response couldn't be trusted, or a test failed — persist and stop. */
+  /**
+   * Regression ran but the response couldn't be trusted, or a test failed — persist and stop.
+   * Guarded by `.eq("status", "pending")` — a concurrent review already in flight loses this race cleanly.
+   */
   async recordRegressionResult(
     id: string,
     input: { status: "pending" | "failed_regression"; regressionResult: Record<string, unknown>; reviewedByUserId: string },
@@ -79,12 +93,19 @@ export class PromptSuggestionRepository {
         reviewed_at: new Date().toISOString(),
       })
       .eq("id", id)
+      .eq("status", "pending")
       .select("*")
       .single();
-    if (error) return err(AppError.externalProvider("Failed to record regression result", error));
+    if (error) {
+      if (isNoRowsMatchedError(error)) {
+        return err(AppError.conflict("Prompt suggestion was already reviewed by someone else"));
+      }
+      return err(AppError.externalProvider("Failed to record regression result", error));
+    }
     return ok(mapPromptSuggestionRow(data));
   }
 
+  /** Guarded by `.eq("status", "pending")` — a concurrent review already in flight loses this race cleanly. */
   async markPublished(
     id: string,
     input: {
@@ -106,9 +127,15 @@ export class PromptSuggestionRepository {
         published_at: new Date().toISOString(),
       })
       .eq("id", id)
+      .eq("status", "pending")
       .select("*")
       .single();
-    if (error) return err(AppError.externalProvider("Failed to mark prompt suggestion published", error));
+    if (error) {
+      if (isNoRowsMatchedError(error)) {
+        return err(AppError.conflict("Prompt suggestion was already reviewed by someone else"));
+      }
+      return err(AppError.externalProvider("Failed to mark prompt suggestion published", error));
+    }
     return ok(mapPromptSuggestionRow(data));
   }
 }
