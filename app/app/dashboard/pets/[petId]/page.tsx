@@ -142,6 +142,9 @@ export default async function PetProfilePage({ params }: Params) {
               {(vaccinationsData?.items ?? []).slice(0, 5).map((v) => (
                 <li key={v.id} className="text-sm text-zinc-600">
                   {v.vaccineName} · {formatIsraelDate(v.administeredAt)}
+                  {v.nextDueAt && (
+                    <span className="text-zinc-400"> · הבא: {formatIsraelDate(v.nextDueAt)}</span>
+                  )}
                 </li>
               ))}
               {(vaccinationsData?.items ?? []).length === 0 ? (
