@@ -79,6 +79,34 @@ export const RecordsIcon = icon(
   </>,
 );
 
+export const ListCheckIcon = icon(
+  <>
+    <path d="m3 17 2 2 4-4" />
+    <path d="m3 7 2 2 4-4" />
+    <path d="M13 6h8" />
+    <path d="M13 12h8" />
+    <path d="M13 18h8" />
+  </>,
+);
+
+export const MicroscopeIcon = icon(
+  <>
+    <path d="M6 18h8" />
+    <path d="M3 22h18" />
+    <path d="M14 22a7 7 0 1 0 0-14h-1" />
+    <path d="M9 14h2" />
+    <path d="M9 12V6a2 2 0 0 1 2-2 2 2 0 0 1 2 2v6" />
+    <path d="M8 6h6" />
+  </>,
+);
+
+export const CreditCardIcon = icon(
+  <>
+    <rect x="2" y="5" width="20" height="14" rx="2" />
+    <line x1="2" y1="10" x2="22" y2="10" />
+  </>,
+);
+
 export const SettingsIcon = icon(
   <>
     <circle cx="12" cy="12" r="3" />
