@@ -21,6 +21,17 @@ export class PrescriptionRepository {
     return ok((data ?? []).map(mapPrescriptionRow));
   }
 
+  async listByPet(petId: string): Promise<Result<Prescription[]>> {
+    const { data, error } = await this.client
+      .from("prescriptions")
+      .select("*")
+      .eq("pet_id", petId)
+      .is("deleted_at", null)
+      .order("prescribed_at", { ascending: false });
+    if (error) return err(AppError.externalProvider("Failed to list prescriptions", error));
+    return ok((data ?? []).map(mapPrescriptionRow));
+  }
+
   async findById(prescriptionId: string): Promise<Result<Prescription | null>> {
     const { data, error } = await this.client
       .from("prescriptions")

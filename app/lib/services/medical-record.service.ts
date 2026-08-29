@@ -258,6 +258,19 @@ export class MedicalRecordService {
     return this.prescriptionRepository.listByVisit(visitId);
   }
 
+  async listPetPrescriptions(
+    actor: ServiceActor,
+    petId: string,
+  ): Promise<Result<Prescription[]>> {
+    const pet = await this.petRepository.findById(petId);
+    if (!pet.ok) return err(pet.error);
+    if (!pet.value) return err(AppError.notFound("Pet not found"));
+    if (!actor.clinicIds.includes(pet.value.clinicId)) {
+      return err(AppError.forbidden("Pet outside actor clinics"));
+    }
+    return this.prescriptionRepository.listByPet(petId);
+  }
+
   async addPrescription(
     actor: ServiceActor,
     visitId: string,
