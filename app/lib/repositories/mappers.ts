@@ -15,10 +15,12 @@ import type {
   PreferredContactMethod,
 } from "@/types/domain/customer";
 import type { Invoice, InvoiceLineItem, InvoiceStatus } from "@/types/domain/invoice";
+import type { LabOrder, LabOrderStatus } from "@/types/domain/lab-order";
 import type { MedicalNote, MedicalNoteType } from "@/types/domain/medical-note";
 import type { Pet, PetStatus } from "@/types/domain/pet";
 import type { Prescription, PrescriptionStatus } from "@/types/domain/prescription";
 import type { Profile } from "@/types/domain/profile";
+import type { Task, TaskPriority, TaskStatus } from "@/types/domain/task";
 import type { Vaccination } from "@/types/domain/vaccination";
 import type { Visit, VisitStatus } from "@/types/domain/visit";
 import type {
@@ -559,6 +561,94 @@ export function mapInvoiceRow(row: {
     total: typeof row.total === "string" ? parseFloat(row.total) : row.total,
     notes: row.notes,
     createdByUserId: row.created_by_user_id,
+    version: row.version,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    deletedAt: row.deleted_at,
+  };
+}
+
+export function mapTaskRow(row: {
+  id: string;
+  clinic_id: string;
+  title: string;
+  description: string | null;
+  priority: TaskPriority;
+  status: TaskStatus;
+  due_at: string | null;
+  assignee_user_id: string | null;
+  customer_id: string | null;
+  customer?: { full_name: string | null } | { full_name: string | null }[] | null;
+  pet_id: string | null;
+  pet?: { name: string | null } | { name: string | null }[] | null;
+  created_by_user_id: string | null;
+  version: number;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}): Task {
+  const customer = Array.isArray(row.customer) ? row.customer[0] : row.customer;
+  const pet = Array.isArray(row.pet) ? row.pet[0] : row.pet;
+
+  return {
+    id: row.id,
+    clinicId: row.clinic_id,
+    title: row.title,
+    description: row.description,
+    priority: row.priority,
+    status: row.status,
+    dueAt: row.due_at,
+    assigneeUserId: row.assignee_user_id,
+    customerId: row.customer_id,
+    customerName: customer?.full_name ?? null,
+    petId: row.pet_id,
+    petName: pet?.name ?? null,
+    createdByUserId: row.created_by_user_id,
+    version: row.version,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    deletedAt: row.deleted_at,
+  };
+}
+
+export function mapLabOrderRow(row: {
+  id: string;
+  clinic_id: string;
+  customer_id: string;
+  customer?: { full_name: string | null } | { full_name: string | null }[] | null;
+  pet_id: string;
+  pet?: { name: string | null } | { name: string | null }[] | null;
+  visit_id: string | null;
+  test_name: string;
+  status: LabOrderStatus;
+  result_text: string | null;
+  flagged: boolean;
+  ordered_by_user_id: string | null;
+  ordered_at: string;
+  completed_at: string | null;
+  version: number;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}): LabOrder {
+  const customer = Array.isArray(row.customer) ? row.customer[0] : row.customer;
+  const pet = Array.isArray(row.pet) ? row.pet[0] : row.pet;
+
+  return {
+    id: row.id,
+    clinicId: row.clinic_id,
+    customerId: row.customer_id,
+    customerName: customer?.full_name ?? null,
+    petId: row.pet_id,
+    petName: pet?.name ?? null,
+    visitId: row.visit_id,
+    testName: row.test_name,
+    status: row.status,
+    resultText: row.result_text,
+    flagged: row.flagged,
+    orderedByUserId: row.ordered_by_user_id,
+    orderedAt: row.ordered_at,
+    completedAt: row.completed_at,
     version: row.version,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

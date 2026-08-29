@@ -7,11 +7,13 @@ import { CalendarBlockRepository } from "@/lib/repositories/calendar-block.repos
 import { ClinicRepository } from "@/lib/repositories/clinic.repository";
 import { CustomerRepository } from "@/lib/repositories/customer.repository";
 import { InvoiceRepository } from "@/lib/repositories/invoice.repository";
+import { LabOrderRepository } from "@/lib/repositories/lab-order.repository";
 import { MedicalNoteRepository } from "@/lib/repositories/medical-note.repository";
 import { PetRepository } from "@/lib/repositories/pet.repository";
 import { PrescriptionRepository } from "@/lib/repositories/prescription.repository";
 import { PromptSuggestionRepository } from "@/lib/repositories/prompt-suggestion.repository";
 import { ProfileRepository } from "@/lib/repositories/profile.repository";
+import { TaskRepository } from "@/lib/repositories/task.repository";
 import { VaccinationRepository } from "@/lib/repositories/vaccination.repository";
 import { VisitRepository } from "@/lib/repositories/visit.repository";
 import { VisitShareRepository } from "@/lib/repositories/visit-share.repository";
@@ -26,11 +28,13 @@ import { ClinicSettingsService } from "@/lib/services/clinic-settings.service";
 import { CustomerService } from "@/lib/services/customer.service";
 import { HealthService } from "@/lib/services/health.service";
 import { InvoiceService } from "@/lib/services/invoice.service";
+import { LabOrderService } from "@/lib/services/lab-order.service";
 import { MedicalRecordService } from "@/lib/services/medical-record.service";
 import { PetService } from "@/lib/services/pet.service";
 import { VisitService } from "@/lib/services/visit.service";
 import { VisitSummaryAssistantService } from "@/lib/services/visit-summary-assistant.service";
 import { PromptSuggestionService } from "@/lib/services/prompt-suggestion.service";
+import { TaskService } from "@/lib/services/task.service";
 import { VisitShareService } from "@/lib/services/visit-share.service";
 import { VoiceCallService } from "@/lib/services/voice-call.service";
 import { WaitlistService } from "@/lib/services/waitlist.service";
@@ -55,6 +59,8 @@ export async function createServices() {
   const vaccinationRepository = new VaccinationRepository(supabase);
   const prescriptionRepository = new PrescriptionRepository(supabase);
   const invoiceRepository = new InvoiceRepository(supabase);
+  const taskRepository = new TaskRepository(supabase);
+  const labOrderRepository = new LabOrderRepository(supabase);
   const visitShareRepository = new VisitShareRepository(admin);
   const promptSuggestionRepository = new PromptSuggestionRepository(admin);
   const auditLogRepository = new AuditLogRepository(admin);
@@ -81,6 +87,8 @@ export async function createServices() {
     calendarBlock: new CalendarBlockService(calendarBlockRepository),
     waitlist: new WaitlistService(waitlistRepository),
     invoice: new InvoiceService(invoiceRepository, auditService),
+    task: new TaskService(taskRepository),
+    labOrder: new LabOrderService(labOrderRepository),
     clinicSettings: new ClinicSettingsService(clinicRepository, auditService),
     visit: new VisitService(
       visitRepository,
