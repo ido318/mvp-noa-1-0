@@ -37,6 +37,18 @@ export function getClinicHoursForDate(date: string): { open: string; close: stri
   return null;
 }
 
+export const BOOKING_WINDOW_DAYS = 14;
+
+export function getBookableDates(fromDate: string): string[] {
+  const [year = 0, month = 1, day = 1] = fromDate.split("-").map(Number);
+  const start = new Date(Date.UTC(year, month - 1, day));
+  return Array.from({ length: BOOKING_WINDOW_DAYS }, (_, i) => {
+    const d = new Date(start);
+    d.setUTCDate(d.getUTCDate() + i);
+    return d.toISOString().slice(0, 10);
+  });
+}
+
 export function toIsraelLocalIso(date: string, hhmm: string): string {
   const [hourRaw, minuteRaw] = hhmm.split(":");
   const hour = Number(hourRaw);
