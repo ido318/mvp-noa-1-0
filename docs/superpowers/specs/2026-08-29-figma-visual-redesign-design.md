@@ -10,7 +10,7 @@ Figma file `6YZZTnWcdXD7Dj8MqGJ7IF` ("Untitled"), page "Page 2". Branded "אני
 
 Note: the file also contains an unrelated "Page 1" (a generic "SmartCRM" sales/deals template) — not used for anything here.
 
-8 real designed screens (4 apparent "duplicates" turned out to be empty placeholder frames and were discarded):
+8 real designed screens as of 2026-08-29 (4 apparent "duplicates" turned out to be empty placeholder frames and were discarded):
 1. `today-dashboard` (node `4:7`)
 2. `calendar-week-view` (node `4:271`)
 3. `appointment-detail-drawer` (node `4:476`)
@@ -19,6 +19,16 @@ Note: the file also contains an unrelated "Page 1" (a generic "SmartCRM" sales/d
 6. `patient-detail-page` (node `5:240`)
 7. `encounter-workspace` (node `5:465`)
 8. `prescription-flow` (node `5:821`)
+
+**Added 2026-08-29 (4 more screens, filling in previously-undesigned nav items):**
+9. `tasks-inbox` (node `42:8`) — unified task queue (prescription renewal requests, lab-result reviews, callback requests, overdue-payment reminders), tabs by urgency/category
+10. `laboratory-dashboard` (node `42:284`) — lab order/result tracking, external-lab sync status
+11. `billing-invoice` (node `42:528`) — single invoice detail view (line items, totals, send)
+12. `settings-page` (node `42:679`) — settings shell with a left sub-nav (clinic details, staff/roles, visit-type templates & durations, service catalog, drug/inventory management, vaccination formulary, AI settings, communication/automation settings, billing & payments, integrations)
+
+Still undesigned: תקשורת (communications) and מרשמים as a standalone list (a "מרשמים" tab exists inside `tasks-inbox`, but no dedicated prescriptions-list screen).
+
+**Flag for later:** `settings-page`'s "סוגי תורים ומשך זמן" sub-section designs an editable UI for appointment-type durations — today these are hardcoded constants (`VISIT_TYPE_CONFIG` in `agent/lib/appointments.ts`) and documented in root `CLAUDE.md` as a binding decision ("משכי ביקורים... הוחלט בפגישה 2026-06-11"). Making them editable means introducing a DB-backed config table the agent reads at runtime instead of a TS constant — a real architecture change, not just a visual one. Out of scope for now; needs its own explicit sign-off when we get to that phase, not to be built as a side effect of "matching the Figma design."
 
 ## Full roadmap (for context — only Phase 1 is being planned/built now)
 
@@ -29,8 +39,9 @@ Note: the file also contains an unrelated "Page 1" (a generic "SmartCRM" sales/d
 | 3 | Calendar week view + appointment drawer + new-appointment modal | Existing data (`appointments`, `calendar_blocks`) |
 | 4 | Client detail + Patient detail pages (incl. billing tab as UI-only, no payment gateway yet — will be wired to a real processor later) | Some new fields/empty states, no schema blockers |
 | 5 | Encounter workspace (SOAP) + Prescription flow | Needs new DB tables/columns — biggest phase |
+| 6 | Tasks inbox + Laboratory dashboard + Billing/invoice (top-level) + Settings page | Added 2026-08-29; needs new DB tables (tasks, lab orders, invoices) and scoping of which settings sub-sections are real vs. deferred |
 
-Sidebar items with no corresponding Figma screen (תקשורת, משימות, מרשמים כרשימה, מעבדה, דוחות, הגדרות) stay exactly as they are today (existing pages/placeholders) until/unless designed later — only their nav-item visual styling updates in Phase 1.
+Sidebar items still with no corresponding Figma screen (תקשורת, מרשמים as a standalone list, דוחות) stay exactly as they are today (existing pages/placeholders) until/unless designed later — only their nav-item visual styling updates in Phase 1.
 
 ## Phase 1 scope: design tokens + shared shell
 
