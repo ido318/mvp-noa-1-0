@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Modal } from "@/components/dashboard/ui/modal";
 import { Btn } from "@/components/dashboard/ui/btn";
 import { AnimalIcon } from "@/components/dashboard/icons";
@@ -38,6 +38,7 @@ export function NewAppointmentWizard({
   const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const { toast } = useToast();
+  const searchRequestIdRef = useRef(0);
 
   const bookableDates = useMemo(() => getBookableDates(new Date().toISOString().slice(0, 10)), []);
 
@@ -59,12 +60,16 @@ export function NewAppointmentWizard({
 
   useEffect(() => {
     const trimmed = customerQuery.trim();
+    searchRequestIdRef.current += 1;
+    const requestId = searchRequestIdRef.current;
     if (trimmed.length < 2) { setCustomerResults([]); return; }
     const t = setTimeout(() => {
       void (async () => {
         const res = await fetch(`/api/search?entity=customers&q=${encodeURIComponent(trimmed)}`);
+        if (searchRequestIdRef.current !== requestId) return; // superseded by a newer keystroke
         if (!res.ok) return;
         const data = await res.json() as { data: { customers: Customer[] } };
+        if (searchRequestIdRef.current !== requestId) return;
         setCustomerResults(data.data.customers);
       })();
     }, 300);
@@ -72,14 +77,21 @@ export function NewAppointmentWizard({
   }, [customerQuery]);
 
   useEffect(() => {
+    // Selecting a different customer invalidates any pet chosen for the previous one -
+    // reset it so step 2 can't be skipped with a stale, mismatched pet still selected.
+    setPet(null);
     if (!customer) { setPets([]); return; }
     void (async () => {
       const res = await fetch(`/api/customers/${customer.id}/pets`);
-      if (!res.ok) return;
+      if (!res.ok) {
+        setPets([]);
+        toast("טעינת רשימת המטופלים נכשלה", "error");
+        return;
+      }
       const data = await res.json() as { data: { items: Pet[] } };
       setPets(data.data.items);
     })();
-  }, [customer]);
+  }, [customer, toast]);
 
   useEffect(() => {
     if (!date) { setSlots([]); return; }
