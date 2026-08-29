@@ -73,8 +73,8 @@ const QA_SYSTEM_PROMPT = `אתה בודק האיכות (QA) של תומר, סו�
  * Per-call QA scoring: runs once per finished conversation, called from
  * /hooks/call-ended chained after logConversation (needs that row to already
  * exist — call_reviews.agent_id/transcript are NOT NULL with no default, so
- * this upsert only sets QA columns, never inserts a bare row). Never throws —
- * a failure here must not affect the webhook response.
+ * this only UPDATEs the QA columns on the existing row, never inserts). Never
+ * throws — a failure here must not affect the webhook response.
  */
 export async function analyzeCallQuality(
   conversationId: string,
@@ -110,9 +110,14 @@ export async function analyzeCallQuality(
 
   const result = applyDeterministicOverride(parsed);
 
-  const { error } = await getSupabase().from("call_reviews").upsert(
-    {
-      conversation_id: conversationId,
+  // UPDATE, not upsert — this function only ever patches an existing call_reviews row
+  // (created by logConversation earlier in the same chain). An upsert here would fail:
+  // Postgres validates NOT NULL constraints (agent_id, transcript) against the raw INSERT
+  // VALUES tuple before it ever checks for a conflict, so a partial-column upsert against a
+  // row missing those columns from its payload throws even when the row already exists.
+  const { error } = await getSupabase()
+    .from("call_reviews")
+    .update({
       overall_score: result.scores.overall,
       empathy_score: result.scores.empathy,
       naturalness_score: result.scores.naturalness,
@@ -127,12 +132,11 @@ export async function analyzeCallQuality(
       reviewer_summary: result.summary,
       analyzer_model: ANTHROPIC_MODEL,
       qa_analyzed_at: new Date().toISOString(),
-    },
-    { onConflict: "conversation_id" },
-  );
+    })
+    .eq("conversation_id", conversationId);
 
   if (error) {
-    logger.error({ err: error, conversationId }, "analyzeCallQuality: call_reviews upsert failed");
+    logger.error({ err: error, conversationId }, "analyzeCallQuality: call_reviews update failed");
   }
 }
 

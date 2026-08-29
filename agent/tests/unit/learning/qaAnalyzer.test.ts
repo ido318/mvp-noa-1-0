@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-const { mockUpsert, mockFrom } = vi.hoisted(() => {
-  const mockUpsert = vi.fn().mockResolvedValue({ error: null });
-  const mockFrom = vi.fn(() => ({ upsert: mockUpsert }));
-  return { mockUpsert, mockFrom };
+const { mockEq, mockUpdate, mockFrom } = vi.hoisted(() => {
+  const mockEq = vi.fn().mockResolvedValue({ error: null });
+  const mockUpdate = vi.fn(() => ({ eq: mockEq }));
+  const mockFrom = vi.fn(() => ({ update: mockUpdate }));
+  return { mockEq, mockUpdate, mockFrom };
 });
 
 vi.mock("../../../src/lib/supabase.js", () => ({
@@ -42,8 +43,9 @@ function mockClaudeResponse(body: Record<string, unknown>) {
 }
 
 beforeEach(() => {
-  mockUpsert.mockClear();
-  mockUpsert.mockResolvedValue({ error: null });
+  mockEq.mockClear();
+  mockEq.mockResolvedValue({ error: null });
+  mockUpdate.mockClear();
   mockFrom.mockClear();
 });
 
@@ -52,15 +54,14 @@ afterEach(() => {
 });
 
 describe("analyzeCallQuality", () => {
-  it("upserts the QA scores onto call_reviews by conversation_id", async () => {
+  it("updates the QA scores onto call_reviews by conversation_id", async () => {
     mockClaudeResponse(GOOD_RESULT);
 
     await analyzeCallQuality("conv_1", VALID_PAYLOAD);
 
     expect(mockFrom).toHaveBeenCalledWith("call_reviews");
-    expect(mockUpsert).toHaveBeenCalledWith(
+    expect(mockUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
-        conversation_id: "conv_1",
         overall_score: 8,
         empathy_score: 8,
         is_exception: false,
@@ -69,8 +70,8 @@ describe("analyzeCallQuality", () => {
         reviewer_summary: "שיחה תקינה",
         analyzer_model: "claude-sonnet-5",
       }),
-      { onConflict: "conversation_id" },
     );
+    expect(mockEq).toHaveBeenCalledWith("conversation_id", "conv_1");
   });
 
   it("forces is_exception when safety_score falls below the deterministic threshold, even if the model said false", async () => {
@@ -83,9 +84,8 @@ describe("analyzeCallQuality", () => {
 
     await analyzeCallQuality("conv_2", VALID_PAYLOAD);
 
-    expect(mockUpsert).toHaveBeenCalledWith(
+    expect(mockUpdate).toHaveBeenCalledWith(
       expect.objectContaining({ is_exception: true, exception_severity: "medium" }),
-      { onConflict: "conversation_id" },
     );
   });
 
@@ -99,9 +99,8 @@ describe("analyzeCallQuality", () => {
 
     await analyzeCallQuality("conv_3", VALID_PAYLOAD);
 
-    expect(mockUpsert).toHaveBeenCalledWith(
+    expect(mockUpdate).toHaveBeenCalledWith(
       expect.objectContaining({ is_exception: true, exception_severity: "critical" }),
-      { onConflict: "conversation_id" },
     );
   });
 
@@ -115,14 +114,14 @@ describe("analyzeCallQuality", () => {
     );
 
     await expect(analyzeCallQuality("conv_4", VALID_PAYLOAD)).resolves.toBeUndefined();
-    expect(mockUpsert).not.toHaveBeenCalled();
+    expect(mockUpdate).not.toHaveBeenCalled();
   });
 
   it("does not write anything when Claude's JSON is missing required fields", async () => {
     mockClaudeResponse({ scores: { overall: 8 } });
 
     await expect(analyzeCallQuality("conv_5", VALID_PAYLOAD)).resolves.toBeUndefined();
-    expect(mockUpsert).not.toHaveBeenCalled();
+    expect(mockUpdate).not.toHaveBeenCalled();
   });
 
   it("does not throw when the Claude request itself fails", async () => {
@@ -132,12 +131,12 @@ describe("analyzeCallQuality", () => {
     );
 
     await expect(analyzeCallQuality("conv_6", VALID_PAYLOAD)).resolves.toBeUndefined();
-    expect(mockUpsert).not.toHaveBeenCalled();
+    expect(mockUpdate).not.toHaveBeenCalled();
   });
 
-  it("does not throw when the Supabase upsert fails", async () => {
+  it("does not throw when the Supabase update fails", async () => {
     mockClaudeResponse(GOOD_RESULT);
-    mockUpsert.mockResolvedValueOnce({ error: { message: "db down" } });
+    mockEq.mockResolvedValueOnce({ error: { message: "db down" } });
 
     await expect(analyzeCallQuality("conv_7", VALID_PAYLOAD)).resolves.toBeUndefined();
   });
@@ -149,7 +148,7 @@ describe("analyzeCallQuality", () => {
     await analyzeCallQuality("conv_8", { transcript: [] });
 
     expect(fetchSpy).not.toHaveBeenCalled();
-    expect(mockUpsert).not.toHaveBeenCalled();
+    expect(mockUpdate).not.toHaveBeenCalled();
   });
 
   it("logs and returns without calling Claude when ANTHROPIC_API_KEY is not configured", async () => {
