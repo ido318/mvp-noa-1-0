@@ -1,0 +1,84 @@
+# Figma Visual Redesign — Design Spec
+
+**Date:** 2026-08-29
+**Status:** Phase 1 approved by user (Ido), pending implementation plan. Phases 2-5 are a roadmap, each needs its own approval before implementation.
+**Relation to prior spec:** [2026-08-27-dashboard-crm-redesign-design.md](2026-08-27-dashboard-crm-redesign-design.md) already shipped the current information architecture (nav items, customer-centric profile, teal `--brand-*` palette). This spec layers a new visual language on top of that IA, sourced from a Figma file the clinic's designer produced, and extends the IA with a few new screens the designer added (patient medical record, clinical encounter/SOAP workspace, prescriptions, billing tab).
+
+## Source
+
+Figma file `6YZZTnWcdXD7Dj8MqGJ7IF` ("Untitled"), page "Page 2". Branded "אנימליה קליניק" in the file — a generic placeholder brand, not real; all copy must be re-targeted to the actual clinic branding already in the app (clinic name comes from `clinics` table / session, not hardcoded).
+
+Note: the file also contains an unrelated "Page 1" (a generic "SmartCRM" sales/deals template) — not used for anything here.
+
+8 real designed screens (4 apparent "duplicates" turned out to be empty placeholder frames and were discarded):
+1. `today-dashboard` (node `4:7`)
+2. `calendar-week-view` (node `4:271`)
+3. `appointment-detail-drawer` (node `4:476`)
+4. `new-appointment-flow` (node `4:611`)
+5. `client-detail-page` (node `5:5`)
+6. `patient-detail-page` (node `5:240`)
+7. `encounter-workspace` (node `5:465`)
+8. `prescription-flow` (node `5:821`)
+
+## Full roadmap (for context — only Phase 1 is being planned/built now)
+
+| Phase | Scope | Notes |
+|---|---|---|
+| **1** | Design tokens + shared shell (sidebar + header) | This spec. No page content changes. |
+| 2 | Today dashboard | 1:1 with existing `dashboard/page.tsx` data |
+| 3 | Calendar week view + appointment drawer + new-appointment modal | Existing data (`appointments`, `calendar_blocks`) |
+| 4 | Client detail + Patient detail pages (incl. billing tab as UI-only, no payment gateway yet — will be wired to a real processor later) | Some new fields/empty states, no schema blockers |
+| 5 | Encounter workspace (SOAP) + Prescription flow | Needs new DB tables/columns — biggest phase |
+
+Sidebar items with no corresponding Figma screen (תקשורת, משימות, מרשמים כרשימה, מעבדה, דוחות, הגדרות) stay exactly as they are today (existing pages/placeholders) until/unless designed later — only their nav-item visual styling updates in Phase 1.
+
+## Phase 1 scope: design tokens + shared shell
+
+### Token mapping
+
+Keep the existing token *architecture* (`app/app/globals.css` CSS custom properties) — do not rename variables or introduce a parallel system. Update values to match the Figma palette, which is already close (both are teal-based, per the 2026-08-27 spec's chosen direction):
+
+| Token | Current | Figma value | Action |
+|---|---|---|---|
+| `--brand-600` (primary actions/active) | `#14877D` | `#0D9488` | update |
+| active-nav background | 3px inset bar, no fill | full pill `#CCFBF1` bg, `#115E59` text | restyle nav item (see below) |
+| `--ink` (primary text) | `#1F2933` | `#0F172A` | update |
+| `--ink-2` / secondary text | `#42505E` | `#475569` | update |
+| `--muted` | `#6B7785` | `#94A3B8` | update |
+| `--line` (borders) | `#E2E8ED` | `#E2E8F0` | update |
+
+Exact final values to be confirmed against the full Figma palette (more tokens exist in the file beyond the sidebar — e.g. status/urgency colors already used by `Badge`/`UrgencyMeter`) during implementation; extract via `get_design_context` on a couple more representative frames rather than guessing.
+
+### Font
+
+Keep **Heebo** (already the established, deliberately-chosen font per `app/app/layout.tsx` and CLAUDE.md Stage 1 notes) instead of switching to the Figma file's Rubik. Both are geometric-humanist Hebrew sans-serifs with a very similar feel; switching fonts is a bigger brand decision than "implement the Figma visuals" calls for, and isn't worth the churn (new font load, retested line-heights across every screen) for a redesign that's meant to refine, not rebrand.
+
+### Sidebar (`app/components/dashboard/sidebar.tsx`)
+
+- Restyle active nav item: rounded-full/pill background (`--brand-100`-equivalent), bold semibold text, matching Figma's `nav-item-0` treatment — replacing the current 3px inset-bar active indicator.
+- Restyle inactive nav items/hover per Figma (transparent bg, `--ink-2` text, subtle hover bg).
+- Icons: swap to the Figma icon set (lucide: `layout-dashboard`, `calendar`, `users`, `message-circle`, `list-check`, `pill`, `microscope`, `credit-card`, `chart-column`, `settings`, `heart-pulse` for the logo mark) — confirm `lucide-react` (or whatever icon lib the project already uses) covers all of these before implementation; swap 1:1 where names differ.
+- Merge nav items — Figma's list plus the three existing MVP-critical items the Figma designer didn't cover, since dropping them would be a functional regression, not just a redesign:
+
+  היום · לוח שנה · לקוחות ומטופלים · שיחות · תשומת לב · המתנה · תקשורת · משימות · מרשמים · מעבדה · חיובים · דוחות · הגדרות
+
+  - "אסקלציות" is renamed **"תשומת לב"** (route stays `/dashboard/escalations`, label only) — echoes the Figma today-dashboard's own "דורש תשומת לב" card heading, and reads more natural than the loanword "אסקלציות."
+  - "שיחות" and "המתנה" keep their current routes/behavior, just restyled.
+  - Exact ordering above is a first pass — worth a quick sanity check with the user once assembled, not worth a separate approval round.
+
+### Header (`app/components/dashboard/header.tsx`)
+
+Restyle to match Figma's shared top-bar treatment (search bar style, spacing, notification bell) — page-specific title/actions (e.g. "יצירה מהירה" button, per-page titles) are out of scope for Phase 1 since those belong to each page's own content, built in later phases.
+
+### Explicitly out of scope for Phase 1
+
+- Any page content/layout change (today dashboard body, calendar grid, etc.) — Phases 2+.
+- New DB tables/columns (prescriptions, encounter clinical fields, invoices) — Phase 4/5.
+- New nav destinations for תקשורת/משימות/מרשמים/מעבדה/דוחות — stay on existing pages/placeholders.
+- Rebuilding existing shared UI primitives (`Btn`, `Badge`, `Card`, etc. in `app/components/dashboard/ui/`) — only their token-driven colors change automatically via the CSS var updates above; no component rewrites needed.
+
+## Open questions for implementation planning
+
+- Final confirmed hex values for status/urgency colors (not yet extracted from Figma) — pull during implementation rather than guessing.
+- Confirm `lucide-react` (or current icon lib) has exact matches for all Figma icons; note any gaps.
+- Final nav item order — quick confirmation once assembled.
