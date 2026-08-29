@@ -9,7 +9,7 @@ import { EmptyState } from "@/components/dashboard/ui/empty-state";
 import { Skeleton } from "@/components/dashboard/ui/skeleton";
 import { useToast } from "@/components/dashboard/ui/toast";
 import { PhoneIcon, ClockIcon, SparkleIcon, CheckIcon, XIcon, UserIcon } from "@/components/dashboard/icons";
-import { ISRAEL_TIMEZONE, formatIsraelDate, formatIsraelTime, israelDateIso } from "@/lib/israel-date";
+import { ISRAEL_TIMEZONE, formatIsraelDate, formatIsraelTime, israelDateIso, israelDayUtcRange } from "@/lib/israel-date";
 import type { Appointment } from "@/types/domain/appointment";
 import type { Escalation } from "@/types/domain/escalation";
 import type { VoiceCall } from "@/types/domain/voice-call";
@@ -273,10 +273,11 @@ export default function TodayPage() {
 
   const fetchData = useCallback(async () => {
     try {
+      const callRange = israelDayUtcRange(today);
       const [apptRes, escRes, callRes, waitlistRes] = await Promise.all([
         fetch(`/api/appointments?date=${today}`),
         fetch("/api/escalations?status=open"),
-        fetch(`/api/voice/calls?from=${today}&to=${today}`),
+        fetch(`/api/voice/calls?from=${encodeURIComponent(callRange.from)}&to=${encodeURIComponent(callRange.to)}`),
         fetch("/api/waitlist"),
       ]);
 
