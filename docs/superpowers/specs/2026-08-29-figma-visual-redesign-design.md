@@ -1,7 +1,7 @@
 # Figma Visual Redesign — Design Spec
 
 **Date:** 2026-08-29
-**Status:** Phases 1-2 shipped (tokens + sidebar, today dashboard). Phases 3-6 are a roadmap, each needs its own approval + spec/plan before implementation.
+**Status:** Phases 1-2 shipped (tokens + sidebar, today dashboard). Phase 3 (calendar + appointment flow) approved and spec'd, see [2026-08-29-figma-phase3-calendar-appointments-design.md](2026-08-29-figma-phase3-calendar-appointments-design.md), pending implementation plan. Phases 4-6 are still a roadmap, each needs its own approval + spec/plan before implementation.
 **Relation to prior spec:** [2026-08-27-dashboard-crm-redesign-design.md](2026-08-27-dashboard-crm-redesign-design.md) already shipped the current information architecture (nav items, customer-centric profile, teal `--brand-*` palette). This spec layers a new visual language on top of that IA, sourced from a Figma file the clinic's designer produced, and extends the IA with a few new screens the designer added (patient medical record, clinical encounter/SOAP workspace, prescriptions, billing tab).
 
 ## Source
