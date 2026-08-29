@@ -8,6 +8,19 @@ import type {
   LabOrderStatus,
 } from "@/types/domain/lab-order";
 
+// completed_at must track status exactly - stamped when moving to
+// "completed", and cleared if the order is later reopened (redo/mistake
+// correction), so a non-completed order never carries a stale "completed at"
+// timestamp from a previous cycle.
+export function buildLabOrderStatusPatch(
+  status: LabOrderStatus,
+): { status: LabOrderStatus; completed_at: string | null } {
+  return {
+    status,
+    completed_at: status === "completed" ? new Date().toISOString() : null,
+  };
+}
+
 export class LabOrderService {
   constructor(private readonly repository: LabOrderRepository) {}
 
@@ -40,8 +53,7 @@ export class LabOrderService {
 
     const columnPatch: Record<string, unknown> = {};
     if (patch.status !== undefined) {
-      columnPatch.status = patch.status;
-      if (patch.status === "completed") columnPatch.completed_at = new Date().toISOString();
+      Object.assign(columnPatch, buildLabOrderStatusPatch(patch.status));
     }
     if (patch.resultText !== undefined) columnPatch.result_text = patch.resultText;
     if (patch.flagged !== undefined) columnPatch.flagged = patch.flagged;
