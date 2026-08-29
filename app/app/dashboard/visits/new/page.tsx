@@ -54,7 +54,7 @@ export default async function NewVisitPage({
 
   if (!clinicId || !customerId || !petId) {
     return (
-      <section className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-800">
+      <section className="rounded-[var(--r-lg)] border border-[var(--amber-500)] bg-[var(--amber-50)] p-6 text-sm text-[var(--amber-600)]">
         כדי ליצור ביקור, צריך לוודא שקיימים לפחות לקוח אחד וחיה אחת במרפאה
         שנבחרה.
       </section>
@@ -62,15 +62,15 @@ export default async function NewVisitPage({
   }
 
   return (
-    <section className="space-y-4">
+    <section className="mx-auto w-full max-w-[640px] space-y-4 p-6">
       <div>
-        <Link href="/dashboard/visits" className="text-sm text-emerald-700">
-          חזרה לביקורים
+        <Link href="/dashboard/visits" className="text-sm font-semibold text-[var(--brand-600)] hover:underline">
+          ← חזרה לביקורים
         </Link>
-        <h2 className="mt-2 text-xl font-semibold text-zinc-900">ביקור חדש</h2>
+        <h2 className="mt-2 text-[22px] font-extrabold text-[var(--ink)]">ביקור חדש</h2>
       </div>
 
-      <div className="rounded-2xl border border-zinc-200 bg-white p-6">
+      <div className="rounded-[var(--r-lg)] border border-[var(--line)] bg-[var(--surface)] p-6">
         <VisitForm
           clinicId={clinicId}
           customerId={customerId}

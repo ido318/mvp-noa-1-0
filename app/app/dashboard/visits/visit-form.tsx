@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Btn } from "@/components/dashboard/ui/btn";
 
 type Props = {
   clinicId: string;
@@ -52,39 +53,33 @@ export function VisitForm({ clinicId, customerId, petId, appointmentId }: Props)
   return (
     <form onSubmit={onSubmit} className="space-y-4">
       <div>
-        <label htmlFor="chiefComplaint" className="mb-1 block text-sm font-medium text-zinc-700">
+        <label htmlFor="chiefComplaint" className="mb-1 block text-sm font-semibold text-[var(--ink-2)]">
           סיבת הביקור
         </label>
         <input
           id="chiefComplaint"
           value={chiefComplaint}
           onChange={(event) => setChiefComplaint(event.target.value)}
-          className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
+          className="w-full rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-[var(--brand-400)]"
         />
       </div>
       <div>
-        <label htmlFor="manualVisitSummary" className="mb-1 block text-sm font-medium text-zinc-700">
+        <label htmlFor="manualVisitSummary" className="mb-1 block text-sm font-semibold text-[var(--ink-2)]">
           סיכום ביקור ידני
         </label>
         <textarea
           id="manualVisitSummary"
           value={manualVisitSummary}
           onChange={(event) => setManualVisitSummary(event.target.value)}
-          className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
+          className="w-full rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-[var(--brand-400)]"
           rows={4}
         />
       </div>
       {appointmentId ? (
-        <p className="text-sm text-zinc-600">תור מקושר: {appointmentId}</p>
+        <p className="text-sm text-[var(--muted)]">תור מקושר: {appointmentId}</p>
       ) : null}
-      {error ? <p className="text-sm text-red-600">{error}</p> : null}
-      <button
-        type="submit"
-        disabled={loading}
-        className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
-      >
-        {loading ? "יוצר..." : "צור ביקור"}
-      </button>
+      {error ? <p className="text-sm font-semibold text-[var(--red-700)]">{error}</p> : null}
+      <Btn type="submit" loading={loading}>צור ביקור</Btn>
     </form>
   );
 }

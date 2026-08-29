@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Btn } from "@/components/dashboard/ui/btn";
 
 type Props = {
   visitId: string;
@@ -52,21 +53,21 @@ export function VisitShareSection({ visitId, hasSummary, hasPrescriptions }: Pro
 
   return (
     <div className="space-y-3">
-      <p className="text-sm text-zinc-600">
+      <p className="text-sm text-[var(--ink-2)]">
         שליחת קישור מאובטח ללקוח ב-SMS עם סיכום הביקור והמרשמים.
       </p>
 
       {nothingToSend ? (
-        <p className="text-sm text-amber-700">
+        <p className="text-sm text-[var(--amber-600)]">
           כדי לשלוח, צריך קודם סיכום ביקור או מרשם פעיל.
         </p>
       ) : null}
 
-      {error ? <p className="text-sm text-red-600">{error}</p> : null}
+      {error ? <p className="text-sm font-semibold text-[var(--red-700)]">{error}</p> : null}
 
       {result ? (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm">
-          <p className="font-medium text-emerald-800">
+        <div className="rounded-[var(--r-lg)] border border-[var(--brand-200)] bg-[var(--brand-50)] p-3 text-sm">
+          <p className="font-bold text-[var(--brand-700)]">
             נשלח ל-{result.recipientPhone} ✓
           </p>
           <div className="mt-2 flex items-center gap-2">
@@ -74,29 +75,18 @@ export function VisitShareSection({ visitId, hasSummary, hasPrescriptions }: Pro
               href={result.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="truncate text-emerald-700 underline"
+              className="truncate text-[var(--brand-600)] underline"
             >
               {result.url}
             </a>
-            <button
-              type="button"
-              onClick={copyLink}
-              className="shrink-0 rounded-lg border border-emerald-300 px-2 py-1 text-xs text-emerald-700"
-            >
-              {copied ? "הועתק" : "העתק"}
-            </button>
+            <Btn size="sm" variant="soft" onClick={copyLink}>{copied ? "הועתק" : "העתק"}</Btn>
           </div>
         </div>
       ) : null}
 
-      <button
-        type="button"
-        disabled={loading || nothingToSend}
-        onClick={sendShare}
-        className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
-      >
-        {loading ? "שולח..." : result ? "שלח שוב" : "שלח סיכום ומרשם ללקוח ב-SMS"}
-      </button>
+      <Btn size="sm" loading={loading} disabled={nothingToSend} onClick={sendShare}>
+        {result ? "שלח שוב" : "שלח סיכום ומרשם ללקוח ב-SMS"}
+      </Btn>
     </div>
   );
 }

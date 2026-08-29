@@ -2,13 +2,13 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Btn } from "@/components/dashboard/ui/btn";
+import { Badge } from "@/components/dashboard/ui/badge";
 import type { Prescription } from "@/types/domain/prescription";
 
 const PRESCRIPTION_STATUS_LABELS: Record<string, string> = {
   active: "פעיל",
-  stopped: "הופסק",
-  completed: "הושלם",
-  cancelled: "בוטל",
+  discontinued: "הופסק",
 };
 
 type Props = {
@@ -56,54 +56,51 @@ export function VisitPrescriptionsSection({ visitId, initialPrescriptions }: Pro
 
   return (
     <div className="space-y-4">
-      <p className="text-xs text-zinc-500">
+      <p className="text-xs text-[var(--muted)]">
         מרשם זה נרשם על ידי הצוות הווטרינרי בלבד. אין להסתמך על AI למינונים.
       </p>
       <ul className="space-y-2">
         {initialPrescriptions.length === 0 ? (
-          <li className="text-sm text-zinc-500">אין עדיין מרשמים.</li>
+          <li className="text-sm text-[var(--faint)]">אין עדיין מרשמים.</li>
         ) : (
           initialPrescriptions.map((rx) => (
-            <li key={rx.id} className="rounded-lg border border-zinc-100 p-3 text-sm">
-              <p className="font-medium text-zinc-800">
-                {rx.medicationName} · {PRESCRIPTION_STATUS_LABELS[rx.status] ?? rx.status}
-              </p>
-              <p className="mt-1 whitespace-pre-wrap text-zinc-700">{rx.instructions}</p>
+            <li key={rx.id} className="rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--surface-2)] p-3 text-sm">
+              <div className="flex items-center justify-between gap-2">
+                <p className="font-bold text-[var(--ink)]">{rx.medicationName}</p>
+                <Badge color={rx.status === "active" ? "green" : "muted"}>
+                  {PRESCRIPTION_STATUS_LABELS[rx.status] ?? rx.status}
+                </Badge>
+              </div>
+              <p className="mt-1 whitespace-pre-wrap text-[var(--ink-2)]">{rx.instructions}</p>
             </li>
           ))
         )}
       </ul>
 
-      <form onSubmit={onSubmit} className="space-y-3 border-t border-zinc-100 pt-4">
+      <form onSubmit={onSubmit} className="space-y-3 border-t border-[var(--line-2)] pt-4">
         <input
           value={medicationName}
           onChange={(event) => setMedicationName(event.target.value)}
           required
           placeholder="שם התרופה"
-          className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
+          className="w-full rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-[var(--brand-400)]"
         />
         <textarea
           value={instructions}
           onChange={(event) => setInstructions(event.target.value)}
           required
           rows={3}
-          placeholder="הנחיות שימוש שנכתבו על ידי הצוות"
-          className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
+          placeholder="מינון, תדירות, משך, הנחיות מיוחדות"
+          className="w-full rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-[var(--brand-400)]"
         />
         <input
           value={notes}
           onChange={(event) => setNotes(event.target.value)}
           placeholder="הערות (לא חובה)"
-          className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
+          className="w-full rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-[var(--brand-400)]"
         />
-        {error ? <p className="text-sm text-red-600">{error}</p> : null}
-        <button
-          type="submit"
-          disabled={loading}
-          className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
-        >
-          {loading ? "שומר..." : "הוסף מרשם"}
-        </button>
+        {error ? <p className="text-sm font-semibold text-[var(--red-700)]">{error}</p> : null}
+        <Btn type="submit" size="sm" loading={loading}>הוסף מרשם</Btn>
       </form>
     </div>
   );
