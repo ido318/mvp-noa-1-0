@@ -7,7 +7,7 @@ import { Btn } from "@/components/dashboard/ui/btn";
 import { EmptyState } from "@/components/dashboard/ui/empty-state";
 import { Skeleton } from "@/components/dashboard/ui/skeleton";
 import { AnimalIcon, ChevLeftIcon, ChevRightIcon, CalendarIcon, PlusIcon } from "@/components/dashboard/icons";
-import { toIsraelLocalIso } from "@/lib/appointment-rules";
+import { toIsraelLocalIso, VISIT_TYPE_CONFIG } from "@/lib/appointment-rules";
 import { ISRAEL_TIMEZONE, israelDateIso } from "@/lib/israel-date";
 import type { MeResponse } from "@/types/api/me";
 import type { Appointment } from "@/types/domain/appointment";
@@ -87,20 +87,6 @@ function fmtWeekRange(start: Date, end: Date) {
   return `${startText} - ${endText}`;
 }
 
-const VISIT_LABELS: Record<string, string> = {
-  checkup: "בדיקה",
-  vaccination: "חיסון",
-  vaccine: "חיסון",
-  neutering: "ניתוח",
-  home_visit: "ביקור בית",
-  phone_consultation: "ייעוץ",
-  consultation: "ייעוץ",
-  urgent: "דחוף",
-  follow_up: "מעקב",
-  followup: "מעקב",
-  other: "כללי",
-};
-
 type AppointmentAccent = { bg: string; border: string; text: string; dot: string };
 
 const DEFAULT_ACCENT: AppointmentAccent = { bg: "#F4F6F8", border: "#E2E8ED", text: "#6B7785", dot: "#97A2AD" };
@@ -127,8 +113,17 @@ const CALENDAR_LEGEND: Array<{ label: string; color: string }> = [
   { label: "טיפול", color: "#14877D" },
 ];
 
+// A couple of legacy aliases ("vaccine", "followup") can still exist on older rows written
+// before the appointment_type enum was tightened to VISIT_TYPE_CONFIG's canonical set —
+// same aliases type-pill.tsx already accounts for.
+const LEGACY_TYPE_ALIASES: Record<string, keyof typeof VISIT_TYPE_CONFIG> = {
+  vaccine: "vaccination",
+  followup: "follow_up",
+};
+
 function visitLabel(type: string) {
-  return VISIT_LABELS[type] ?? type;
+  const canonical = LEGACY_TYPE_ALIASES[type] ?? (type as keyof typeof VISIT_TYPE_CONFIG);
+  return VISIT_TYPE_CONFIG[canonical]?.labelHe ?? type;
 }
 
 function appointmentAccent(type: string, status: string) {
