@@ -1,7 +1,7 @@
 # Figma Visual Redesign — Design Spec
 
 **Date:** 2026-08-29
-**Status:** Phase 1 approved by user (Ido), pending implementation plan. Phases 2-5 are a roadmap, each needs its own approval before implementation.
+**Status:** Phase 1 shipped (tokens + sidebar). Phases 2-6 are a roadmap, each needs its own approval + spec/plan before implementation.
 **Relation to prior spec:** [2026-08-27-dashboard-crm-redesign-design.md](2026-08-27-dashboard-crm-redesign-design.md) already shipped the current information architecture (nav items, customer-centric profile, teal `--brand-*` palette). This spec layers a new visual language on top of that IA, sourced from a Figma file the clinic's designer produced, and extends the IA with a few new screens the designer added (patient medical record, clinical encounter/SOAP workspace, prescriptions, billing tab).
 
 ## Source
@@ -51,14 +51,17 @@ Keep the existing token *architecture* (`app/app/globals.css` CSS custom propert
 
 | Token | Current | Figma value | Action |
 |---|---|---|---|
-| `--brand-600` (primary actions/active) | `#14877D` | `#0D9488` | update |
-| active-nav background | 3px inset bar, no fill | full pill `#CCFBF1` bg, `#115E59` text | restyle nav item (see below) |
-| `--ink` (primary text) | `#1F2933` | `#0F172A` | update |
-| `--ink-2` / secondary text | `#42505E` | `#475569` | update |
-| `--muted` | `#6B7785` | `#94A3B8` | update |
-| `--line` (borders) | `#E2E8ED` | `#E2E8F0` | update |
+| `--brand-600` (primary actions/active) | `#14877D` | `#0D9488` (Tailwind teal-600) | update |
+| `--brand-100` (light teal fills) | `#D3EEEA` | `#CCFBF1` (Tailwind teal-100) | update |
+| `--brand-800` (active-nav text) | *(doesn't exist)* | `#115E59` (Tailwind teal-800) | **add** — natural gap in the existing 900→50 scale |
+| `--ink` (primary text) | `#1F2933` | `#0F172A` (Tailwind slate-900) | update |
+| `--ink-2` / secondary text | `#42505E` | `#475569` (Tailwind slate-600) | update |
+| `--muted` | `#6B7785` | `#94A3B8` (Tailwind slate-400) | update |
+| `--line` (borders) | `#E2E8ED` | `#E2E8F0` (Tailwind slate-200) | update |
 
-Exact final values to be confirmed against the full Figma palette (more tokens exist in the file beyond the sidebar — e.g. status/urgency colors already used by `Badge`/`UrgencyMeter`) during implementation; extract via `get_design_context` on a couple more representative frames rather than guessing.
+The Figma file's colors turn out to be exactly the Tailwind default teal/slate scale — confirmed by matching hex values above — so remaining tokens (`--brand-900/700/500/400/200/50`, `--faint`, `--line-2`) are left as-is for Phase 1 (already close enough) rather than guessed at; revisit only if a later phase's screenshot comparison shows a mismatch.
+
+Active-nav item: full pill using `--brand-100` background + `--brand-800` text (replacing the current 3px inset-bar + `--brand-50` background + `--brand-700` text treatment).
 
 ### Font
 
@@ -68,14 +71,15 @@ Keep **Heebo** (already the established, deliberately-chosen font per `app/app/l
 
 - Restyle active nav item: rounded-full/pill background (`--brand-100`-equivalent), bold semibold text, matching Figma's `nav-item-0` treatment — replacing the current 3px inset-bar active indicator.
 - Restyle inactive nav items/hover per Figma (transparent bg, `--ink-2` text, subtle hover bg).
-- Icons: swap to the Figma icon set (lucide: `layout-dashboard`, `calendar`, `users`, `message-circle`, `list-check`, `pill`, `microscope`, `credit-card`, `chart-column`, `settings`, `heart-pulse` for the logo mark) — confirm `lucide-react` (or whatever icon lib the project already uses) covers all of these before implementation; swap 1:1 where names differ.
-- Merge nav items — Figma's list plus the three existing MVP-critical items the Figma designer didn't cover, since dropping them would be a functional regression, not just a redesign:
+- Icons: the app has its own hand-rolled stroke-icon set (`app/components/dashboard/icons.tsx`, a shared `icon(path, viewBox)` factory), not a library — `TodayIcon`/`CalendarIcon`/`CallsIcon`/`EscalationIcon`/`ClientsIcon`/`ClockIcon`/`SettingsIcon` already exist and already visually match the Figma icon set (layout-dashboard/calendar/phone/triangle-alert/users/clock/settings), so no new icons are needed for the 7-item Phase 1 nav.
+- Nav items, restyled only — **only items with a real, working destination today** get a sidebar entry; a nav item with no page behind it is a dead link, worse than no nav item, and contradicts "leave undesigned sections as they currently exist" (today, only `הגדרות` has both a nav slot and a page — תקשורת/משימות/מרשמים/מעבדה/דוחות have neither, so they're not added to the sidebar yet; they'll be added in the phase that actually ships their page):
 
-  היום · לוח שנה · לקוחות ומטופלים · שיחות · תשומת לב · המתנה · תקשורת · משימות · מרשמים · מעבדה · חיובים · דוחות · הגדרות
+  היום · לוח שנה · לקוחות ומטופלים · שיחות · תשומת לב · המתנה · הגדרות
 
   - "אסקלציות" is renamed **"תשומת לב"** (route stays `/dashboard/escalations`, label only) — echoes the Figma today-dashboard's own "דורש תשומת לב" card heading, and reads more natural than the loanword "אסקלציות."
+  - "לקוחות" is renamed **"לקוחות ומטופלים"** (route stays `/dashboard/clients`, label only), matching Figma.
   - "שיחות" and "המתנה" keep their current routes/behavior, just restyled.
-  - Exact ordering above is a first pass — worth a quick sanity check with the user once assembled, not worth a separate approval round.
+  - When Phase 6 (or a later phase) ships a real page for תקשורת/משימות/מרשמים/מעבדה/דוחות, that phase's plan adds its nav item + icon at that time — not before.
 
 ### Header (`app/components/dashboard/header.tsx`)
 

@@ -23,17 +23,19 @@ interface SidebarProps {
 
 function NavLink({ item }: { item: NavItem }) {
   const pathname = usePathname();
-  const active = pathname === item.href || pathname.startsWith(item.href + "/");
+  const active =
+    pathname === item.href ||
+    (item.href !== "/dashboard" && pathname.startsWith(item.href + "/"));
 
   return (
-    <li className="relative">
+    <li>
       <Link
         href={item.href}
         className={[
-          "flex items-center gap-3 px-3 py-2.5 rounded-[var(--r-md)] text-[13.5px] font-medium transition-colors duration-150",
+          "flex items-center gap-3 px-3 py-2.5 rounded-[var(--r-md)] text-[13.5px] transition-colors duration-150",
           active
-            ? "bg-[var(--brand-50)] text-[var(--brand-700)] font-bold"
-            : "text-[var(--ink-2)] hover:bg-[var(--surface-2)] hover:text-[var(--ink)]",
+            ? "bg-[var(--brand-100)] text-[var(--brand-800)] font-semibold"
+            : "text-[var(--ink-2)] font-medium hover:bg-[var(--surface-2)] hover:text-[var(--ink)]",
         ].join(" ")}
       >
         <item.icon size={18} className="flex-shrink-0" />
@@ -44,26 +46,19 @@ function NavLink({ item }: { item: NavItem }) {
           </span>
         )}
       </Link>
-      {/* Active indicator bar */}
-      {active && (
-        <span
-          className="absolute inset-y-1.5 -start-0 w-[3px] rounded-full bg-[var(--brand-600)]"
-          aria-hidden="true"
-        />
-      )}
     </li>
   );
 }
 
 export function Sidebar({ openEscalations = 0, userName = "ד״ר נועה כבשני", userRole = "וטרינרית ראשית" }: SidebarProps) {
   const navItems: NavItem[] = [
-    { href: "/dashboard",            label: "היום",         icon: TodayIcon },
-    { href: "/dashboard/calendar",   label: "יומן",         icon: CalendarIcon },
-    { href: "/dashboard/calls",      label: "שיחות",        icon: CallsIcon },
-    { href: "/dashboard/escalations",label: "אסקלציות",     icon: EscalationIcon, badge: openEscalations },
-    { href: "/dashboard/waitlist",    label: "המתנה",        icon: ClockIcon },
-    { href: "/dashboard/clients",    label: "לקוחות",       icon: ClientsIcon },
-    { href: "/dashboard/settings",   label: "הגדרות",       icon: SettingsIcon },
+    { href: "/dashboard",            label: "היום",              icon: TodayIcon },
+    { href: "/dashboard/calendar",   label: "לוח שנה",           icon: CalendarIcon },
+    { href: "/dashboard/clients",    label: "לקוחות ומטופלים",   icon: ClientsIcon },
+    { href: "/dashboard/calls",      label: "שיחות",             icon: CallsIcon },
+    { href: "/dashboard/escalations",label: "תשומת לב",          icon: EscalationIcon, badge: openEscalations },
+    { href: "/dashboard/waitlist",   label: "המתנה",             icon: ClockIcon },
+    { href: "/dashboard/settings",   label: "הגדרות",            icon: SettingsIcon },
   ];
 
   return (
