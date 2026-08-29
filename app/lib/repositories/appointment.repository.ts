@@ -33,7 +33,7 @@ export class AppointmentRepository {
       .from("appointments")
       .select(`
         *,
-        customer:customers!appointments_customer_clinic_fk(full_name),
+        customer:customers!appointments_customer_clinic_fk(full_name, phone),
         pet:pets!appointments_pet_clinic_fk(name, species)
       `)
       .in("clinic_id", filters.clinicIds)

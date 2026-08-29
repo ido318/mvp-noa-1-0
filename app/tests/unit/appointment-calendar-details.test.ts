@@ -27,12 +27,23 @@ describe("calendar appointment details", () => {
   it("maps joined customer and pet details for rich calendar blocks", () => {
     const appointment = mapAppointmentRow({
       ...baseAppointmentRow,
-      customer: { full_name: "יעל ברקוביץ׳" },
+      customer: { full_name: "יעל ברקוביץ׳", phone: "+972501234567" },
       pet: { name: "לונה", species: "dog" },
     });
 
     expect(appointment.customerName).toBe("יעל ברקוביץ׳");
+    expect(appointment.customerPhone).toBe("+972501234567");
     expect(appointment.petName).toBe("לונה");
     expect(appointment.petSpecies).toBe("dog");
+  });
+
+  it("defaults customerPhone to null when the customer join has no phone", () => {
+    const appointment = mapAppointmentRow({
+      ...baseAppointmentRow,
+      customer: { full_name: "יעל ברקוביץ׳", phone: null },
+      pet: { name: "לונה", species: "dog" },
+    });
+
+    expect(appointment.customerPhone).toBeNull();
   });
 });

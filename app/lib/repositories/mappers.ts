@@ -228,7 +228,7 @@ export function mapAppointmentRow(row: {
   clinic_id: string;
   customer_id: string;
   pet_id: string;
-  customer?: { full_name: string | null } | { full_name: string | null }[] | null;
+  customer?: { full_name: string | null; phone?: string | null } | { full_name: string | null; phone?: string | null }[] | null;
   pet?: { name: string | null; species: string | null } | { name: string | null; species: string | null }[] | null;
   appointment_type: AppointmentType;
   status: AppointmentStatus;
@@ -255,6 +255,7 @@ export function mapAppointmentRow(row: {
     customerId: row.customer_id,
     petId: row.pet_id,
     customerName: customer?.full_name ?? null,
+    customerPhone: customer?.phone ?? null,
     petName: pet?.name ?? null,
     petSpecies: pet?.species ?? null,
     appointmentType: row.appointment_type,

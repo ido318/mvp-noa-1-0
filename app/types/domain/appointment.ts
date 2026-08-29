@@ -31,6 +31,7 @@ export type Appointment = {
   customerId: string;
   petId: string;
   customerName?: string | null;
+  customerPhone?: string | null;
   petName?: string | null;
   petSpecies?: string | null;
   appointmentType: AppointmentType;
