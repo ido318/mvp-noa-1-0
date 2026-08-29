@@ -19,11 +19,18 @@ export function NewAppointmentWizard({
   onClose,
   clinicId,
   onCreated,
+  initialCustomerId,
+  initialPetId,
 }: {
   open: boolean;
   onClose: () => void;
   clinicId: string;
   onCreated: () => void;
+  // Lets an entry point that already knows who it's booking for (e.g. the
+  // patient detail page's "קבע תור" button) skip straight past the
+  // customer/pet search steps instead of making staff search again.
+  initialCustomerId?: string | null;
+  initialPetId?: string | null;
 }) {
   const [step, setStep] = useState<Step>(1);
   const [customerQuery, setCustomerQuery] = useState("");
@@ -55,8 +62,30 @@ export function NewAppointmentWizard({
       setSlots([]);
       setSlot(null);
       setReason("");
+      return;
     }
-  }, [open]);
+
+    if (!initialCustomerId) return;
+    void (async () => {
+      const customerRes = await fetch(`/api/customers/${initialCustomerId}`);
+      if (!customerRes.ok) return;
+      const customerData = await customerRes.json() as { data: Customer };
+      setCustomer(customerData.data);
+
+      const petsRes = await fetch(`/api/customers/${initialCustomerId}/pets`);
+      if (!petsRes.ok) { setStep(2); return; }
+      const petsData = await petsRes.json() as { data: { items: Pet[] } };
+      setPets(petsData.data.items);
+
+      const matchedPet = initialPetId ? petsData.data.items.find((p) => p.id === initialPetId) : undefined;
+      if (matchedPet) {
+        setPet(matchedPet);
+        setStep(3);
+      } else {
+        setStep(2);
+      }
+    })();
+  }, [open, initialCustomerId, initialPetId]);
 
   useEffect(() => {
     const trimmed = customerQuery.trim();

@@ -6,7 +6,7 @@ import { XIcon } from "@/components/dashboard/icons";
 interface DrawerProps {
   open: boolean;
   onClose: () => void;
-  title?: string;
+  title?: React.ReactNode;
   children: React.ReactNode;
   width?: number;
   footer?: React.ReactNode;
@@ -49,7 +49,7 @@ export function Drawer({ open, onClose, title, children, width = 460, footer }: 
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--line-2)] flex-shrink-0">
           {title ? (
-            <h2 className="text-[15px] font-bold text-[var(--ink)]">{title}</h2>
+            <div className="text-[15px] font-bold text-[var(--ink)]">{title}</div>
           ) : (
             <span />
           )}

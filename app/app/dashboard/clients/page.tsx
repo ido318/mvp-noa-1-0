@@ -5,10 +5,11 @@ import { useSearchParams } from "next/navigation";
 import { Card } from "@/components/dashboard/ui/card";
 import { Badge } from "@/components/dashboard/ui/badge";
 import { Btn } from "@/components/dashboard/ui/btn";
+import { Drawer } from "@/components/dashboard/ui/drawer";
 import { EmptyState } from "@/components/dashboard/ui/empty-state";
 import { Skeleton } from "@/components/dashboard/ui/skeleton";
 import { PersonAvatar, AnimalAvatar } from "@/components/dashboard/ui/avatar";
-import { SearchIcon, PhoneIcon, MailIcon, PinIcon, XIcon, ChevRightIcon } from "@/components/dashboard/icons";
+import { SearchIcon, PhoneIcon, MailIcon, PinIcon, ChevRightIcon } from "@/components/dashboard/icons";
 import { NewCustomerModal } from "@/components/dashboard/new-customer-modal";
 import { NewPetModal } from "@/components/dashboard/new-pet-modal";
 import { InvoicesSection } from "@/components/dashboard/invoices-section";
@@ -93,12 +94,6 @@ function ClientProfile({
   const [showNewPet, setShowNewPet] = useState(false);
   const [, startTransition] = useTransition();
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
   const fetchPets = useCallback(async (showLoading = true) => {
     if (showLoading) setPetsLoading(true);
     const res = await fetch(`/api/pets?customerId=${customer.id}`);
@@ -152,24 +147,29 @@ function ClientProfile({
 
   return (
     <>
-      <div className="fixed inset-0 z-40 bg-black/20" onClick={onClose} />
-      <div className="fixed inset-y-0 start-0 z-50 flex w-full max-w-[480px] flex-col bg-[var(--surface)] shadow-[var(--sh-lg)] drawer-enter">
-        {/* Header */}
-        <div className="flex items-start justify-between border-b border-[var(--line)] px-5 py-4">
+      <Drawer
+        open
+        onClose={onClose}
+        width={480}
+        title={
           <div className="flex items-center gap-3">
             <PersonAvatar initials={initials(customer.fullName)} size={44} />
             <div>
               <p className="text-[15px] font-extrabold text-[var(--ink)]">{customer.fullName}</p>
-              <p className="text-xs text-[var(--muted)]">לקוח/ה מאז {fmtDate(customer.createdAt)}</p>
+              <p className="text-xs font-normal text-[var(--muted)]">לקוח/ה מאז {fmtDate(customer.createdAt)}</p>
             </div>
           </div>
-          <button onClick={onClose} className="rounded-full p-1.5 hover:bg-[var(--surface-2)]">
-            <XIcon size={18} />
-          </button>
-        </div>
+        }
+      >
+        <div className="px-5 py-4 space-y-6">
+          {/* Quick actions */}
+          <Link
+            href={`/dashboard/calendar?newAppointment=1&customerId=${customer.id}`}
+            className="inline-flex items-center justify-center rounded-full bg-[var(--brand-600)] px-4 py-2 text-[13px] font-semibold text-white hover:brightness-110"
+          >
+            תור חדש
+          </Link>
 
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-6">
           {/* Contact info */}
           <div className="space-y-2">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">פרטי קשר</p>
@@ -307,7 +307,7 @@ function ClientProfile({
             </div>
           )}
         </div>
-      </div>
+      </Drawer>
 
       <NewPetModal
         open={showNewPet}

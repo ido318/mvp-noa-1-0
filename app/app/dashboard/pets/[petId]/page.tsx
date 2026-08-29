@@ -123,7 +123,10 @@ export default async function PetProfilePage({ params }: Params) {
             התקשר לבעלים
           </a>
         )}
-        <Link href={`/dashboard/calendar?newAppointment=1`} className="rounded-full border border-[var(--line)] bg-[var(--surface)] px-4 py-2 text-[13px] font-semibold text-[var(--ink)] hover:bg-[var(--surface-2)]">
+        <Link
+          href={`/dashboard/calendar?newAppointment=1&customerId=${pet.customerId}&petId=${pet.id}`}
+          className="rounded-full border border-[var(--line)] bg-[var(--surface)] px-4 py-2 text-[13px] font-semibold text-[var(--ink)] hover:bg-[var(--surface-2)]"
+        >
           קבע תור
         </Link>
         <Link href={`/dashboard/visits/new?petId=${pet.id}`} className="rounded-full bg-[var(--brand-600)] px-4 py-2 text-[13px] font-semibold text-white hover:brightness-110">

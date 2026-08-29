@@ -655,6 +655,8 @@ export default function CalendarPage() {
         onClose={() => setWizardOpen(false)}
         clinicId={clinicId ?? ""}
         onCreated={() => void fetchData()}
+        initialCustomerId={searchParams.get("customerId")}
+        initialPetId={searchParams.get("petId")}
       />
     </div>
   );
