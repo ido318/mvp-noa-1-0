@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Btn } from "@/components/dashboard/ui/btn";
 import { useToast } from "@/components/dashboard/ui/toast";
 import type { Pet } from "@/types/domain/pet";
 
@@ -18,6 +19,9 @@ function nullableNumber(value: FormDataEntryValue | null): number | null {
   const text = typeof value === "string" ? value.trim() : "";
   return text.length > 0 ? Number(text) : null;
 }
+
+const fieldClass = "w-full rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--bg)] px-3 py-2 font-normal text-[var(--ink)] outline-none focus:border-[var(--brand-400)]";
+const labelClass = "space-y-1 text-sm font-semibold text-[var(--ink-2)]";
 
 export function PetProfileForm({ pet }: Props) {
   const router = useRouter();
@@ -69,91 +73,85 @@ export function PetProfileForm({ pet }: Props) {
   }
 
   return (
-    <form onSubmit={onSubmit} className="rounded-2xl border border-zinc-200 bg-white p-6">
+    <form onSubmit={onSubmit}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h3 className="text-base font-bold text-zinc-900">פרופיל רפואי</h3>
-          <p className="mt-1 text-sm text-zinc-500">פרטים קבועים שחייבים להיות זמינים לנועה בכל ביקור.</p>
+          <h3 className="text-[15px] font-bold text-[var(--ink)]">פרופיל רפואי</h3>
+          <p className="mt-0.5 text-xs text-[var(--muted)]">פרטים קבועים שחייבים להיות זמינים בכל ביקור</p>
         </div>
-        <button
-          type="submit"
-          disabled={saving}
-          className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
-        >
-          {saving ? "שומר..." : "שמור פרטים"}
-        </button>
+        <Btn type="submit" size="sm" loading={saving}>שמור פרטים</Btn>
       </div>
 
       <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <label className="space-y-1 text-sm font-semibold text-zinc-700">
+        <label className={labelClass}>
           שם החיה
-          <input name="name" defaultValue={pet.name} required className="w-full rounded-xl border border-zinc-200 px-3 py-2 font-normal" />
+          <input name="name" defaultValue={pet.name} required className={fieldClass} />
         </label>
-        <label className="space-y-1 text-sm font-semibold text-zinc-700">
+        <label className={labelClass}>
           סוג חיה
-          <select name="species" defaultValue={pet.species} className="w-full rounded-xl border border-zinc-200 px-3 py-2 font-normal">
+          <select name="species" defaultValue={pet.species} className={fieldClass}>
             <option value="dog">כלב</option>
             <option value="cat">חתול</option>
             <option value="other">אחר</option>
           </select>
         </label>
-        <label className="space-y-1 text-sm font-semibold text-zinc-700">
+        <label className={labelClass}>
           גזע
-          <input name="breed" defaultValue={pet.breed ?? ""} className="w-full rounded-xl border border-zinc-200 px-3 py-2 font-normal" />
+          <input name="breed" defaultValue={pet.breed ?? ""} className={fieldClass} />
         </label>
-        <label className="space-y-1 text-sm font-semibold text-zinc-700">
+        <label className={labelClass}>
           מין
-          <select name="sex" defaultValue={pet.sex ?? ""} className="w-full rounded-xl border border-zinc-200 px-3 py-2 font-normal">
+          <select name="sex" defaultValue={pet.sex ?? ""} className={fieldClass}>
             <option value="">לא ידוע</option>
             <option value="male">זכר</option>
             <option value="female">נקבה</option>
           </select>
         </label>
-        <label className="space-y-1 text-sm font-semibold text-zinc-700">
+        <label className={labelClass}>
           משקל בק״ג
-          <input name="weight" type="number" step="0.01" min="0" defaultValue={pet.weight ?? ""} className="w-full rounded-xl border border-zinc-200 px-3 py-2 font-normal" />
+          <input name="weight" type="number" step="0.01" min="0" defaultValue={pet.weight ?? ""} className={fieldClass} />
         </label>
-        <label className="space-y-1 text-sm font-semibold text-zinc-700">
+        <label className={labelClass}>
           תאריך לידה
-          <input name="birthDate" type="date" defaultValue={pet.birthDate ?? ""} className="w-full rounded-xl border border-zinc-200 px-3 py-2 font-normal" />
+          <input name="birthDate" type="date" defaultValue={pet.birthDate ?? ""} className={fieldClass} />
         </label>
-        <label className="space-y-1 text-sm font-semibold text-zinc-700">
+        <label className={labelClass}>
           מספר שבב
-          <input name="chipNumber" defaultValue={pet.chipNumber ?? ""} className="w-full rounded-xl border border-zinc-200 px-3 py-2 font-normal" />
+          <input name="chipNumber" defaultValue={pet.chipNumber ?? ""} className={fieldClass} />
         </label>
-        <label className="space-y-1 text-sm font-semibold text-zinc-700">
+        <label className={labelClass}>
           סטטוס
-          <select name="status" defaultValue={pet.status} className="w-full rounded-xl border border-zinc-200 px-3 py-2 font-normal">
+          <select name="status" defaultValue={pet.status} className={fieldClass}>
             <option value="active">פעיל</option>
             <option value="inactive">לא פעיל</option>
           </select>
         </label>
-        <label className="flex items-center gap-2 self-end rounded-xl border border-zinc-200 px-3 py-2 text-sm font-semibold text-zinc-700">
+        <label className="flex items-center gap-2 self-end rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm font-semibold text-[var(--ink-2)]">
           <input name="isNeutered" type="checkbox" defaultChecked={pet.isNeutered} />
           מעוקר / מסורס
         </label>
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
-        <label className="space-y-1 text-sm font-semibold text-zinc-700">
+        <label className={labelClass}>
           אלרגיות
-          <textarea name="allergies" defaultValue={pet.allergies ?? ""} rows={3} className="w-full rounded-xl border border-zinc-200 px-3 py-2 font-normal" />
+          <textarea name="allergies" defaultValue={pet.allergies ?? ""} rows={3} className={fieldClass} />
         </label>
-        <label className="space-y-1 text-sm font-semibold text-zinc-700">
+        <label className={labelClass}>
           מחלות כרוניות
-          <textarea name="chronicConditions" defaultValue={pet.chronicConditions ?? ""} rows={3} className="w-full rounded-xl border border-zinc-200 px-3 py-2 font-normal" />
+          <textarea name="chronicConditions" defaultValue={pet.chronicConditions ?? ""} rows={3} className={fieldClass} />
         </label>
-        <label className="space-y-1 text-sm font-semibold text-zinc-700">
+        <label className={labelClass}>
           תרופות קבועות
-          <textarea name="currentMedications" defaultValue={pet.currentMedications ?? ""} rows={3} className="w-full rounded-xl border border-zinc-200 px-3 py-2 font-normal" />
+          <textarea name="currentMedications" defaultValue={pet.currentMedications ?? ""} rows={3} className={fieldClass} />
         </label>
-        <label className="space-y-1 text-sm font-semibold text-zinc-700">
+        <label className={labelClass}>
           הערות
-          <textarea name="notes" defaultValue={pet.notes ?? ""} rows={3} className="w-full rounded-xl border border-zinc-200 px-3 py-2 font-normal" />
+          <textarea name="notes" defaultValue={pet.notes ?? ""} rows={3} className={fieldClass} />
         </label>
       </div>
 
-      {error ? <p className="mt-3 text-sm font-semibold text-red-600">{error}</p> : null}
+      {error ? <p className="mt-3 text-sm font-semibold text-[var(--red-700)]">{error}</p> : null}
     </form>
   );
 }

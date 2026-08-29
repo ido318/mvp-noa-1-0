@@ -1,18 +1,14 @@
 import Link from "next/link";
 import { dashboardApiFetch } from "@/app/dashboard/api-client";
-import { formatIsraelDate, formatIsraelDateTime } from "@/lib/israel-date";
-import { PetProfileForm } from "@/app/dashboard/pets/[petId]/pet-profile-form";
+import { AnimalIcon } from "@/components/dashboard/icons";
+import { PetDetailTabs } from "@/app/dashboard/pets/[petId]/pet-detail-tabs";
+import type { Customer } from "@/types/domain/customer";
 import type { Pet } from "@/types/domain/pet";
 import type { Vaccination } from "@/types/domain/vaccination";
-import type { Visit, VisitStatus } from "@/types/domain/visit";
+import type { Prescription } from "@/types/domain/prescription";
+import type { Visit } from "@/types/domain/visit";
 
 type Params = { params: Promise<{ petId: string }> };
-
-const VISIT_STATUS_LABELS: Record<VisitStatus, string> = {
-  in_progress: "בטיפול",
-  completed: "הושלם",
-  cancelled: "בוטל",
-};
 
 const PET_SEX_LABELS: Record<string, string> = {
   male: "זכר",
@@ -20,140 +16,128 @@ const PET_SEX_LABELS: Record<string, string> = {
   unknown: "לא ידוע",
 };
 
-const PET_STATUS_LABELS: Record<string, string> = {
-  active: "פעיל",
-  inactive: "לא פעיל",
-};
+function petAge(birthDate: string | null): string | null {
+  if (!birthDate) return null;
+  const diff = Date.now() - new Date(birthDate).getTime();
+  const years = Math.floor(diff / (365.25 * 24 * 3600 * 1000));
+  if (years >= 1) return `${years} שנים`;
+  const months = Math.floor(diff / (30.4 * 24 * 3600 * 1000));
+  return months > 0 ? `${months} חודשים` : "גור";
+}
 
 export default async function PetProfilePage({ params }: Params) {
   const { petId } = await params;
   const pet = await dashboardApiFetch<Pet>(`/api/pets/${petId}`);
 
-  const visitsData = pet
-    ? await dashboardApiFetch<{ items: Visit[] }>(
-        `/api/visits?petId=${encodeURIComponent(petId)}&clinicId=${encodeURIComponent(pet.clinicId)}&limit=5`,
-      )
-    : null;
-  const vaccinationsData = pet
-    ? await dashboardApiFetch<{ items: Vaccination[] }>(
-        `/api/pets/${petId}/vaccinations?clinicId=${encodeURIComponent(pet.clinicId)}`,
-      )
-    : null;
-
   if (!pet) {
     return (
-      <section className="rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-700">
+      <section className="rounded-[var(--r-lg)] border border-[var(--red-100)] bg-[var(--red-50)] p-6 text-sm text-[var(--red-700)]">
         החיה לא נמצאה.
       </section>
     );
   }
 
+  const [visitsData, vaccinationsData, prescriptionsData, owner] = await Promise.all([
+    dashboardApiFetch<{ items: Visit[] }>(
+      `/api/visits?petId=${encodeURIComponent(petId)}&clinicId=${encodeURIComponent(pet.clinicId)}&limit=10`,
+    ),
+    dashboardApiFetch<{ items: Vaccination[] }>(
+      `/api/pets/${petId}/vaccinations?clinicId=${encodeURIComponent(pet.clinicId)}`,
+    ),
+    dashboardApiFetch<{ items: Prescription[] }>(`/api/pets/${petId}/prescriptions`),
+    dashboardApiFetch<Customer>(`/api/customers/${pet.customerId}`),
+  ]);
+
+  const age = petAge(pet.birthDate);
+  const hasAlerts = Boolean(pet.allergies || pet.chronicConditions);
+
   return (
-    <section className="space-y-6">
-      <div>
-        <Link href={`/dashboard/clients?customerId=${pet.customerId}`} className="text-sm text-emerald-700">
-          חזרה ללקוח
+    <div className="mx-auto w-full max-w-[1000px] space-y-5 p-6">
+      <Link href={`/dashboard/clients?customerId=${pet.customerId}`} className="text-sm font-semibold text-[var(--brand-600)] hover:underline">
+        ← חזרה ללקוח
+      </Link>
+
+      {/* Hero */}
+      <div className="flex flex-wrap items-center justify-between gap-6 rounded-[var(--r-lg)] border border-[var(--line)] bg-[var(--surface)] p-6">
+        <div className="flex flex-wrap items-center gap-6">
+          {pet.weight != null && (
+            <div className="text-end">
+              <p className="text-[11px] text-[var(--muted)]">משקל אחרון</p>
+              <p className="text-[20px] font-bold tabular-nums text-[var(--ink)]">{pet.weight} ק״ג</p>
+            </div>
+          )}
+          {age && (
+            <div className="text-end">
+              <p className="text-[11px] text-[var(--muted)]">גיל</p>
+              <p className="text-[20px] font-bold text-[var(--ink)]">{age}</p>
+            </div>
+          )}
+          {owner && (
+            <div className="text-end">
+              <p className="text-[11px] text-[var(--muted)]">בעלים</p>
+              <Link href={`/dashboard/clients?customerId=${owner.id}`} className="text-[16px] font-bold text-[var(--brand-600)] hover:underline">
+                {owner.fullName}
+              </Link>
+              {owner.phone && <p className="text-xs text-[var(--muted)]">{owner.phone}</p>}
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center gap-3">
+          <div className="text-end">
+            <div className="flex items-center gap-2">
+              {pet.isNeutered && <span className="rounded px-1.5 py-0.5 text-[11px] font-semibold text-[#1d4ed8] bg-[#eff6ff]">מעוקר/ת</span>}
+              <p className="text-[20px] font-bold text-[var(--ink)]">{pet.name}</p>
+            </div>
+            <p className="text-sm text-[var(--ink-2)]">
+              {pet.species}{pet.breed ? ` · ${pet.breed}` : ""}
+              {pet.sex ? ` · ${PET_SEX_LABELS[pet.sex] ?? pet.sex}` : ""}
+            </p>
+          </div>
+          <span className="flex h-16 w-16 items-center justify-center rounded-full bg-[var(--brand-100)]">
+            <AnimalIcon species={pet.species} size={32} />
+          </span>
+        </div>
+      </div>
+
+      {/* Medical alerts */}
+      {hasAlerts && (
+        <div className="space-y-2">
+          {pet.allergies && (
+            <div className="flex items-start gap-2 rounded-[var(--r-md)] border border-[var(--red-500)] bg-[var(--red-50)] p-3">
+              <p className="text-[13px] font-bold text-[var(--red-700)]">אלרגיה: {pet.allergies}</p>
+            </div>
+          )}
+          {pet.chronicConditions && (
+            <div className="flex items-start gap-2 rounded-[var(--r-md)] border border-[var(--amber-500)] bg-[var(--amber-50)] p-3">
+              <p className="text-[13px] font-bold text-[var(--amber-600)]">מצב כרוני: {pet.chronicConditions}</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Quick actions */}
+      <div className="flex flex-wrap justify-end gap-2">
+        {owner?.phone && (
+          <a href={`tel:${owner.phone}`} className="rounded-full border border-[var(--line)] bg-[var(--surface)] px-4 py-2 text-[13px] font-semibold text-[var(--ink)] hover:bg-[var(--surface-2)]">
+            התקשר לבעלים
+          </a>
+        )}
+        <Link href={`/dashboard/calendar?newAppointment=1`} className="rounded-full border border-[var(--line)] bg-[var(--surface)] px-4 py-2 text-[13px] font-semibold text-[var(--ink)] hover:bg-[var(--surface-2)]">
+          קבע תור
         </Link>
-        <h2 className="mt-2 text-xl font-semibold text-zinc-900">{pet.name}</h2>
-        <p className="text-sm text-zinc-600">
-          {pet.species}
-          {pet.breed ? ` · ${pet.breed}` : ""}
-        </p>
+        <Link href={`/dashboard/visits/new?petId=${pet.id}`} className="rounded-full bg-[var(--brand-600)] px-4 py-2 text-[13px] font-semibold text-white hover:brightness-110">
+          פתח ביקור חדש
+        </Link>
       </div>
 
-      <div className="rounded-2xl border border-zinc-200 bg-white p-6">
-        <dl className="grid gap-3 text-sm text-zinc-700 sm:grid-cols-2">
-          <div>
-            <dt className="text-zinc-500">מין</dt>
-            <dd>{pet.sex ? (PET_SEX_LABELS[pet.sex] ?? pet.sex) : "—"}</dd>
-          </div>
-          <div>
-            <dt className="text-zinc-500">תאריך לידה</dt>
-            <dd>{pet.birthDate ?? "—"}</dd>
-          </div>
-          <div>
-            <dt className="text-zinc-500">משקל</dt>
-            <dd>{pet.weight ?? "—"}</dd>
-          </div>
-          <div>
-            <dt className="text-zinc-500">מספר שבב</dt>
-            <dd>{pet.chipNumber ?? "—"}</dd>
-          </div>
-          <div>
-            <dt className="text-zinc-500">מעוקר/מסורס</dt>
-            <dd>{pet.isNeutered ? "כן" : "לא"}</dd>
-          </div>
-          <div>
-            <dt className="text-zinc-500">סטטוס</dt>
-            <dd>{PET_STATUS_LABELS[pet.status] ?? pet.status}</dd>
-          </div>
-        </dl>
-      </div>
-
-      <PetProfileForm pet={pet} />
-
-      <div className="rounded-2xl border border-zinc-200 bg-white p-6">
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">הערות</h3>
-        <p className="mt-2 text-sm text-zinc-700">{pet.notes ?? "אין עדיין הערות."}</p>
-      </div>
-
-      <div className="rounded-2xl border border-zinc-200 bg-white p-6">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">
-            היסטוריה רפואית
-          </h3>
-          <Link
-            href={`/dashboard/visits?petId=${encodeURIComponent(petId)}`}
-            className="text-sm text-emerald-700"
-          >
-            כל הביקורים
-          </Link>
-        </div>
-        <div className="mt-4 space-y-4">
-          <div>
-            <h4 className="text-sm font-medium text-zinc-800">ביקורים אחרונים</h4>
-            <ul className="mt-2 space-y-2">
-              {(visitsData?.items ?? []).length === 0 ? (
-                <li className="text-sm text-zinc-500">לא נרשמו ביקורים.</li>
-              ) : (
-                (visitsData?.items ?? []).map((visit) => (
-                  <li key={visit.id}>
-                    <Link
-                      href={`/dashboard/visits/${visit.id}`}
-                      className="text-sm text-emerald-700"
-                    >
-                      {formatIsraelDateTime(visit.startedAt)} ·{" "}
-                      {VISIT_STATUS_LABELS[visit.status]}
-                    </Link>
-                  </li>
-                ))
-              )}
-            </ul>
-            <Link
-              href={`/dashboard/visits/new?petId=${encodeURIComponent(petId)}`}
-              className="mt-2 inline-block text-sm text-emerald-700"
-            >
-              + ביקור חדש
-            </Link>
-          </div>
-          <div>
-            <h4 className="text-sm font-medium text-zinc-800">חיסונים</h4>
-            <ul className="mt-2 space-y-1">
-              {(vaccinationsData?.items ?? []).slice(0, 5).map((v) => (
-                <li key={v.id} className="text-sm text-zinc-600">
-                  {v.vaccineName} · {formatIsraelDate(v.administeredAt)}
-                  {v.nextDueAt && (
-                    <span className="text-zinc-400"> · הבא: {formatIsraelDate(v.nextDueAt)}</span>
-                  )}
-                </li>
-              ))}
-              {(vaccinationsData?.items ?? []).length === 0 ? (
-                <li className="text-sm text-zinc-500">לא נרשמו חיסונים.</li>
-              ) : null}
-            </ul>
-          </div>
-        </div>
-      </div>
-    </section>
+      <PetDetailTabs
+        pet={pet}
+        clinicId={pet.clinicId}
+        visits={visitsData?.items ?? []}
+        vaccinations={vaccinationsData?.items ?? []}
+        prescriptions={prescriptionsData?.items ?? []}
+      />
+    </div>
   );
 }

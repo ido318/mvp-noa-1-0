@@ -11,6 +11,7 @@ import { PersonAvatar, AnimalAvatar } from "@/components/dashboard/ui/avatar";
 import { SearchIcon, PhoneIcon, MailIcon, PinIcon, XIcon, ChevRightIcon } from "@/components/dashboard/icons";
 import { NewCustomerModal } from "@/components/dashboard/new-customer-modal";
 import { NewPetModal } from "@/components/dashboard/new-pet-modal";
+import { InvoicesSection } from "@/components/dashboard/invoices-section";
 import type { Customer } from "@/types/domain/customer";
 import type { Pet } from "@/types/domain/pet";
 import type { Appointment } from "@/types/domain/appointment";
@@ -21,6 +22,11 @@ import type { Visit } from "@/types/domain/visit";
 const TZ = "Asia/Jerusalem";
 function fmtDate(iso: string) {
   return new Intl.DateTimeFormat("he-IL", { timeZone: TZ, day: "numeric", month: "short", year: "numeric" }).format(new Date(iso));
+}
+
+function waPhone(phone: string): string {
+  const digits = phone.replace(/\D/g, "");
+  return digits.startsWith("0") ? `972${digits.slice(1)}` : digits;
 }
 
 function petAge(birthDate: string | null): string | null {
@@ -168,10 +174,23 @@ function ClientProfile({
           <div className="space-y-2">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">פרטי קשר</p>
             {customer.phone && (
-              <div className="flex items-center gap-2 text-sm text-[var(--ink)]">
-                <PhoneIcon size={14} className="text-[var(--muted)]" />
-                <a href={`tel:${customer.phone}`} className="hover:text-[var(--brand-600)]">{customer.phone}</a>
-              </div>
+              <>
+                <div className="flex items-center gap-2 text-sm text-[var(--ink)]">
+                  <PhoneIcon size={14} className="text-[var(--muted)]" />
+                  <a href={`tel:${customer.phone}`} className="hover:text-[var(--brand-600)]">{customer.phone}</a>
+                </div>
+                <div className="flex items-center gap-2">
+                  <a href={`sms:${customer.phone}`} className="text-xs font-semibold text-[var(--brand-600)] hover:underline">שלח SMS</a>
+                  <a
+                    href={`https://wa.me/${waPhone(customer.phone)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs font-semibold text-[var(--brand-600)] hover:underline"
+                  >
+                    WhatsApp
+                  </a>
+                </div>
+              </>
             )}
             {customer.email && (
               <div className="flex items-center gap-2 text-sm text-[var(--ink)]">
@@ -276,6 +295,9 @@ function ClientProfile({
               </div>
             )}
           </div>
+
+          {/* Billing */}
+          <InvoicesSection clinicId={customer.clinicId} customerId={customer.id} />
 
           {/* Notes */}
           {customer.notes && (
