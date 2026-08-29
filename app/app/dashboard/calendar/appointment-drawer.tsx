@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { Drawer } from "@/components/dashboard/ui/drawer";
 import { Badge } from "@/components/dashboard/ui/badge";
@@ -38,6 +38,15 @@ export function AppointmentDrawer({
   const [confirmingCancel, setConfirmingCancel] = useState<"cancelled" | "no_show" | null>(null);
   const [savingStatus, setSavingStatus] = useState(false);
   const { toast } = useToast();
+
+  // AppointmentDrawer itself never unmounts (Drawer only hides its content via
+  // `open`), so local UI state must be reset explicitly whenever the selected
+  // appointment changes — otherwise a leftover approve/reject or cancel-confirm
+  // step from a previous appointment would reappear for the next one.
+  useEffect(() => {
+    setApproveRejectMode(null);
+    setConfirmingCancel(null);
+  }, [appointment?.id]);
 
   async function applyStatus(status: "cancelled" | "no_show") {
     if (!appointment) return;
