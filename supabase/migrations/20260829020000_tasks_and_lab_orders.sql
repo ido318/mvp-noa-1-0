@@ -24,10 +24,10 @@ CREATE TABLE public.tasks (
   deleted_at    timestamptz,
   CONSTRAINT tasks_customer_clinic_fk
     FOREIGN KEY (customer_id, clinic_id)
-    REFERENCES public.customers (id, clinic_id) ON DELETE CASCADE,
+    REFERENCES public.customers (id, clinic_id) ON DELETE RESTRICT,
   CONSTRAINT tasks_pet_clinic_fk
     FOREIGN KEY (pet_id, clinic_id)
-    REFERENCES public.pets (id, clinic_id) ON DELETE CASCADE
+    REFERENCES public.pets (id, clinic_id) ON DELETE RESTRICT
 );
 
 CREATE TRIGGER tasks_set_updated_at
@@ -78,10 +78,10 @@ CREATE TABLE public.lab_orders (
   deleted_at    timestamptz,
   CONSTRAINT lab_orders_customer_clinic_fk
     FOREIGN KEY (customer_id, clinic_id)
-    REFERENCES public.customers (id, clinic_id) ON DELETE CASCADE,
+    REFERENCES public.customers (id, clinic_id) ON DELETE RESTRICT,
   CONSTRAINT lab_orders_pet_clinic_fk
     FOREIGN KEY (pet_id, clinic_id)
-    REFERENCES public.pets (id, clinic_id) ON DELETE CASCADE,
+    REFERENCES public.pets (id, clinic_id) ON DELETE RESTRICT,
   CONSTRAINT lab_orders_visit_clinic_fk
     FOREIGN KEY (visit_id, clinic_id)
     REFERENCES public.visits (id, clinic_id) ON DELETE SET NULL
