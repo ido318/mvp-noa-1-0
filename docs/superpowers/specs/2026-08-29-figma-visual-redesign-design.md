@@ -1,7 +1,7 @@
 # Figma Visual Redesign — Design Spec
 
 **Date:** 2026-08-29
-**Status:** Phase 1 shipped (tokens + sidebar). Phases 2-6 are a roadmap, each needs its own approval + spec/plan before implementation.
+**Status:** Phases 1-2 shipped (tokens + sidebar, today dashboard). Phases 3-6 are a roadmap, each needs its own approval + spec/plan before implementation.
 **Relation to prior spec:** [2026-08-27-dashboard-crm-redesign-design.md](2026-08-27-dashboard-crm-redesign-design.md) already shipped the current information architecture (nav items, customer-centric profile, teal `--brand-*` palette). This spec layers a new visual language on top of that IA, sourced from a Figma file the clinic's designer produced, and extends the IA with a few new screens the designer added (patient medical record, clinical encounter/SOAP workspace, prescriptions, billing tab).
 
 ## Source
@@ -35,7 +35,7 @@ Still undesigned: תקשורת (communications) and מרשמים as a standalone
 | Phase | Scope | Notes |
 |---|---|---|
 | **1** | Design tokens + shared shell (sidebar + header) | This spec. No page content changes. |
-| 2 | Today dashboard | 1:1 with existing `dashboard/page.tsx` data |
+| **2** | Today dashboard | Shipped using existing `dashboard/page.tsx` data; no DB/API changes |
 | 3 | Calendar week view + appointment drawer + new-appointment modal | Existing data (`appointments`, `calendar_blocks`) |
 | 4 | Client detail + Patient detail pages (incl. billing tab as UI-only, no payment gateway yet — will be wired to a real processor later) | Some new fields/empty states, no schema blockers |
 | 5 | Encounter workspace (SOAP) + Prescription flow | Needs new DB tables/columns — biggest phase |
