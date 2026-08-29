@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/dashboard/ui/skeleton";
 import { AnimalIcon, ChevLeftIcon, ChevRightIcon, CalendarIcon, PlusIcon } from "@/components/dashboard/icons";
 import { toIsraelLocalIso, VISIT_TYPE_CONFIG } from "@/lib/appointment-rules";
 import { ISRAEL_TIMEZONE, israelDateIso } from "@/lib/israel-date";
+import { AppointmentDrawer } from "@/app/dashboard/calendar/appointment-drawer";
 import type { MeResponse } from "@/types/api/me";
 import type { Appointment } from "@/types/domain/appointment";
 import type { CalendarBlock } from "@/types/domain/calendar-block";
@@ -140,7 +141,7 @@ function appointmentTime(iso: string) {
 
 // ─── Week columns ──────────────────────────────────────────────────────────────
 
-function ApptBlock({ appt }: { appt: Appointment }) {
+function ApptBlock({ appt, onClick }: { appt: Appointment; onClick: () => void }) {
   const top  = topPx(appt.scheduledAt);
   const h    = heightPx(appt.durationMinutes);
   const accent = appointmentAccent(appt.appointmentType, appt.status);
@@ -149,8 +150,10 @@ function ApptBlock({ appt }: { appt: Appointment }) {
   const title = `${petName} · ${customerName} · ${visitLabel(appt.appointmentType)}`;
 
   return (
-    <div
-      className="absolute inset-x-3 z-10 overflow-hidden rounded-[12px] border px-3 py-2.5 text-[12px] shadow-[0_10px_22px_rgba(31,41,51,0.10)] transition-transform hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(31,41,51,0.16)]"
+    <button
+      type="button"
+      onClick={onClick}
+      className="absolute inset-x-3 z-10 overflow-hidden rounded-[12px] border px-3 py-2.5 text-start text-[12px] shadow-[0_10px_22px_rgba(31,41,51,0.10)] transition-transform hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(31,41,51,0.16)]"
       style={{
         top: `${top}px`,
         height: `${Math.max(h, 72)}px`,
@@ -175,7 +178,7 @@ function ApptBlock({ appt }: { appt: Appointment }) {
       {appt.status === "pending_approval" && (
         <div className="mt-1 text-[10px] font-extrabold">ממתין לאישור</div>
       )}
-    </div>
+    </button>
   );
 }
 
@@ -223,12 +226,14 @@ function DayColumn({
   blocks,
   isToday,
   onDeleteBlock,
+  onSelectAppointment,
 }: {
   day: Date;
   appointments: Appointment[];
   blocks: CalendarBlock[];
   isToday: boolean;
   onDeleteBlock: (blockId: string) => void;
+  onSelectAppointment: (appt: Appointment) => void;
 }) {
   const isFriday = day.getDay() === 5;
   const isSaturday = day.getDay() === 6;
@@ -274,7 +279,7 @@ function DayColumn({
       ))}
 
       {appointments.map(appt => (
-        <ApptBlock key={appt.id} appt={appt} />
+        <ApptBlock key={appt.id} appt={appt} onClick={() => onSelectAppointment(appt)} />
       ))}
     </div>
   );
@@ -296,6 +301,7 @@ export default function CalendarPage() {
   const [blockReason, setBlockReason] = useState("סיום מוקדם");
   const [blockError, setBlockError] = useState<string | null>(null);
   const [calendarError, setCalendarError] = useState<string | null>(null);
+  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
 
   const weekDays = useMemo(
     () => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)) as [Date, Date, Date, Date, Date, Date, Date],
@@ -615,6 +621,7 @@ export default function CalendarPage() {
                   blocks={blocksForDay(day)}
                   isToday={isoOfDate(day) === today}
                   onDeleteBlock={deleteBlock}
+                  onSelectAppointment={setSelectedAppointment}
                 />
               ))}
             </div>
@@ -631,6 +638,12 @@ export default function CalendarPage() {
         />
       )}
       </div>
+
+      <AppointmentDrawer
+        appointment={selectedAppointment}
+        onClose={() => setSelectedAppointment(null)}
+        onChanged={() => void fetchData()}
+      />
     </div>
   );
 }
