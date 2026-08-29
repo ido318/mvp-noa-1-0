@@ -25,7 +25,7 @@ export default async function AppointmentsPage({
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-semibold text-zinc-900">Appointments</h2>
         <Link
-          href="/dashboard/appointments/new"
+          href="/dashboard/calendar?newAppointment=1"
           className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-medium text-white"
         >
           New appointment

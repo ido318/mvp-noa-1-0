@@ -10,6 +10,8 @@ import { AnimalIcon, ChevLeftIcon, ChevRightIcon, CalendarIcon, PlusIcon } from 
 import { toIsraelLocalIso, VISIT_TYPE_CONFIG } from "@/lib/appointment-rules";
 import { ISRAEL_TIMEZONE, israelDateIso } from "@/lib/israel-date";
 import { AppointmentDrawer } from "@/app/dashboard/calendar/appointment-drawer";
+import { NewAppointmentWizard } from "@/app/dashboard/calendar/new-appointment-wizard";
+import { useSearchParams } from "next/navigation";
 import type { MeResponse } from "@/types/api/me";
 import type { Appointment } from "@/types/domain/appointment";
 import type { CalendarBlock } from "@/types/domain/calendar-block";
@@ -302,6 +304,8 @@ export default function CalendarPage() {
   const [blockError, setBlockError] = useState<string | null>(null);
   const [calendarError, setCalendarError] = useState<string | null>(null);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+  const searchParams = useSearchParams();
+  const [wizardOpen, setWizardOpen] = useState(() => searchParams.get("newAppointment") === "1");
 
   const weekDays = useMemo(
     () => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)) as [Date, Date, Date, Date, Date, Date, Date],
@@ -471,13 +475,14 @@ export default function CalendarPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <Link
-            href="/dashboard/appointments/new"
+          <button
+            type="button"
+            onClick={() => setWizardOpen(true)}
             className="inline-flex h-10 items-center justify-center gap-2 rounded-[12px] bg-[var(--brand-600)] px-4 text-sm font-semibold text-white shadow-[var(--sh-sm)] transition-all hover:brightness-110 active:brightness-95"
           >
             <PlusIcon size={15} />
             תור חדש
-          </Link>
+          </button>
           <div className="flex h-10 items-center overflow-hidden rounded-[12px] border border-[#E2E8ED] bg-white shadow-[var(--sh-sm)]">
             <button
               type="button"
@@ -643,6 +648,13 @@ export default function CalendarPage() {
         appointment={selectedAppointment}
         onClose={() => setSelectedAppointment(null)}
         onChanged={() => void fetchData()}
+      />
+
+      <NewAppointmentWizard
+        open={wizardOpen}
+        onClose={() => setWizardOpen(false)}
+        clinicId={clinicId ?? ""}
+        onCreated={() => void fetchData()}
       />
     </div>
   );
