@@ -55,18 +55,18 @@ supabase db reset         # re-run all migrations + seed
 ### Call flow
 ```
 [Caller] → [Twilio Israeli number]
-         → POST /twilio/voice        (agent/)
-         → ElevenLabs signed URL
+         → Twilio voice_url = https://api.elevenlabs.io/twilio/inbound-call   (ElevenLabs native integration)
          → ElevenLabs "Tomer" agent (Hebrew conversation)
               ├── POST /tools/lookup-customer  → customers + pets (Supabase)
               └── POST /tools/escalate-to-noa → escalations table (Supabase)
          → call ends → POST /hooks/call-ended
          → upsert to voice_calls table
 ```
+**Verified 2026-08-29:** the number's Twilio `voice_url` points directly at ElevenLabs' native inbound-call webhook, not at our own server. `agent/src/server/routes/twilio.ts`'s `/twilio/voice` and `/twilio/status` routes are currently **dead code in production** (kept for reference / possible fallback, not wired to the live number). Root cause + history: see the 2026-08-25 outage where someone re-pointed `voice_url` at our server and broke calls — if "Tomer" ever goes silent again, check `voice_url` on the Twilio number first.
 
 ### Agent (`agent/src/`)
 - `server/app.ts` — Hono app factory, mounts all route groups
-- `server/routes/twilio.ts` — Twilio webhook, validates signature, returns ElevenLabs signed URL via TwiML `<Stream>`
+- `server/routes/twilio.ts` — Twilio webhook, validates signature, returns ElevenLabs signed URL via TwiML `<Stream>` — **currently dead code in production**, see "Call flow" above
 - `server/routes/tools.ts` — ElevenLabs tool endpoints (all protected by `verifyElevenLabsSignature`):
   - `/tools/lookup-customer` — find customer + pets by phone
   - `/tools/escalate-to-noa` — create escalation record
@@ -101,8 +101,8 @@ Architecture is layered: `UI (page.tsx) → API route → Service → Repository
 ### Supabase
 - **Cloud project:** `xpsuhtqfxqmnunppnyov` (account: voxly ai, region: eu-central-1, Frankfurt) — `https://xpsuhtqfxqmnunppnyov.supabase.co`
   Old projects (deleted): `ssfkximqwyzqlsgwfbye` (Seoul), `voxly-tomer` (`grbgkjjtyfohzulssuga`).
-- Migrations in `supabase/migrations/` — run in timestamp order; 15 migrations total (through `20260612000015_notifications.sql`)
-- pg_cron **not yet active** — see "הפעלת cron" below; activate manually after Vercel deploy
+- Migrations in `supabase/migrations/` — run in timestamp order; latest is `20260828000031_vaccination_reminder_id_required.sql`
+- pg_cron **active** (verified 2026-08-29): `process-sms-notifications` (every 15 min) and `send-vaccination-reminders` (daily 06:00) are both scheduled and active in `cron.job`. The weekly `analyze-tomer-conversations` job (prompt learning loop) documented below has **not** been created yet.
 - RLS is enabled on all tables; the app uses the anon key + user session for data access, the service role key only for admin operations (audit logs, AI events, health checks)
 - Multi-tenant by `clinic_id` — every data table has a `clinic_id` column
 - Clinic seed: Get A Vet → `AGENT_CLINIC_ID=37681721-a59f-40d5-a041-ad15a49ecf29`
@@ -175,9 +175,19 @@ Shared (same Supabase project): `SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_URL`, `SU
 - תקשורת עם המשתמש בעברית. קוד והודעות commit באנגלית.
 - תיעוד מרכזי בנושן: דף Voxly-Tomer (`36f1354b584881b587c5c6f42a6bf6c7`).
 
-## הפעלת cron (אחרי Vercel deploy)
+## cron (pg_cron)
 
-לאחר ש-`PUBLIC_BASE_URL` ו-`JOBS_BEARER_TOKEN` ידועים, הרץ ב-SQL editor של Supabase:
+**סטטוס נוכחי (עודכן 2026-08-29):** 3 jobs פעילים ב-`cron.job` על הפרויקט בענן, כולם מול `https://voxly-agent.fly.dev`:
+
+| jobid | jobname | schedule | סטטוס |
+|---|---|---|---|
+| 1 | `process-sms-notifications` | `*/15 * * * *` | ✅ active |
+| 3 | `send-vaccination-reminders` | `0 6 * * *` | ✅ active |
+| 4 | `analyze-tomer-conversations` | `0 6 * * 0` | ✅ active |
+
+אין צורך להריץ שוב את ה-SQL למטה — הוא נשמר כאן לתיעוד/שחזור בלבד. `ANTHROPIC_API_KEY` מוגדר ב-Fly secrets.
+
+**⚠️ תקלה שתוקנה 2026-08-29 בדרך:** טבלת `call_reviews` בענן הייתה קיימת עם סכמה שונה לגמרי ממה שהמיגרציה המקורית (`20260828000022_prompt_learning_loop.sql`) וה-agent code ציפו לו — מישהו יצר/שינה אותה ישירות ב-SQL editor בלי מיגרציה, וה-`create table if not exists` פשוט no-op-ה. זה שבר בשקט את `logConversation.ts` (0 שורות ב-`call_reviews` מאז 28.8) וגרם ל-`analyzeConversations.ts` (וממילא ל-job הזה) לזרוק שגיאת עמודה חסרה. תוקן: `agent/src/lib/learning/logConversation.ts` + `analyzeConversations.ts` עודכנו להתאים לסכמה האמיתית בענן (`conversation_id`, `agent_id`, `version_id`, `call_successful`, `evaluation_criteria_results`, `data_collection_results`, `flagged_reasons` וכו'), ומיגרציה `20260829002217_call_reviews_clinic_id.sql` הוסיפה את `clinic_id` שהיה חסר. אם משהו דומה קורה שוב (עמודה/טבלה "לא קיימת" למרות שהמיגרציה "רצה בהצלחה") — תמיד לבדוק את הסכמה בפועל בענן מול קובץ המיגרציה, לא להניח שהם זהים.
 
 ```sql
 SELECT cron.schedule(
@@ -195,7 +205,7 @@ SELECT cron.schedule(
 
 לביטול: `SELECT cron.unschedule('process-sms-notifications');`
 
-**cron שני — לולאת שיפור פרומפט (prompt learning loop), שבועי:**
+**cron שני — לולאת שיפור פרומפט (prompt learning loop), שבועי — עדיין לא נוצר בפועל (jobid לא קיים ב-`cron.job`):**
 
 ```sql
 SELECT cron.schedule(
@@ -221,13 +231,13 @@ SELECT cron.schedule(
 
 ## משימות פתוחות
 
-ראה Backlog בדף הנושן: חיבור פרויקטי Vercel, שדרוג ל-`@elevenlabs/elevenlabs-js`, `npm audit`.
+ראה Backlog בדף הנושן.
 
 ### ספרינט 2 — הושלם (2026-06-12) ✅
 - SMS pipeline: `notifications_log`, atomic-claim processor, DB trigger, 6 templates ✅
 - migration 20260612000015 הוחל על cloud ✅
 - 149 טסטים עוברים ✅
-- pg_cron: ממתין להפעלה ידנית אחרי Vercel deploy (ראה "הפעלת cron" למעלה)
+- pg_cron: הופעל ✅ (ראה "cron (pg_cron)" למעלה)
 
 ### ספרינט 3 — הושלם (2026-06-12) ✅
 - מנוע טריאז': `decideTriage` עם 4 decisions + `isWithinBusinessHours` ✅
@@ -255,13 +265,16 @@ SELECT cron.schedule(
 - 5 מסכים: היום (timeline 08:00–20:00 + pending_approval), יומן (week calendar RTL), שיחות (table + CallDrawer + audio), אסקלציות (resolve flow), לקוחות (profile drawer) ✅
 - Placeholders: pets, records, settings ✅
 
-**פתוח לשלב ה-deploy (לאחר ספרינט 5):**
-- Vercel deploy — `agent/` + `app/` (שני פרויקטים נפרדים)
-- הגדרת ElevenLabs post-call webhook: URL = `https://<AGENT_PUBLIC_URL>/hooks/call-ended`, Secret = `ELEVENLABS_WEBHOOK_SECRET`
-- הפעלת pg_cron (ראה "הפעלת cron" למעלה) — דורש `CREATE EXTENSION pg_cron` אם לא קיים, ואז הרצת ה-SQL עם ה-URL האמיתי
+**Deploy — הושלם (2026-08-28, ראה `docs/DEPLOYMENT_STATUS.md`) ✅**
+- Agent: **Fly.io** (`voxly-agent`, region `fra`) — `https://voxly-agent.fly.dev`, `/health` מחזיר 200 (לא Vercel כפי שתוכנן במקור)
+- App: **Vercel** (`get-a-vrt-d`) — production ב-`https://voxly-app-chi.vercel.app`, auto-deploy על כל push ל-`main`
+- ElevenLabs post-call webhook מוגדר ומאומת: `https://voxly-agent.fly.dev/hooks/call-ended` ✅
+- Twilio voice_url מצביע נכון לאינטגרציה הנייטיבית של ElevenLabs ✅ (ראה "Call flow" למעלה)
+- pg_cron: כל 3 ה-jobs פעילים ✅ (ראה "cron (pg_cron)" למעלה)
 
 ### ספרינט 5 (עתידי)
-- דשבורד: ניהול `calendar_blocks` (UI לחסימת חופשות)
-- דשבורד: תצוגת `waitlist`
-- שדרוג ל-`@elevenlabs/elevenlabs-js`
-- `npm audit` + dependency cleanup
+- ~~דשבורד: ניהול `calendar_blocks` (UI לחסימת חופשות)~~ ✅ כבר בנוי (`app/app/dashboard/calendar/page.tsx`)
+- ~~דשבורד: תצוגת `waitlist`~~ ✅ כבר בנוי (`/dashboard/waitlist`)
+- ~~`npm audit`~~ ✅ נקי (0 חולשות, agent + app) — נבדק 2026-08-29
+- שדרוג ל-`@elevenlabs/elevenlabs-js` — **עדיין פתוח**, agent על החבילה הישנה `elevenlabs@^1.59.0`
+- customer tags (`customers.tags` — דורש מיגרציה חדשה)
