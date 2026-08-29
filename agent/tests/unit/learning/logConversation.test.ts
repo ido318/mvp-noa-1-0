@@ -21,6 +21,7 @@ beforeEach(() => {
 describe("logConversation", () => {
   it("flags the call when a criterion result is 'failure'", async () => {
     await logConversation("conv_1", "clinic_1", {
+      agent_id: "agent_1",
       analysis: {
         evaluation_criteria_results: {
           natural_hebrew: { result: "success", rationale: "ok" },
@@ -33,16 +34,18 @@ describe("logConversation", () => {
     expect(mockUpsert).toHaveBeenCalledWith(
       expect.objectContaining({
         clinic_id: "clinic_1",
-        elevenlabs_conversation_id: "conv_1",
+        conversation_id: "conv_1",
+        agent_id: "agent_1",
         flagged: true,
-        flagged_criteria: ["no_forbidden_phrases"],
+        flagged_reasons: ["no_forbidden_phrases"],
       }),
-      { onConflict: "elevenlabs_conversation_id" },
+      { onConflict: "conversation_id" },
     );
   });
 
   it("does not flag the call when every criterion succeeds", async () => {
     await logConversation("conv_2", "clinic_1", {
+      agent_id: "agent_1",
       analysis: {
         evaluation_criteria_results: {
           natural_hebrew: { result: "success" },
@@ -52,23 +55,59 @@ describe("logConversation", () => {
     });
 
     expect(mockUpsert).toHaveBeenCalledWith(
-      expect.objectContaining({ flagged: false, flagged_criteria: [] }),
-      { onConflict: "elevenlabs_conversation_id" },
+      expect.objectContaining({ flagged: false, flagged_reasons: [] }),
+      { onConflict: "conversation_id" },
     );
   });
 
-  it("does not throw when the payload has no analysis object", async () => {
+  it("falls back to the env agent id and empty transcript when the payload has no analysis object", async () => {
     await expect(logConversation("conv_3", "clinic_1", {})).resolves.toBeUndefined();
     expect(mockUpsert).toHaveBeenCalledWith(
-      expect.objectContaining({ evaluation_results: {}, flagged: false }),
-      { onConflict: "elevenlabs_conversation_id" },
+      expect.objectContaining({
+        agent_id: expect.any(String),
+        transcript: [],
+        evaluation_criteria_results: {},
+        flagged: false,
+      }),
+      { onConflict: "conversation_id" },
+    );
+  });
+
+  it("maps agent_id, version_id, call_successful, transcript, and call_duration_secs from the payload", async () => {
+    await logConversation("conv_5", "clinic_1", {
+      agent_id: "agent_9",
+      version_id: "version_9",
+      transcript: [{ role: "user", message: "היי" }],
+      metadata: { call_duration_secs: 42 },
+      analysis: {
+        call_successful: "success",
+        transcript_summary: "סיכום קצר",
+        evaluation_criteria_results: {},
+        data_collection_results: { customer_name: { value: "דנה" } },
+      },
+    });
+
+    expect(mockUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        agent_id: "agent_9",
+        version_id: "version_9",
+        transcript: [{ role: "user", message: "היי" }],
+        call_duration_secs: 42,
+        call_successful: "success",
+        transcript_summary: "סיכום קצר",
+        data_collection_results: { customer_name: { value: "דנה" } },
+      }),
+      { onConflict: "conversation_id" },
     );
   });
 
   it("swallows a Supabase error instead of throwing", async () => {
     mockUpsert.mockResolvedValueOnce({ error: { message: "db down" } });
     await expect(
-      logConversation("conv_4", "clinic_1", { analysis: { evaluation_criteria_results: {} } }),
+      logConversation("conv_4", "clinic_1", {
+        agent_id: "agent_1",
+        analysis: { evaluation_criteria_results: {} },
+      }),
     ).resolves.toBeUndefined();
   });
 });

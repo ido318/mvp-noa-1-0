@@ -3,9 +3,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 // ANTHROPIC_API_KEY default comes from tests/setup.ts (must be set before any
 // module that calls getEnv() at import time — e.g. logger.ts — is evaluated).
 
-const { mockFrom, callReviewsSelectResult, voiceCallsSelectResult, insertedSuggestion } = vi.hoisted(() => {
+const { mockFrom, callReviewsSelectResult, insertedSuggestion } = vi.hoisted(() => {
   const callReviewsSelectResult: { data: unknown[]; error: null } = { data: [], error: null };
-  const voiceCallsSelectResult: { data: unknown[]; error: null } = { data: [], error: null };
   const insertedSuggestion = { id: "suggestion-1" };
 
   const mockFrom = vi.fn((table: string) => {
@@ -17,13 +16,6 @@ const { mockFrom, callReviewsSelectResult, voiceCallsSelectResult, insertedSugge
               gte: () => Promise.resolve(callReviewsSelectResult),
             }),
           }),
-        }),
-      };
-    }
-    if (table === "voice_calls") {
-      return {
-        select: () => ({
-          in: () => Promise.resolve(voiceCallsSelectResult),
         }),
       };
     }
@@ -39,7 +31,7 @@ const { mockFrom, callReviewsSelectResult, voiceCallsSelectResult, insertedSugge
     throw new Error(`unexpected table: ${table}`);
   });
 
-  return { mockFrom, callReviewsSelectResult, voiceCallsSelectResult, insertedSuggestion };
+  return { mockFrom, callReviewsSelectResult, insertedSuggestion };
 });
 
 vi.mock("../../../src/lib/supabase.js", () => ({
@@ -51,7 +43,6 @@ import { analyzeConversations } from "../../../src/lib/learning/analyzeConversat
 beforeEach(() => {
   mockFrom.mockClear();
   callReviewsSelectResult.data = [];
-  voiceCallsSelectResult.data = [];
 });
 
 afterEach(() => {
@@ -61,7 +52,7 @@ afterEach(() => {
 describe("analyzeConversations", () => {
   it("no-ops when fewer than 2 flagged calls exist", async () => {
     callReviewsSelectResult.data = [
-      { id: "r1", elevenlabs_conversation_id: "conv_1", evaluation_results: {}, flagged_criteria: [] },
+      { id: "r1", evaluation_criteria_results: {}, flagged_reasons: [], transcript_summary: null },
     ];
 
     const result = await analyzeConversations("clinic-1");
@@ -94,20 +85,16 @@ describe("analyzeConversations", () => {
     callReviewsSelectResult.data = [
       {
         id: "r1",
-        elevenlabs_conversation_id: "conv_1",
-        evaluation_results: { no_forbidden_phrases: { result: "failure", rationale: "used forbidden phrase" } },
-        flagged_criteria: ["no_forbidden_phrases"],
+        evaluation_criteria_results: { no_forbidden_phrases: { result: "failure", rationale: "used forbidden phrase" } },
+        flagged_reasons: ["no_forbidden_phrases"],
+        transcript_summary: "summary 1",
       },
       {
         id: "r2",
-        elevenlabs_conversation_id: "conv_2",
-        evaluation_results: { no_forbidden_phrases: { result: "failure", rationale: "used forbidden phrase again" } },
-        flagged_criteria: ["no_forbidden_phrases"],
+        evaluation_criteria_results: { no_forbidden_phrases: { result: "failure", rationale: "used forbidden phrase again" } },
+        flagged_reasons: ["no_forbidden_phrases"],
+        transcript_summary: "summary 2",
       },
-    ];
-    voiceCallsSelectResult.data = [
-      { elevenlabs_conversation_id: "conv_1", ai_summary: "summary 1" },
-      { elevenlabs_conversation_id: "conv_2", ai_summary: "summary 2" },
     ];
 
     vi.stubGlobal(
@@ -146,8 +133,8 @@ describe("analyzeConversations", () => {
 
   it("throws when the Anthropic API request fails", async () => {
     callReviewsSelectResult.data = [
-      { id: "r1", elevenlabs_conversation_id: "conv_1", evaluation_results: {}, flagged_criteria: ["x"] },
-      { id: "r2", elevenlabs_conversation_id: "conv_2", evaluation_results: {}, flagged_criteria: ["x"] },
+      { id: "r1", evaluation_criteria_results: {}, flagged_reasons: ["x"], transcript_summary: null },
+      { id: "r2", evaluation_criteria_results: {}, flagged_reasons: ["x"], transcript_summary: null },
     ];
 
     vi.stubGlobal(

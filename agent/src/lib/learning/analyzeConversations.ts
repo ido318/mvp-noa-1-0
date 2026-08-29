@@ -8,14 +8,9 @@ const ANTHROPIC_MODEL = "claude-sonnet-5";
 
 type FlaggedCallReview = {
   id: string;
-  elevenlabs_conversation_id: string;
-  evaluation_results: Record<string, { result?: string; rationale?: string }>;
-  flagged_criteria: string[];
-};
-
-type VoiceCallSummary = {
-  elevenlabs_conversation_id: string | null;
-  ai_summary: string | null;
+  evaluation_criteria_results: Record<string, { result?: string; rationale?: string }>;
+  flagged_reasons: string[];
+  transcript_summary: string | null;
 };
 
 export type AnalyzeConversationsResult = {
@@ -40,7 +35,7 @@ export async function analyzeConversations(clinicId: string): Promise<AnalyzeCon
 
   const { data: flaggedReviews, error: reviewsErr } = await getSupabase()
     .from("call_reviews")
-    .select("id, elevenlabs_conversation_id, evaluation_results, flagged_criteria")
+    .select("id, evaluation_criteria_results, flagged_reasons, transcript_summary")
     .eq("clinic_id", clinicId)
     .eq("flagged", true)
     .gte("created_at", since);
@@ -56,24 +51,12 @@ export async function analyzeConversations(clinicId: string): Promise<AnalyzeCon
     return { ranAnalysis: false, flaggedCallCount: reviews.length };
   }
 
-  const conversationIds = reviews.map((r) => r.elevenlabs_conversation_id);
-  const { data: voiceCalls, error: callsErr } = await getSupabase()
-    .from("voice_calls")
-    .select("elevenlabs_conversation_id, ai_summary")
-    .in("elevenlabs_conversation_id", conversationIds);
-
-  if (callsErr) throw new Error(`analyzeConversations: voice_calls query failed: ${callsErr.message}`);
-
-  const summaryByConversationId = new Map(
-    ((voiceCalls ?? []) as VoiceCallSummary[]).map((c) => [c.elevenlabs_conversation_id, c.ai_summary]),
-  );
-
   const casesForPrompt = reviews.map((r) => ({
-    failed_criteria: r.flagged_criteria,
-    rationale: r.flagged_criteria
-      .map((id) => r.evaluation_results[id]?.rationale)
+    failed_criteria: r.flagged_reasons,
+    rationale: r.flagged_reasons
+      .map((id) => r.evaluation_criteria_results[id]?.rationale)
       .filter((v): v is string => Boolean(v)),
-    call_summary: summaryByConversationId.get(r.elevenlabs_conversation_id) ?? null,
+    call_summary: r.transcript_summary,
   }));
 
   const suggestion = await requestPromptSuggestion(env.ANTHROPIC_API_KEY, casesForPrompt);
