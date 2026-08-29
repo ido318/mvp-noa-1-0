@@ -1,7 +1,7 @@
 # Figma Visual Redesign — Design Spec
 
 **Date:** 2026-08-29
-**Status:** Phases 1-3 shipped (tokens + sidebar, today dashboard, calendar + appointment drawer + booking wizard — see [2026-08-29-figma-phase3-calendar-appointments-design.md](2026-08-29-figma-phase3-calendar-appointments-design.md)). Phases 4-6 are still a roadmap, each needs its own approval + spec/plan before implementation.
+**Status:** Phases 1-4 shipped (tokens + sidebar, today dashboard, calendar + appointment drawer + booking wizard, client + patient detail with a new UI-only invoices backend — see [2026-08-29-figma-phase3-calendar-appointments-design.md](2026-08-29-figma-phase3-calendar-appointments-design.md) and [2026-08-29-figma-phase4-client-patient-detail-design.md](2026-08-29-figma-phase4-client-patient-detail-design.md)). Phases 5-6 are still a roadmap.
 **Relation to prior spec:** [2026-08-27-dashboard-crm-redesign-design.md](2026-08-27-dashboard-crm-redesign-design.md) already shipped the current information architecture (nav items, customer-centric profile, teal `--brand-*` palette). This spec layers a new visual language on top of that IA, sourced from a Figma file the clinic's designer produced, and extends the IA with a few new screens the designer added (patient medical record, clinical encounter/SOAP workspace, prescriptions, billing tab).
 
 ## Source
@@ -38,7 +38,7 @@ Still undesigned: תקשורת (communications) and מרשמים as a standalone
 | **2** | Today dashboard | Shipped using existing `dashboard/page.tsx` data; no DB/API changes |
 | 3 | Calendar week view + appointment drawer + new-appointment modal | Existing data (`appointments`, `calendar_blocks`) |
 | 4 | Client detail + Patient detail pages (incl. billing tab as UI-only, no payment gateway yet — will be wired to a real processor later) | Some new fields/empty states, no schema blockers |
-| 5 | Encounter workspace (SOAP) + Prescription flow | Needs new DB tables/columns — biggest phase |
+| 5 | Encounter workspace (SOAP) + Prescription flow | **Discovered during Phase 4 research: `visits`, `medical_notes` (already has `soap_subjective/objective/assessment/plan` types!), and `prescriptions` all already exist and are fully functional** (`app/app/dashboard/visits/[visitId]/page.tsx` + its sections) — just plain-styled, not Figma-matched. No new tables needed; this is a reskin + reorganization phase like 2-4, not the schema-heavy phase originally assumed. |
 | 6 | Tasks inbox + Laboratory dashboard + Billing/invoice (top-level) + Settings page | Added 2026-08-29; needs new DB tables (tasks, lab orders, invoices) and scoping of which settings sub-sections are real vs. deferred |
 
 Sidebar items still with no corresponding Figma screen (תקשורת, מרשמים as a standalone list, דוחות) stay exactly as they are today (existing pages/placeholders) until/unless designed later — only their nav-item visual styling updates in Phase 1.
