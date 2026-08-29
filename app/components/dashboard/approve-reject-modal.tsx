@@ -1,5 +1,6 @@
 "use client";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { Btn } from "@/components/dashboard/ui/btn";
 import { useToast } from "@/components/dashboard/ui/toast";
 
@@ -21,7 +22,10 @@ export function ApproveRejectModal({
   onClose: () => void;
 }) {
   const [loading, setLoading] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const { toast } = useToast();
+
+  useEffect(() => { setMounted(true); }, []);
 
   async function handleConfirm() {
     setLoading(true);
@@ -41,7 +45,12 @@ export function ApproveRejectModal({
     }
   }
 
-  return (
+  if (!mounted) return null;
+
+  // Portalled to document.body - see the matching comment in drawer.tsx for why
+  // (the dashboard layout's .page-enter animation ends on a non-none transform,
+  // which breaks `position: fixed` containment for descendants otherwise).
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={onClose}>
       <div
         className="w-full max-w-sm rounded-[var(--r-xl)] bg-[var(--surface)] p-6 shadow-[var(--sh-lg)] modal-enter"
@@ -67,6 +76,7 @@ export function ApproveRejectModal({
           </Btn>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

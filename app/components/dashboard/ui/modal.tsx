@@ -1,5 +1,6 @@
 "use client";
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { XIcon } from "@/components/dashboard/icons";
 
 interface ModalProps {
@@ -12,6 +13,10 @@ interface ModalProps {
 }
 
 export function Modal({ open, onClose, title, subtitle, children, maxWidth = 520 }: ModalProps) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => { setMounted(true); }, []);
+
   useEffect(() => {
     if (!open) return;
     const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -19,9 +24,12 @@ export function Modal({ open, onClose, title, subtitle, children, maxWidth = 520
     return () => window.removeEventListener("keydown", handler);
   }, [open, onClose]);
 
-  if (!open) return null;
+  if (!open || !mounted) return null;
 
-  return (
+  // Portalled to document.body - see the matching comment in drawer.tsx for why
+  // (the dashboard layout's .page-enter animation ends on a non-none transform,
+  // which breaks `position: fixed` containment for descendants otherwise).
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       style={{ backgroundColor: "rgba(45,38,32,.6)", backdropFilter: "blur(4px)" }}
@@ -51,6 +59,7 @@ export function Modal({ open, onClose, title, subtitle, children, maxWidth = 520
         )}
         <div className="p-6">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

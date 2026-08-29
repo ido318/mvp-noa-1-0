@@ -1,5 +1,6 @@
 "use client";
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { XIcon } from "@/components/dashboard/icons";
 
 interface DrawerProps {
@@ -12,6 +13,10 @@ interface DrawerProps {
 }
 
 export function Drawer({ open, onClose, title, children, width = 460, footer }: DrawerProps) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => { setMounted(true); }, []);
+
   useEffect(() => {
     if (!open) return;
     const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -19,9 +24,14 @@ export function Drawer({ open, onClose, title, children, width = 460, footer }: 
     return () => window.removeEventListener("keydown", handler);
   }, [open, onClose]);
 
-  if (!open) return null;
+  if (!open || !mounted) return null;
 
-  return (
+  // Portalled to document.body: the dashboard layout's page-entrance animation
+  // (.page-enter in globals.css) ends on a non-none `transform`, which per the CSS
+  // spec makes that ancestor a containing block for `position: fixed` descendants -
+  // without the portal, this panel would be positioned relative to the scrollable
+  // page content instead of the viewport.
+  return createPortal(
     <div className="fixed inset-0 z-40 flex">
       {/* Overlay */}
       <div
@@ -62,6 +72,7 @@ export function Drawer({ open, onClose, title, children, width = 460, footer }: 
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
