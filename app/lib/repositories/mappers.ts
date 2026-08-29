@@ -14,6 +14,7 @@ import type {
   CustomerStatus,
   PreferredContactMethod,
 } from "@/types/domain/customer";
+import type { Invoice, InvoiceLineItem, InvoiceStatus } from "@/types/domain/invoice";
 import type { MedicalNote, MedicalNoteType } from "@/types/domain/medical-note";
 import type { Pet, PetStatus } from "@/types/domain/pet";
 import type { Prescription, PrescriptionStatus } from "@/types/domain/prescription";
@@ -518,5 +519,49 @@ export function mapWaitlistRow(row: {
     notes: row.notes,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+  };
+}
+
+export function mapInvoiceRow(row: {
+  id: string;
+  clinic_id: string;
+  customer_id: string;
+  customer?: { full_name: string | null } | { full_name: string | null }[] | null;
+  pet_id: string | null;
+  pet?: { name: string | null } | { name: string | null }[] | null;
+  invoice_number: string;
+  status: InvoiceStatus;
+  issued_at: string;
+  items: unknown;
+  total: number | string;
+  notes: string | null;
+  created_by_user_id: string | null;
+  version: number;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}): Invoice {
+  const customer = Array.isArray(row.customer) ? row.customer[0] : row.customer;
+  const pet = Array.isArray(row.pet) ? row.pet[0] : row.pet;
+  const items = (Array.isArray(row.items) ? row.items : []) as InvoiceLineItem[];
+
+  return {
+    id: row.id,
+    clinicId: row.clinic_id,
+    customerId: row.customer_id,
+    customerName: customer?.full_name ?? null,
+    petId: row.pet_id,
+    petName: pet?.name ?? null,
+    invoiceNumber: row.invoice_number,
+    status: row.status,
+    issuedAt: row.issued_at,
+    items,
+    total: typeof row.total === "string" ? parseFloat(row.total) : row.total,
+    notes: row.notes,
+    createdByUserId: row.created_by_user_id,
+    version: row.version,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    deletedAt: row.deleted_at,
   };
 }

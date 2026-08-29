@@ -6,6 +6,7 @@ import { AuditLogRepository } from "@/lib/repositories/audit-log.repository";
 import { CalendarBlockRepository } from "@/lib/repositories/calendar-block.repository";
 import { ClinicRepository } from "@/lib/repositories/clinic.repository";
 import { CustomerRepository } from "@/lib/repositories/customer.repository";
+import { InvoiceRepository } from "@/lib/repositories/invoice.repository";
 import { MedicalNoteRepository } from "@/lib/repositories/medical-note.repository";
 import { PetRepository } from "@/lib/repositories/pet.repository";
 import { PrescriptionRepository } from "@/lib/repositories/prescription.repository";
@@ -24,6 +25,7 @@ import { CalendarService } from "@/lib/services/calendar.service";
 import { ClinicSettingsService } from "@/lib/services/clinic-settings.service";
 import { CustomerService } from "@/lib/services/customer.service";
 import { HealthService } from "@/lib/services/health.service";
+import { InvoiceService } from "@/lib/services/invoice.service";
 import { MedicalRecordService } from "@/lib/services/medical-record.service";
 import { PetService } from "@/lib/services/pet.service";
 import { VisitService } from "@/lib/services/visit.service";
@@ -52,6 +54,7 @@ export async function createServices() {
   const medicalNoteRepository = new MedicalNoteRepository(supabase);
   const vaccinationRepository = new VaccinationRepository(supabase);
   const prescriptionRepository = new PrescriptionRepository(supabase);
+  const invoiceRepository = new InvoiceRepository(supabase);
   const visitShareRepository = new VisitShareRepository(admin);
   const promptSuggestionRepository = new PromptSuggestionRepository(admin);
   const auditLogRepository = new AuditLogRepository(admin);
@@ -77,6 +80,7 @@ export async function createServices() {
     calendar: new CalendarService(appointmentRepository, calendarBlockRepository),
     calendarBlock: new CalendarBlockService(calendarBlockRepository),
     waitlist: new WaitlistService(waitlistRepository),
+    invoice: new InvoiceService(invoiceRepository, auditService),
     clinicSettings: new ClinicSettingsService(clinicRepository, auditService),
     visit: new VisitService(
       visitRepository,
