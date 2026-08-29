@@ -3,36 +3,31 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 // ANTHROPIC_API_KEY default comes from tests/setup.ts (must be set before any
 // module that calls getEnv() at import time — e.g. logger.ts — is evaluated).
 
-const { mockFrom, callReviewsSelectResult, insertedSuggestion } = vi.hoisted(() => {
-  const callReviewsSelectResult: { data: unknown[]; error: null } = { data: [], error: null };
-  const insertedSuggestion = { id: "suggestion-1" };
+const { mockFrom, callReviewsSelectResult, insertedSuggestion, callReviewsEqClinicId, callReviewsEqIsException } =
+  vi.hoisted(() => {
+    const callReviewsSelectResult: { data: unknown[]; error: null } = { data: [], error: null };
+    const insertedSuggestion = { id: "suggestion-1" };
+    const callReviewsEqIsException = vi.fn(() => ({ gte: () => Promise.resolve(callReviewsSelectResult) }));
+    const callReviewsEqClinicId = vi.fn(() => ({ eq: callReviewsEqIsException }));
 
-  const mockFrom = vi.fn((table: string) => {
-    if (table === "call_reviews") {
-      return {
-        select: () => ({
-          eq: () => ({
-            eq: () => ({
-              gte: () => Promise.resolve(callReviewsSelectResult),
+    const mockFrom = vi.fn((table: string) => {
+      if (table === "call_reviews") {
+        return { select: () => ({ eq: callReviewsEqClinicId }) };
+      }
+      if (table === "prompt_suggestions") {
+        return {
+          insert: () => ({
+            select: () => ({
+              single: () => Promise.resolve({ data: insertedSuggestion, error: null }),
             }),
           }),
-        }),
-      };
-    }
-    if (table === "prompt_suggestions") {
-      return {
-        insert: () => ({
-          select: () => ({
-            single: () => Promise.resolve({ data: insertedSuggestion, error: null }),
-          }),
-        }),
-      };
-    }
-    throw new Error(`unexpected table: ${table}`);
-  });
+        };
+      }
+      throw new Error(`unexpected table: ${table}`);
+    });
 
-  return { mockFrom, callReviewsSelectResult, insertedSuggestion };
-});
+    return { mockFrom, callReviewsSelectResult, insertedSuggestion, callReviewsEqClinicId, callReviewsEqIsException };
+  });
 
 vi.mock("../../../src/lib/supabase.js", () => ({
   getSupabase: vi.fn(() => ({ from: mockFrom })),
@@ -43,6 +38,8 @@ import { analyzeConversations } from "../../../src/lib/learning/analyzeConversat
 beforeEach(() => {
   mockFrom.mockClear();
   callReviewsSelectResult.data = [];
+  callReviewsEqClinicId.mockClear();
+  callReviewsEqIsException.mockClear();
 });
 
 afterEach(() => {
@@ -64,6 +61,12 @@ describe("analyzeConversations", () => {
   it("no-ops on zero flagged calls", async () => {
     const result = await analyzeConversations("clinic-1");
     expect(result).toEqual({ ranAnalysis: false, flaggedCallCount: 0 });
+  });
+
+  it("filters call_reviews by clinic_id and is_exception", async () => {
+    await analyzeConversations("clinic-1");
+    expect(callReviewsEqClinicId).toHaveBeenCalledWith("clinic_id", "clinic-1");
+    expect(callReviewsEqIsException).toHaveBeenCalledWith("is_exception", true);
   });
 
   it("throws a clear error when ANTHROPIC_API_KEY is not configured", async () => {

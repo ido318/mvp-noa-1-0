@@ -37,7 +37,7 @@ export async function analyzeConversations(clinicId: string): Promise<AnalyzeCon
     .from("call_reviews")
     .select("id, evaluation_criteria_results, flagged_reasons, transcript_summary")
     .eq("clinic_id", clinicId)
-    .eq("flagged", true)
+    .eq("is_exception", true)
     .gte("created_at", since);
 
   if (reviewsErr) throw new Error(`analyzeConversations: call_reviews query failed: ${reviewsErr.message}`);
