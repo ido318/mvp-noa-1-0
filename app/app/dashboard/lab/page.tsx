@@ -121,7 +121,12 @@ function NewLabOrderModal({ open, onClose, clinicId, onCreated }: { open: boolea
           </>
         ) : !pet ? (
           <div className="space-y-1">
-            <p className="text-sm font-semibold text-[var(--ink-2)]">מטופל של {customer.fullName}</p>
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold text-[var(--ink-2)]">מטופל של {customer.fullName}</p>
+              <button type="button" onClick={() => setCustomer(null)} className="text-xs font-semibold text-[var(--brand-600)] hover:underline">
+                החלף לקוח
+              </button>
+            </div>
             {pets.length === 0 ? (
               <p className="text-sm text-[var(--faint)]">ללקוח זה אין מטופלים רשומים.</p>
             ) : pets.map((p) => (
@@ -138,7 +143,12 @@ function NewLabOrderModal({ open, onClose, clinicId, onCreated }: { open: boolea
           </div>
         ) : (
           <>
-            <p className="text-sm text-[var(--ink-2)]">{customer.fullName} · {pet.name}</p>
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-[var(--ink-2)]">{customer.fullName} · {pet.name}</p>
+              <button type="button" onClick={() => setPet(null)} className="text-xs font-semibold text-[var(--brand-600)] hover:underline">
+                החלף מטופל
+              </button>
+            </div>
             <input
               autoFocus
               value={testName}
