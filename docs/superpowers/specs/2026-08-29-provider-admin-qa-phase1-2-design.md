@@ -1,7 +1,7 @@
 # Provider Admin QA — Phase 1+2 (Capture + Automatic QA) — Design Spec
 
 **Date:** 2026-08-29
-**Status:** Approved by user (Ido), pending implementation plan.
+**Status:** Approved by user (Ido). Implemented in full (Tasks 1-7 of `docs/superpowers/plans/2026-08-29-qa-analyzer-phase1-2.md`), deployed, verified via a real call. **Post-implementation correction (2026-08-30):** the write path described below as `.upsert(..., {onConflict: "conversation_id"})` was found to be a real production bug — Postgres validates NOT NULL constraints against the raw INSERT VALUES tuple before checking for a conflict, so the upsert failed on every real call even though the target row already existed. Fixed to `.update({...}).eq("conversation_id", conversationId)` (commit `07e4af0` on `feat/qa-analyzer-phase1-2`). See `docs/superpowers/plans/2026-08-30-tomer-qa-kb-provider-admin-roadmap.md` for what comes next.
 **Source:** `tomer_provider_admin_qa_implementation.md` (external spec dropped on the Desktop), a much larger multi-phase "Provider Admin + QA + Continuous Improvement" plan. This spec covers only Phases 1+2 of that document (Capture + Automatic QA). Phases 3-6 (richer improvement-suggestion aggregation, Provider Admin dashboard UI + auth, prompt/KB versioning, regression eval set) are explicitly out of scope — separate specs later.
 
 ## Problem
