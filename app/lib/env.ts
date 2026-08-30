@@ -5,6 +5,7 @@ const serverSchema = z.object({
   APP_BASE_URL: z.string().url(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
   HEALTH_CHECK_TOKEN: z.string().min(16).optional(),
+  HEALTH_CHECK_ALLOWED_IPS: z.string().optional(),
 });
 
 const clientSchema = z.object({
@@ -29,6 +30,7 @@ function parseEnv() {
     APP_BASE_URL: process.env.APP_BASE_URL,
     SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
     HEALTH_CHECK_TOKEN: process.env.HEALTH_CHECK_TOKEN || undefined,
+    HEALTH_CHECK_ALLOWED_IPS: process.env.HEALTH_CHECK_ALLOWED_IPS || undefined,
   });
 
   if (!server.success) {

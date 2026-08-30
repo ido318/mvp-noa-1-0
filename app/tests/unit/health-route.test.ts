@@ -77,4 +77,47 @@ describe("GET /api/health", () => {
     expect(body.data).not.toHaveProperty("db");
     expect(mockCreateAdminServices).not.toHaveBeenCalled();
   });
+
+  it("requires a trusted source IP before revealing detailed health", async () => {
+    vi.stubEnv("HEALTH_CHECK_TOKEN", "internal-health-token-123");
+    vi.stubEnv("HEALTH_CHECK_ALLOWED_IPS", "203.0.113.10");
+    const { GET } = await import("@/app/api/health/route");
+
+    const response = await GET(
+      new Request("http://localhost/api/health", {
+        headers: {
+          Authorization: "Bearer internal-health-token-123",
+          "X-Forwarded-For": "198.51.100.7",
+        },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.data.status).toBe("ok");
+    expect(body.data).not.toHaveProperty("env");
+    expect(body.data).not.toHaveProperty("db");
+    expect(mockCreateAdminServices).not.toHaveBeenCalled();
+  });
+
+  it("allows detailed health from an explicitly trusted IP", async () => {
+    vi.stubEnv("HEALTH_CHECK_TOKEN", "internal-health-token-123");
+    vi.stubEnv("HEALTH_CHECK_ALLOWED_IPS", "203.0.113.10");
+    const { GET } = await import("@/app/api/health/route");
+
+    const response = await GET(
+      new Request("http://localhost/api/health", {
+        headers: {
+          Authorization: "Bearer internal-health-token-123",
+          "X-Forwarded-For": "203.0.113.10",
+        },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.data.env).toBe("test");
+    expect(body.data.db).toBe("connected");
+    expect(mockCreateAdminServices).toHaveBeenCalledTimes(1);
+  });
 });

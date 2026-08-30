@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Hono } from "hono";
-import { jobsRoutes } from "../../../src/server/routes/jobs.js";
+import { jobsRoutes, resetJobSecurityCaches } from "../../../src/server/routes/jobs.js";
 
 vi.mock("../../../src/services/notification.processor.js", () => ({
   processNotifications: vi.fn().mockResolvedValue({
@@ -28,6 +28,7 @@ function makeApp() {
 }
 
 beforeEach(() => {
+  resetJobSecurityCaches();
   vi.clearAllMocks();
   vi.mocked(processNotifications).mockResolvedValue({ processed: 1, sent: 1, failed: 0, deferred: 0 });
   vi.mocked(analyzeConversations).mockResolvedValue({ ranAnalysis: false, flaggedCallCount: 0 });
@@ -73,6 +74,102 @@ describe("POST /jobs/process-notifications", () => {
     const body = await res.json() as { processed: number; sent: number };
     expect(body.processed).toBe(1);
     expect(body.sent).toBe(1);
+  });
+
+  it("returns the same result for the same idempotency key and does not re-run the job", async () => {
+    const app = makeApp();
+    const headers = {
+      Authorization: `Bearer ${VALID_TOKEN}`,
+      "Content-Type": "application/json",
+      "Idempotency-Key": "job-dup-123",
+    };
+
+    const first = await app.request("/jobs/process-notifications", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ appointmentId: "appt-123" }),
+    });
+    const second = await app.request("/jobs/process-notifications", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ appointmentId: "appt-123" }),
+    });
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(processNotifications).toHaveBeenCalledTimes(1);
+  });
+
+  it("rate-limits repeated requests from the same caller", async () => {
+    const app = makeApp();
+    const headers = {
+      Authorization: `Bearer ${VALID_TOKEN}`,
+      "Content-Type": "application/json",
+      "X-Forwarded-For": "203.0.113.10",
+    };
+
+    for (let i = 0; i < 5; i += 1) {
+      const res = await app.request("/jobs/process-notifications", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({}),
+      });
+      expect(res.status).toBe(200);
+    }
+
+    const blocked = await app.request("/jobs/process-notifications", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({}),
+    });
+
+    expect(blocked.status).toBe(429);
+  });
+
+  it("does not rate-limit retries for a cached idempotency key", async () => {
+    const app = makeApp();
+    const headers = {
+      Authorization: `Bearer ${VALID_TOKEN}`,
+      "Content-Type": "application/json",
+      "Idempotency-Key": "job-retry-123",
+      "X-Forwarded-For": "203.0.113.10",
+    };
+
+    for (let i = 0; i < 6; i += 1) {
+      const res = await app.request("/jobs/process-notifications", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ appointmentId: "appt-123" }),
+      });
+      expect(res.status).toBe(200);
+    }
+
+    expect(processNotifications).toHaveBeenCalledTimes(1);
+  });
+
+  it("scopes idempotency keys to each job route", async () => {
+    const app = makeApp();
+    const headers = {
+      Authorization: `Bearer ${VALID_TOKEN}`,
+      "Content-Type": "application/json",
+      "Idempotency-Key": "shared-key",
+    };
+
+    const notificationRes = await app.request("/jobs/process-notifications", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({}),
+    });
+    const analysisRes = await app.request("/jobs/analyze-conversations", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({}),
+    });
+
+    expect(notificationRes.status).toBe(200);
+    expect(analysisRes.status).toBe(200);
+    expect(processNotifications).toHaveBeenCalledTimes(1);
+    expect(analyzeConversations).toHaveBeenCalledTimes(1);
   });
 
   it("passes appointmentId from body to processNotifications", async () => {
