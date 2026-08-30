@@ -1,10 +1,10 @@
 import { getSupabase } from "../supabase.js";
 import { getEnv } from "../env.js";
 import { logger } from "../logger.js";
+import { callClaudeForJson } from "./claudeJson.js";
 
 const MIN_FLAGGED_CALLS = 2;
 const LOOKBACK_DAYS = 7;
-const ANTHROPIC_MODEL = "claude-sonnet-5";
 
 type FlaggedCallReview = {
   id: string;
@@ -37,7 +37,7 @@ export async function analyzeConversations(clinicId: string): Promise<AnalyzeCon
     .from("call_reviews")
     .select("id, evaluation_criteria_results, flagged_reasons, transcript_summary")
     .eq("clinic_id", clinicId)
-    .eq("flagged", true)
+    .eq("is_exception", true)
     .gte("created_at", since);
 
   if (reviewsErr) throw new Error(`analyzeConversations: call_reviews query failed: ${reviewsErr.message}`);
@@ -94,41 +94,7 @@ async function requestPromptSuggestion(
     "קבל רשימת מקרים שנכשלו בקריטריוני הערכה, זהה דפוס חוזר, והצע פרומפט מערכת מתוקן מלא. " +
     'החזר אך ורק JSON תקני בצורה: {"pattern_summary": "...", "suggested_prompt": "..."} ללא טקסט נוסף.';
 
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      model: ANTHROPIC_MODEL,
-      max_tokens: 4096,
-      system: systemPrompt,
-      messages: [
-        {
-          role: "user",
-          content: JSON.stringify({ flagged_cases: cases }),
-        },
-      ],
-    }),
-  });
-
-  if (!response.ok) {
-    const body = await response.text().catch(() => "");
-    throw new Error(`Anthropic API request failed (${response.status}): ${body}`);
-  }
-
-  const data = (await response.json()) as { content?: Array<{ type: string; text?: string }> };
-  const text = data.content?.find((block) => block.type === "text")?.text;
-  if (!text) throw new Error("Anthropic API returned no text content");
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(stripMarkdownJsonFence(text));
-  } catch {
-    throw new Error(`Anthropic API returned non-JSON content: ${text.slice(0, 200)}`);
-  }
+  const parsed = await callClaudeForJson(apiKey, systemPrompt, { flagged_cases: cases });
 
   if (
     typeof parsed !== "object" ||
@@ -140,11 +106,4 @@ async function requestPromptSuggestion(
   }
 
   return parsed as PromptSuggestionDraft;
-}
-
-/** Claude sometimes wraps requested-JSON-only output in a ```json fence despite instructions. */
-function stripMarkdownJsonFence(text: string): string {
-  const trimmed = text.trim();
-  const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/);
-  return fenced?.[1] ?? trimmed;
 }

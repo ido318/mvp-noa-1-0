@@ -3,12 +3,13 @@ import { createHmac } from "node:crypto";
 import { Hono } from "hono";
 import { hooksRoutes } from "../../../src/server/routes/hooks.js";
 
-const { mockSaveVoiceCall, mockUpload, mockUpdate, mockEq, mockLogConversation } = vi.hoisted(() => ({
+const { mockSaveVoiceCall, mockUpload, mockUpdate, mockEq, mockLogConversation, mockAnalyzeCallQuality } = vi.hoisted(() => ({
   mockSaveVoiceCall: vi.fn().mockResolvedValue(undefined),
   mockUpload: vi.fn().mockResolvedValue({ error: null }),
   mockEq: vi.fn().mockResolvedValue({ error: null }),
   mockUpdate: vi.fn(() => ({ eq: mockEq })),
   mockLogConversation: vi.fn().mockResolvedValue(undefined),
+  mockAnalyzeCallQuality: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("../../../src/lib/store.js", async (importOriginal) => {
@@ -18,6 +19,10 @@ vi.mock("../../../src/lib/store.js", async (importOriginal) => {
 
 vi.mock("../../../src/lib/learning/logConversation.js", () => ({
   logConversation: mockLogConversation,
+}));
+
+vi.mock("../../../src/lib/learning/qaAnalyzer.js", () => ({
+  analyzeCallQuality: mockAnalyzeCallQuality,
 }));
 
 vi.mock("../../../src/lib/supabase.js", () => ({
@@ -64,6 +69,8 @@ describe("POST /hooks/call-ended", () => {
     mockEq.mockClear();
     mockLogConversation.mockClear();
     mockLogConversation.mockResolvedValue(undefined);
+    mockAnalyzeCallQuality.mockClear();
+    mockAnalyzeCallQuality.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -211,6 +218,31 @@ describe("POST /hooks/call-ended", () => {
     });
   });
 
+  it("calls analyzeCallQuality after logConversation resolves", async () => {
+    const callOrder: string[] = [];
+    mockLogConversation.mockImplementation(async () => {
+      callOrder.push("logConversation");
+    });
+    mockAnalyzeCallQuality.mockImplementation(async () => {
+      callOrder.push("analyzeCallQuality");
+    });
+
+    const res = await makeApp().request("/hooks/call-ended", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "elevenlabs-signature": sign(payload),
+      },
+      body: payload,
+    });
+    expect(res.status).toBe(200);
+
+    await vi.waitFor(() => {
+      expect(mockAnalyzeCallQuality).toHaveBeenCalledWith("conv_test123", expect.any(Object));
+    });
+    expect(callOrder).toEqual(["logConversation", "analyzeCallQuality"]);
+  });
+
   it("a logConversation failure does not fail the webhook response", async () => {
     mockLogConversation.mockRejectedValueOnce(new Error("call_reviews upsert failed"));
 
@@ -225,6 +257,7 @@ describe("POST /hooks/call-ended", () => {
     expect(res.status).toBe(200);
     const json = (await res.json()) as { ok: boolean };
     expect(json.ok).toBe(true);
+    expect(mockAnalyzeCallQuality).not.toHaveBeenCalled();
   });
 
   it("returns 401 with wrong signature — no DB write", async () => {
