@@ -137,6 +137,15 @@ for (const src of kbSources) {
   if (!res.ok) {
     const body = await res.text();
     console.error(`[sync-kb] Failed to create doc "${src.docName}": ${res.status} ${body}`);
+    if (createdDocs.length > 0) {
+      console.error(
+        `[sync-kb] ${createdDocs.length} doc(s) created before this failure were never attached ` +
+        `to the agent, so a re-run will NOT find or replace them (this script only matches ` +
+        `against the agent's currently-attached knowledge_base). Delete them manually via ` +
+        `DELETE /v1/convai/knowledge-base/{id}?force=true: ` +
+        `${createdDocs.map((d) => `${d.name} (${d.id})`).join(", ")}`,
+      );
+    }
     process.exit(1);
   }
 
