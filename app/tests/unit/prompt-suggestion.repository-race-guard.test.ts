@@ -15,7 +15,11 @@ const suggestionRow = {
   id: "sugg-1",
   clinic_id: "clinic-1",
   status: "rejected",
+  category: "prompt",
+  target_file: null,
   pattern_summary: "x",
+  proposed_change: "y",
+  root_cause: null,
   suggested_prompt: "y",
   supporting_call_review_ids: [],
   regression_result: null,
@@ -95,5 +99,29 @@ describe("PromptSuggestionRepository write guards", () => {
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.error.status).toBe(502);
+  });
+
+  it("markApproved scopes the update to status='pending' (compare-and-set)", async () => {
+    const query = buildQuery({ data: { ...suggestionRow, status: "approved" }, error: null });
+    const client = { from: vi.fn().mockReturnValue(query) };
+    const repo = new PromptSuggestionRepository(client as never);
+
+    const result = await repo.markApproved("sugg-1", "user-1");
+
+    expect(result.ok).toBe(true);
+    expect(query.eq).toHaveBeenNthCalledWith(1, "id", "sugg-1");
+    expect(query.eq).toHaveBeenNthCalledWith(2, "status", "pending");
+  });
+
+  it("markApproved returns a 409 conflict when a concurrent review already claimed the row", async () => {
+    const query = buildQuery({ data: null, error: { code: "PGRST116", message: "no rows" } });
+    const client = { from: vi.fn().mockReturnValue(query) };
+    const repo = new PromptSuggestionRepository(client as never);
+
+    const result = await repo.markApproved("sugg-1", "user-1");
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.status).toBe(409);
   });
 });

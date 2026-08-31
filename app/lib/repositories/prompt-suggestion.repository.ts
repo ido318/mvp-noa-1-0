@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { AppError, err, ok, type Result } from "@/lib/errors/app-error";
-import type { PromptSuggestion, PromptSuggestionStatus } from "@/types/domain/prompt-suggestion";
+import type { PromptSuggestion, PromptSuggestionCategory, PromptSuggestionStatus } from "@/types/domain/prompt-suggestion";
 
 function isNoRowsMatchedError(error: unknown): boolean {
   return (error as { code?: string } | null)?.code === "PGRST116";
@@ -11,8 +11,12 @@ function mapPromptSuggestionRow(row: Record<string, unknown>): PromptSuggestion 
     id: row.id as string,
     clinicId: row.clinic_id as string,
     status: row.status as PromptSuggestionStatus,
+    category: row.category as PromptSuggestionCategory,
+    targetFile: (row.target_file as string | null) ?? null,
     patternSummary: row.pattern_summary as string,
-    suggestedPrompt: row.suggested_prompt as string,
+    proposedChange: (row.proposed_change as string | null) ?? null,
+    rootCause: (row.root_cause as string | null) ?? null,
+    suggestedPrompt: (row.suggested_prompt as string | null) ?? null,
     supportingCallReviewIds: (row.supporting_call_review_ids as string[] | null) ?? [],
     regressionResult: (row.regression_result as Record<string, unknown> | null) ?? null,
     previousPrompt: (row.previous_prompt as Record<string, unknown> | null) ?? null,
@@ -72,6 +76,28 @@ export class PromptSuggestionRepository {
         return err(AppError.conflict("Prompt suggestion was already reviewed by someone else"));
       }
       return err(AppError.externalProvider("Failed to reject prompt suggestion", error));
+    }
+    return ok(mapPromptSuggestionRow(data));
+  }
+
+  /** Guarded by `.eq("status", "pending")` — a concurrent review already in flight loses this race cleanly. */
+  async markApproved(id: string, reviewedByUserId: string): Promise<Result<PromptSuggestion>> {
+    const { data, error } = await this.client
+      .from("prompt_suggestions")
+      .update({
+        status: "approved",
+        reviewed_by_user_id: reviewedByUserId,
+        reviewed_at: new Date().toISOString(),
+      })
+      .eq("id", id)
+      .eq("status", "pending")
+      .select("*")
+      .single();
+    if (error) {
+      if (isNoRowsMatchedError(error)) {
+        return err(AppError.conflict("Prompt suggestion was already reviewed by someone else"));
+      }
+      return err(AppError.externalProvider("Failed to approve prompt suggestion", error));
     }
     return ok(mapPromptSuggestionRow(data));
   }
