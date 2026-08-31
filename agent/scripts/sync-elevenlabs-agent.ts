@@ -64,6 +64,40 @@ type ElevenLabsTool = {
 
 const tools: ElevenLabsTool[] = JSON.parse(toolsJson) as ElevenLabsTool[];
 
+// ── Fetch current config (to preserve fields this script doesn't own) ─────────
+// The ElevenLabs PATCH endpoint's merge semantics for nested objects like
+// conversation_config.agent.prompt are undocumented. To avoid silently wiping
+// knowledge_base/rag (owned by sync-elevenlabs-knowledge-base.ts) when this
+// script replaces `prompt`, always fetch-then-merge instead of trusting the API.
+const currentConfigRes = await fetch(
+  `https://api.elevenlabs.io/v1/convai/agents/${ELEVENLABS_AGENT_ID}`,
+  { headers: { "xi-api-key": ELEVENLABS_API_KEY } },
+);
+if (!currentConfigRes.ok) {
+  console.error(`[sync] Failed to fetch current agent config: ${currentConfigRes.status}`);
+  process.exit(1);
+}
+const currentConfig = await currentConfigRes.json() as {
+  conversation_config?: {
+    agent?: {
+      prompt?: {
+        knowledge_base?: unknown;
+        rag?: unknown;
+        tools?: Array<{ name?: string; type?: string }>;
+      };
+    };
+  };
+};
+const existingKnowledgeBase = currentConfig.conversation_config?.agent?.prompt?.knowledge_base ?? [];
+const existingRag = currentConfig.conversation_config?.agent?.prompt?.rag ?? { enabled: false };
+
+// ElevenLabs built-in tools (end_call, language_detection, voicemail_detection, …) have
+// type "system" and aren't defined in tomer-tools.json — they only exist on the live
+// agent. Preserve any non-webhook tool so this script's `tools` replace doesn't
+// silently delete them (same undocumented-merge risk as knowledge_base/rag above).
+const existingSystemTools = (currentConfig.conversation_config?.agent?.prompt?.tools ?? [])
+  .filter((t) => t.type !== "webhook");
+
 // ── Payload ───────────────────────────────────────────────────────────────────
 
 const patchPayload = {
@@ -73,7 +107,9 @@ const patchPayload = {
       language: "he",
       prompt: {
         prompt: systemPrompt,
-        tools,
+        tools: [...tools, ...existingSystemTools],
+        knowledge_base: existingKnowledgeBase,
+        rag: existingRag,
       },
     },
     turn: {
@@ -152,8 +188,9 @@ if (isDryRun) {
 
   console.log("\n── TOOLS ─────────────────────────────────────────────────────");
   console.log(`Current  (${currentToolNames.length}): ${currentToolNames.join(", ") || "(none)"}`);
-  console.log(`Proposed (${tools.length}):`);
-  for (const t of tools) {
+  const proposedTools = patchPayload.conversation_config.agent.prompt.tools;
+  console.log(`Proposed (${proposedTools.length}):`);
+  for (const t of proposedTools) {
     const apiUrl = (t.api as { url?: string } | undefined)?.url
       ?? (t as unknown as { api_schema?: { url?: string } }).api_schema?.url
       ?? "(unknown)";
