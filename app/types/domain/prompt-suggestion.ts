@@ -5,12 +5,23 @@ export type PromptSuggestionStatus =
   | "published"
   | "failed_regression";
 
+export type PromptSuggestionCategory =
+  | "prompt"
+  | "knowledge_base"
+  | "tool"
+  | "backend_logic"
+  | "conversation_flow";
+
 export interface PromptSuggestion {
   id: string;
   clinicId: string;
   status: PromptSuggestionStatus;
+  category: PromptSuggestionCategory;
+  targetFile: string | null;
   patternSummary: string;
-  suggestedPrompt: string;
+  proposedChange: string | null;
+  rootCause: string | null;
+  suggestedPrompt: string | null;
   supportingCallReviewIds: string[];
   regressionResult: Record<string, unknown> | null;
   previousPrompt: Record<string, unknown> | null;

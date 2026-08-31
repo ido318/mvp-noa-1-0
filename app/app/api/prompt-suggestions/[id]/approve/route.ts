@@ -7,6 +7,8 @@ function messageFor(suggestion: PromptSuggestion): string {
   switch (suggestion.status) {
     case "published":
       return "Regression tests passed — the new prompt was published to the live agent.";
+    case "approved":
+      return "Marked approved for manual follow-through — this fix isn't a prompt rewrite, so no regression test or publish was run.";
     case "failed_regression":
       return "One or more regression tests failed. The prompt was not published; see regressionResult.";
     case "pending":
