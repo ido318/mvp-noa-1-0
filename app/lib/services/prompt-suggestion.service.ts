@@ -37,7 +37,9 @@ export class PromptSuggestionService {
    * Regression-tests the candidate prompt before publishing. Only publishes
    * when every test passed AND the response could be confidently parsed —
    * an ambiguous response leaves the suggestion pending with the raw result
-   * attached, never publishing on an unverified guess.
+   * attached, never publishing on an unverified guess. Only category='prompt'
+   * suggestions carry a suggested_prompt at all — everything else is marked
+   * approved directly, for manual follow-through outside this pipeline.
    */
   async approve(actor: ServiceActor, id: string): Promise<Result<PromptSuggestion>> {
     const existing = await this.repo.findById(id);
@@ -50,6 +52,14 @@ export class PromptSuggestionService {
     }
     if (suggestion.status !== "pending") {
       return err(AppError.conflict(`Prompt suggestion already ${suggestion.status}`));
+    }
+
+    if (suggestion.category !== "prompt") {
+      return this.repo.markApproved(id, actor.userId);
+    }
+
+    if (!suggestion.suggestedPrompt) {
+      return err(AppError.internal("prompt suggestion is missing suggested_prompt despite category='prompt'"));
     }
 
     const regression = await runRegressionTests(suggestion.suggestedPrompt).catch((error: unknown) => {

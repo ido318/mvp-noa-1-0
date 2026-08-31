@@ -38,7 +38,11 @@ function suggestion(overrides: Partial<PromptSuggestion> = {}): PromptSuggestion
     id: "sugg-1",
     clinicId: TARGET_CLINIC,
     status: "pending",
+    category: "prompt",
+    targetFile: null,
     patternSummary: "תומר משתמש בביטוי אסור",
+    proposedChange: "להסיר את הביטוי מהפרומפט",
+    rootCause: null,
     suggestedPrompt: "פרומפט מתוקן",
     supportingCallReviewIds: ["r1", "r2"],
     regressionResult: null,
@@ -63,6 +67,7 @@ function baseRepo() {
     listByStatus: vi.fn().mockResolvedValue(ok([suggestion()])),
     findById: vi.fn().mockResolvedValue(ok(suggestion())),
     markRejected: vi.fn().mockResolvedValue(ok(suggestion({ status: "rejected" }))),
+    markApproved: vi.fn().mockResolvedValue(ok(suggestion({ status: "approved" }))),
     recordRegressionResult: vi.fn().mockImplementation((_id, input) =>
       Promise.resolve(ok(suggestion({ status: input.status, regressionResult: input.regressionResult }))),
     ),
@@ -188,4 +193,34 @@ describe("PromptSuggestionService.approve", () => {
     expect(result.error.status).toBe(502);
     expect(repo.markPublished).not.toHaveBeenCalled();
   });
+
+  it("marks non-prompt categories approved without running regression or publish", async () => {
+    const { service, repo } = buildService({
+      findById: vi.fn().mockResolvedValue(ok(suggestion({ category: "knowledge_base", suggestedPrompt: null }))),
+    });
+
+    const result = await service.approve(adminActor, "sugg-1");
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.status).toBe("approved");
+    expect(repo.markApproved).toHaveBeenCalledWith("sugg-1", adminActor.userId);
+    expect(mockRunRegressionTests).not.toHaveBeenCalled();
+    expect(mockPublishPrompt).not.toHaveBeenCalled();
+  });
+
+  it.each(["tool", "backend_logic", "conversation_flow"] as const)(
+    "marks category '%s' approved without publish, same as knowledge_base",
+    async (category) => {
+      const { service, repo } = buildService({
+        findById: vi.fn().mockResolvedValue(ok(suggestion({ category, suggestedPrompt: null }))),
+      });
+
+      const result = await service.approve(adminActor, "sugg-1");
+
+      expect(result.ok).toBe(true);
+      expect(repo.markApproved).toHaveBeenCalledOnce();
+      expect(mockRunRegressionTests).not.toHaveBeenCalled();
+    },
+  );
 });
