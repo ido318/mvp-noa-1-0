@@ -5,6 +5,10 @@ import { Card } from "@/components/dashboard/ui/card";
 import { Badge } from "@/components/dashboard/ui/badge";
 import { Btn } from "@/components/dashboard/ui/btn";
 import { EmptyState } from "@/components/dashboard/ui/empty-state";
+import { ActiveProblems } from "@/components/dashboard/medical-record/active-problems";
+import { AlertBanner } from "@/components/dashboard/medical-record/alert-banner";
+import { MedicalTimeline } from "@/components/dashboard/medical-record/medical-timeline";
+import { VitalsTrend } from "@/components/dashboard/medical-record/vitals-trend";
 import { InvoicesSection } from "@/components/dashboard/invoices-section";
 import { PatientContextDrawer } from "@/components/dashboard/patient-context-drawer";
 import { PetProfileForm } from "@/app/dashboard/pets/[petId]/pet-profile-form";
@@ -15,6 +19,7 @@ import type { Vaccination } from "@/types/domain/vaccination";
 import type { Prescription } from "@/types/domain/prescription";
 import type { Visit, VisitStatus } from "@/types/domain/visit";
 import type { MedicalRecord } from "@/types/domain/medical-record";
+import type { MedicalRecordTimelineItem } from "@/types/api/medical-record-timeline";
 
 const VISIT_STATUS_LABELS: Record<VisitStatus, string> = {
   in_progress: "בטיפול",
@@ -45,6 +50,7 @@ export function PetDetailTabs({
   vaccinations,
   prescriptions,
   medicalRecord,
+  timelineItems,
   owner,
 }: {
   pet: Pet;
@@ -53,6 +59,7 @@ export function PetDetailTabs({
   vaccinations: Vaccination[];
   prescriptions: Prescription[];
   medicalRecord: MedicalRecord | null;
+  timelineItems: MedicalRecordTimelineItem[];
   owner: Customer | null;
 }) {
   const [tab, setTab] = useState<Tab>("overview");
@@ -95,82 +102,25 @@ export function PetDetailTabs({
 
         {tab === "medicalRecord" && (
           <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
-            <Card noPad>
-              <div className="border-b border-[var(--line-2)] px-5 py-4">
-                <h3 className="text-[15px] font-bold text-[var(--ink)]">כניסה לתיק רפואי</h3>
-                <p className="mt-1 text-xs text-[var(--muted)]">סיכום, אזהרות וקישורים לרשומות המקור של {pet.name}</p>
-              </div>
-              <div className="space-y-4 px-5 py-4">
-                <section>
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">סיכום</p>
-                  <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-[var(--ink)]">
-                    {medicalRecord?.summary || "אין עדיין סיכום רפואי קבוע."}
-                  </p>
-                </section>
-
-                <section>
-                  <div className="mb-2 flex items-center justify-between">
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">ביקורים אחרונים</p>
-                    <Link href={`/dashboard/visits/new?petId=${pet.id}`} className="text-xs font-semibold text-[var(--brand-600)] hover:underline">
-                      ביקור חדש
-                    </Link>
-                  </div>
-                  {visits.length === 0 ? (
-                    <p className="text-sm text-[var(--faint)]">אין ביקורים רפואיים עדיין.</p>
-                  ) : (
-                    <div className="divide-y divide-[var(--line-2)] rounded-[var(--r-md)] border border-[var(--line)]">
-                      {visits.slice(0, 5).map((visit) => (
-                        <Link
-                          key={visit.id}
-                          href={`/dashboard/visits/${visit.id}`}
-                          className="block px-3 py-2.5 transition-colors hover:bg-[var(--surface-2)]"
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <p className="text-[13px] font-semibold text-[var(--ink)]">{formatIsraelDateTime(visit.startedAt)}</p>
-                            <Badge color={visit.status === "completed" ? "green" : visit.status === "cancelled" ? "muted" : "brand"}>
-                              {VISIT_STATUS_LABELS[visit.status]}
-                            </Badge>
-                          </div>
-                          <p className="mt-0.5 truncate text-xs text-[var(--muted)]">{visit.chiefComplaint ?? "ללא תלונה ראשית"}</p>
-                        </Link>
-                      ))}
-                    </div>
-                  )}
-                </section>
-              </div>
-            </Card>
+            <MedicalTimeline items={timelineItems} />
 
             <div className="space-y-3">
               <Card>
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">אזהרות</p>
-                <div className="mt-2 space-y-2">
-                  {pet.allergies && <Badge color="red">אלרגיה: {pet.allergies}</Badge>}
-                  {pet.chronicConditions && <Badge color="amber">כרוני: {pet.chronicConditions}</Badge>}
-                  {(medicalRecord?.alerts ?? []).map((alert, index) => (
-                    <p key={index} className="rounded-[var(--r-sm)] bg-[var(--red-50)] px-2 py-1 text-xs font-semibold text-[var(--red-700)]">
-                      {String(alert)}
-                    </p>
-                  ))}
-                  {!pet.allergies && !pet.chronicConditions && (medicalRecord?.alerts ?? []).length === 0 && (
-                    <p className="text-sm text-[var(--faint)]">אין אזהרות רשומות.</p>
-                  )}
-                </div>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">סיכום</p>
+                <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-[var(--ink)]">
+                  {medicalRecord?.summary || "אין עדיין סיכום רפואי קבוע."}
+                </p>
               </Card>
 
-              <Card>
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">בעיות פעילות</p>
-                <div className="mt-2 space-y-1">
-                  {(medicalRecord?.activeProblemList ?? []).length === 0 ? (
-                    <p className="text-sm text-[var(--faint)]">אין בעיות פעילות רשומות.</p>
-                  ) : (
-                    medicalRecord!.activeProblemList.map((problem, index) => (
-                      <p key={index} className="rounded-[var(--r-sm)] bg-[var(--surface-2)] px-2 py-1 text-xs font-semibold text-[var(--ink)]">
-                        {String(problem)}
-                      </p>
-                    ))
-                  )}
-                </div>
-              </Card>
+              <AlertBanner
+                allergies={pet.allergies}
+                chronicConditions={pet.chronicConditions}
+                alerts={medicalRecord?.alerts ?? []}
+              />
+
+              <ActiveProblems problems={medicalRecord?.activeProblemList ?? []} />
+
+              <VitalsTrend items={timelineItems} />
 
               <Card>
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">מניעה ותרופות</p>

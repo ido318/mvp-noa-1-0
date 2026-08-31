@@ -19,6 +19,7 @@ import { VaccinationRepository } from "@/lib/repositories/vaccination.repository
 import { VisitRepository } from "@/lib/repositories/visit.repository";
 import { VisitShareRepository } from "@/lib/repositories/visit-share.repository";
 import { WaitlistRepository } from "@/lib/repositories/waitlist.repository";
+import { VitalRepository } from "@/lib/repositories/vital.repository";
 import { AIEventService } from "@/lib/services/ai-event.service";
 import { AppointmentService } from "@/lib/services/appointment.service";
 import { AuditService } from "@/lib/services/audit.service";
@@ -63,6 +64,7 @@ export async function createServices() {
   const invoiceRepository = new InvoiceRepository(supabase);
   const taskRepository = new TaskRepository(supabase);
   const labOrderRepository = new LabOrderRepository(supabase);
+  const vitalRepository = new VitalRepository(supabase);
   const visitShareRepository = new VisitShareRepository(admin);
   const promptSuggestionRepository = new PromptSuggestionRepository(admin);
   const auditLogRepository = new AuditLogRepository(admin);
@@ -77,6 +79,8 @@ export async function createServices() {
     petRepository,
     auditService,
     medicalRecordRepository,
+    vitalRepository,
+    labOrderRepository,
   );
 
   return {

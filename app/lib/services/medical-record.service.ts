@@ -1,10 +1,12 @@
 import { AppError, err, ok, type Result } from "@/lib/errors/app-error";
+import type { LabOrderRepository } from "@/lib/repositories/lab-order.repository";
 import type { MedicalNoteRepository } from "@/lib/repositories/medical-note.repository";
 import type { MedicalRecordRepository } from "@/lib/repositories/medical-record.repository";
 import type { PetRepository } from "@/lib/repositories/pet.repository";
 import type { PrescriptionRepository } from "@/lib/repositories/prescription.repository";
 import type { VaccinationRepository } from "@/lib/repositories/vaccination.repository";
 import type { VisitRepository } from "@/lib/repositories/visit.repository";
+import type { VitalRepository } from "@/lib/repositories/vital.repository";
 import { assertMedicalDeleteAuthorized } from "@/lib/services/medical-authorization";
 import type { AuditService } from "@/lib/services/audit.service";
 import type { ServiceActor } from "@/lib/services/service-context";
@@ -30,6 +32,22 @@ import type {
 } from "@/types/domain/vaccination";
 import type { Pet } from "@/types/domain/pet";
 import type { Visit } from "@/types/domain/visit";
+import type { LabOrder } from "@/types/domain/lab-order";
+import type { Vital } from "@/types/domain/vital";
+import type {
+  MedicalRecordTimelineItem,
+  MedicalRecordTimelineResponse,
+  MedicalRecordTimelineType,
+} from "@/types/api/medical-record-timeline";
+
+const NOTE_TYPE_LABELS: Record<string, string> = {
+  general: "הערה רפואית",
+  soap_subjective: "SOAP - תלונת לקוח",
+  soap_objective: "SOAP - ממצאים",
+  soap_assessment: "SOAP - הערכה",
+  soap_plan: "SOAP - תוכנית טיפול",
+  follow_up: "מעקב",
+};
 
 export class MedicalRecordService {
   constructor(
@@ -40,6 +58,8 @@ export class MedicalRecordService {
     private readonly petRepository: PetRepository,
     private readonly auditService: AuditService,
     private readonly medicalRecordRepository?: MedicalRecordRepository,
+    private readonly vitalRepository?: VitalRepository,
+    private readonly labOrderRepository?: LabOrderRepository,
   ) {}
 
   async getRecordByPet(actor: ServiceActor, petId: string): Promise<Result<MedicalRecord>> {
@@ -117,6 +137,116 @@ export class MedicalRecordService {
     });
 
     return updated;
+  }
+
+  async getTimeline(
+    actor: ServiceActor,
+    petId: string,
+    filters: { type?: MedicalRecordTimelineType; q?: string },
+  ): Promise<Result<MedicalRecordTimelineResponse>> {
+    const pet = await this.assertPetAccessible(actor, petId);
+    if (!pet.ok) return err(pet.error);
+
+    const [visits, notes, vaccinations, prescriptions, vitals, labOrders] = await Promise.all([
+      this.visitRepository.list({ clinicIds: [pet.value.clinicId], petId }),
+      this.medicalNoteRepository.listByPet(pet.value.clinicId, petId),
+      this.vaccinationRepository.listByPet(petId, pet.value.clinicId),
+      this.prescriptionRepository.listByPet(petId),
+      this.vitalRepository ? this.vitalRepository.listByPet(pet.value.clinicId, petId) : ok<Vital[]>([]),
+      this.labOrderRepository ? this.labOrderRepository.list({ clinicIds: [pet.value.clinicId], petId }) : ok<LabOrder[]>([]),
+    ]);
+
+    if (!visits.ok) return err(visits.error);
+    if (!notes.ok) return err(notes.error);
+    if (!vaccinations.ok) return err(vaccinations.error);
+    if (!prescriptions.ok) return err(prescriptions.error);
+    if (!vitals.ok) return err(vitals.error);
+    if (!labOrders.ok) return err(labOrders.error);
+
+    const visitItems = visits.value;
+    const noteItems = notes.value;
+    const vaccinationItems = vaccinations.value;
+    const prescriptionItems = prescriptions.value;
+    const vitalItems = vitals.value;
+    const labOrderItems = labOrders.value;
+
+    const items: MedicalRecordTimelineItem[] = [
+      ...visitItems.map((visit): MedicalRecordTimelineItem => ({
+        id: `visit-${visit.id}`,
+        type: "visit",
+        occurredAt: visit.startedAt,
+        title: "ביקור",
+        subtitle: visit.chiefComplaint ?? visit.manualVisitSummary ?? visit.aiVisitSummary,
+        sourceVisitId: visit.id,
+        sourceHref: `/dashboard/visits/${visit.id}`,
+        data: visit,
+      })),
+      ...noteItems.map((note): MedicalRecordTimelineItem => ({
+        id: `medical-note-${note.id}`,
+        type: "medical_note",
+        occurredAt: note.createdAt,
+        title: NOTE_TYPE_LABELS[note.noteType] ?? "הערה רפואית",
+        subtitle: note.content,
+        sourceVisitId: note.visitId,
+        sourceHref: `/dashboard/visits/${note.visitId}`,
+        data: note,
+      })),
+      ...vitalItems.map((vital): MedicalRecordTimelineItem => ({
+        id: `vital-${vital.id}`,
+        type: "vital",
+        occurredAt: vital.recordedAt,
+        title: "מדדים",
+        subtitle: [
+          vital.weightKg != null ? `${vital.weightKg} קג` : null,
+          vital.temperatureC != null ? `${vital.temperatureC} C` : null,
+          vital.heartRateBpm != null ? `${vital.heartRateBpm} bpm` : null,
+        ].filter(Boolean).join(" · ") || vital.notes,
+        sourceVisitId: vital.visitId,
+        sourceHref: vital.visitId ? `/dashboard/visits/${vital.visitId}` : `/dashboard/pets/${petId}`,
+        data: vital,
+      })),
+      ...prescriptionItems.map((prescription): MedicalRecordTimelineItem => ({
+        id: `prescription-${prescription.id}`,
+        type: "prescription",
+        occurredAt: prescription.prescribedAt,
+        title: `מרשם: ${prescription.medicationName}`,
+        subtitle: prescription.instructions,
+        sourceVisitId: prescription.visitId,
+        sourceHref: `/dashboard/visits/${prescription.visitId}`,
+        data: prescription,
+      })),
+      ...vaccinationItems.map((vaccination): MedicalRecordTimelineItem => ({
+        id: `vaccination-${vaccination.id}`,
+        type: "vaccination",
+        occurredAt: vaccination.administeredAt,
+        title: `חיסון: ${vaccination.vaccineName}`,
+        subtitle: vaccination.notes,
+        sourceVisitId: vaccination.visitId,
+        sourceHref: vaccination.visitId ? `/dashboard/visits/${vaccination.visitId}` : `/dashboard/pets/${petId}`,
+        data: vaccination,
+      })),
+      ...labOrderItems.map((labOrder): MedicalRecordTimelineItem => ({
+        id: `lab-order-${labOrder.id}`,
+        type: "lab_order",
+        occurredAt: labOrder.completedAt ?? labOrder.orderedAt,
+        title: `בדיקת מעבדה: ${labOrder.testName}`,
+        subtitle: labOrder.resultText,
+        sourceVisitId: labOrder.visitId,
+        sourceHref: labOrder.visitId ? `/dashboard/visits/${labOrder.visitId}` : "/dashboard/lab",
+        data: labOrder,
+      })),
+    ];
+
+    const query = filters.q?.trim().toLowerCase();
+    const filtered = items
+      .filter((item) => !filters.type || item.type === filters.type)
+      .filter((item) => {
+        if (!query) return true;
+        return `${item.title} ${item.subtitle ?? ""}`.toLowerCase().includes(query);
+      })
+      .sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime());
+
+    return ok({ items: filtered });
   }
 
   async listNotes(actor: ServiceActor, visitId: string): Promise<Result<MedicalNote[]>> {

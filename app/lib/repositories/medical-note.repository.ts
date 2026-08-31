@@ -21,6 +21,18 @@ export class MedicalNoteRepository {
     return ok((data ?? []).map(mapMedicalNoteRow));
   }
 
+  async listByPet(clinicId: string, petId: string): Promise<Result<MedicalNote[]>> {
+    const { data, error } = await this.client
+      .from("medical_notes")
+      .select("*, visit:visits!medical_notes_visit_clinic_fk(pet_id)")
+      .eq("clinic_id", clinicId)
+      .eq("visit.pet_id", petId)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false });
+    if (error) return err(AppError.externalProvider("Failed to list pet medical notes", error));
+    return ok((data ?? []).map(mapMedicalNoteRow));
+  }
+
   async findById(noteId: string): Promise<Result<MedicalNote | null>> {
     const { data, error } = await this.client
       .from("medical_notes")

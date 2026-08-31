@@ -24,6 +24,7 @@ import type { Profile } from "@/types/domain/profile";
 import type { Task, TaskPriority, TaskStatus } from "@/types/domain/task";
 import type { Vaccination } from "@/types/domain/vaccination";
 import type { Visit, VisitStatus } from "@/types/domain/visit";
+import type { Vital } from "@/types/domain/vital";
 import type {
   VoiceCall,
   VoiceCallDirection,
@@ -692,6 +693,54 @@ export function mapLabOrderRow(row: {
     orderedByUserId: row.ordered_by_user_id,
     orderedAt: row.ordered_at,
     completedAt: row.completed_at,
+    version: row.version,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    deletedAt: row.deleted_at,
+  };
+}
+
+export function mapVitalRow(row: {
+  id: string;
+  clinic_id: string;
+  customer_id: string;
+  pet_id: string;
+  visit_id: string | null;
+  recorded_at: string;
+  weight_kg: number | string | null;
+  temperature_c: number | string | null;
+  heart_rate_bpm: number | null;
+  respiratory_rate_bpm: number | null;
+  mucous_membrane: string | null;
+  capillary_refill_time: string | null;
+  body_condition_score: number | string | null;
+  pain_score: number | null;
+  hydration_status: string | null;
+  notes: string | null;
+  recorded_by_user_id: string | null;
+  version: number;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}): Vital {
+  return {
+    id: row.id,
+    clinicId: row.clinic_id,
+    customerId: row.customer_id,
+    petId: row.pet_id,
+    visitId: row.visit_id,
+    recordedAt: row.recorded_at,
+    weightKg: row.weight_kg == null ? null : Number(row.weight_kg),
+    temperatureC: row.temperature_c == null ? null : Number(row.temperature_c),
+    heartRateBpm: row.heart_rate_bpm,
+    respiratoryRateBpm: row.respiratory_rate_bpm,
+    mucousMembrane: row.mucous_membrane,
+    capillaryRefillTime: row.capillary_refill_time,
+    bodyConditionScore: row.body_condition_score == null ? null : Number(row.body_condition_score),
+    painScore: row.pain_score,
+    hydrationStatus: row.hydration_status,
+    notes: row.notes,
+    recordedByUserId: row.recorded_by_user_id,
     version: row.version,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

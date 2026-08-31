@@ -8,6 +8,7 @@ import type { Vaccination } from "@/types/domain/vaccination";
 import type { Prescription } from "@/types/domain/prescription";
 import type { Visit } from "@/types/domain/visit";
 import type { MedicalRecord } from "@/types/domain/medical-record";
+import type { MedicalRecordTimelineResponse } from "@/types/api/medical-record-timeline";
 
 type Params = { params: Promise<{ petId: string }> };
 
@@ -38,7 +39,7 @@ export default async function PetProfilePage({ params }: Params) {
     );
   }
 
-  const [visitsData, vaccinationsData, prescriptionsData, owner, medicalRecordData] = await Promise.all([
+  const [visitsData, vaccinationsData, prescriptionsData, owner, medicalRecordData, timelineData] = await Promise.all([
     dashboardApiFetch<{ items: Visit[] }>(
       `/api/visits?petId=${encodeURIComponent(petId)}&clinicId=${encodeURIComponent(pet.clinicId)}&limit=10`,
     ),
@@ -48,6 +49,7 @@ export default async function PetProfilePage({ params }: Params) {
     dashboardApiFetch<{ items: Prescription[] }>(`/api/pets/${petId}/prescriptions`),
     dashboardApiFetch<Customer>(`/api/customers/${pet.customerId}`),
     dashboardApiFetch<{ item: MedicalRecord }>(`/api/pets/${petId}/medical-record`),
+    dashboardApiFetch<MedicalRecordTimelineResponse>(`/api/pets/${petId}/medical-record/timeline`),
   ]);
 
   const age = petAge(pet.birthDate);
@@ -143,6 +145,7 @@ export default async function PetProfilePage({ params }: Params) {
         vaccinations={vaccinationsData?.items ?? []}
         prescriptions={prescriptionsData?.items ?? []}
         medicalRecord={medicalRecordData?.item ?? null}
+        timelineItems={timelineData?.items ?? []}
         owner={owner ?? null}
       />
     </div>
