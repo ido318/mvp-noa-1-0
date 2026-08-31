@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { AppointmentRepository } from "@/lib/repositories/appointment.repository";
 
 describe("AppointmentRepository.findActiveOverlaps", () => {
-  it("treats pending approval appointments as active calendar blockers", async () => {
+  it("treats scheduled, confirmed, pending approval, checked-in, and in-visit appointments as active blockers", async () => {
     const inFilter = vi.fn().mockReturnThis();
     const query = {
       select: vi.fn().mockReturnThis(),
@@ -29,6 +29,8 @@ describe("AppointmentRepository.findActiveOverlaps", () => {
       "scheduled",
       "confirmed",
       "pending_approval",
+      "checked_in",
+      "in_visit",
     ]);
   });
 });

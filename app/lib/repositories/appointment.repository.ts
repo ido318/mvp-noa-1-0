@@ -129,7 +129,7 @@ export class AppointmentRepository {
       .from("appointments")
       .select("*")
       .eq("clinic_id", clinicId)
-      .in("status", ["scheduled", "confirmed", "pending_approval"])
+      .in("status", ["scheduled", "confirmed", "pending_approval", "checked_in", "in_visit"])
       .is("deleted_at", null)
       .lt("scheduled_at", endIso);
 

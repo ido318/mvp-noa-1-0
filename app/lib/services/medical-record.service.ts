@@ -1,5 +1,6 @@
 import { AppError, err, ok, type Result } from "@/lib/errors/app-error";
 import type { MedicalNoteRepository } from "@/lib/repositories/medical-note.repository";
+import type { MedicalRecordRepository } from "@/lib/repositories/medical-record.repository";
 import type { PetRepository } from "@/lib/repositories/pet.repository";
 import type { PrescriptionRepository } from "@/lib/repositories/prescription.repository";
 import type { VaccinationRepository } from "@/lib/repositories/vaccination.repository";
@@ -13,6 +14,11 @@ import type {
   UpdateMedicalNoteInput,
 } from "@/types/domain/medical-note";
 import type {
+  EnsureMedicalRecordForPetInput,
+  MedicalRecord,
+  UpdateMedicalRecordInput,
+} from "@/types/domain/medical-record";
+import type {
   CreatePrescriptionInput,
   Prescription,
   UpdatePrescriptionInput,
@@ -22,6 +28,7 @@ import type {
   UpdateVaccinationInput,
   Vaccination,
 } from "@/types/domain/vaccination";
+import type { Pet } from "@/types/domain/pet";
 import type { Visit } from "@/types/domain/visit";
 
 export class MedicalRecordService {
@@ -32,7 +39,85 @@ export class MedicalRecordService {
     private readonly prescriptionRepository: PrescriptionRepository,
     private readonly petRepository: PetRepository,
     private readonly auditService: AuditService,
+    private readonly medicalRecordRepository?: MedicalRecordRepository,
   ) {}
+
+  async getRecordByPet(actor: ServiceActor, petId: string): Promise<Result<MedicalRecord>> {
+    const pet = await this.assertPetAccessible(actor, petId);
+    if (!pet.ok) return err(pet.error);
+    return this.ensureRecordForPet(actor, {
+      clinicId: pet.value.clinicId,
+      petId: pet.value.id,
+    });
+  }
+
+  async ensureRecordForPet(
+    actor: ServiceActor,
+    input: EnsureMedicalRecordForPetInput,
+  ): Promise<Result<MedicalRecord>> {
+    if (!this.medicalRecordRepository) {
+      return err(AppError.internal("Medical record repository is not configured"));
+    }
+    if (!actor.clinicIds.includes(input.clinicId)) {
+      return err(AppError.forbidden("Cannot access medical record for requested clinic"));
+    }
+
+    const pet = await this.petRepository.findById(input.petId);
+    if (!pet.ok) return err(pet.error);
+    if (!pet.value) return err(AppError.notFound("Pet not found"));
+    if (pet.value.clinicId !== input.clinicId) {
+      return err(AppError.validation("Pet clinic mismatch"));
+    }
+
+    const existing = await this.medicalRecordRepository.findByPet(input.clinicId, input.petId);
+    if (!existing.ok) return existing;
+    if (existing.value) return ok(existing.value);
+
+    const created = await this.medicalRecordRepository.createForPet(input.clinicId, input.petId);
+    if (!created.ok) return created;
+
+    await this.auditService.logAction({
+      clinicId: created.value.clinicId,
+      actorType: "user",
+      actorId: actor.userId,
+      action: "medical_record.create",
+      entityType: "medical_record",
+      entityId: created.value.id,
+      afterPayload: created.value,
+      metadata: { petId: created.value.petId },
+    });
+
+    return created;
+  }
+
+  async updateRecordByPet(
+    actor: ServiceActor,
+    petId: string,
+    input: UpdateMedicalRecordInput,
+  ): Promise<Result<MedicalRecord>> {
+    if (!this.medicalRecordRepository) {
+      return err(AppError.internal("Medical record repository is not configured"));
+    }
+    const existing = await this.getRecordByPet(actor, petId);
+    if (!existing.ok) return existing;
+
+    const updated = await this.medicalRecordRepository.update(existing.value.id, input);
+    if (!updated.ok) return updated;
+
+    await this.auditService.logAction({
+      clinicId: updated.value.clinicId,
+      actorType: "user",
+      actorId: actor.userId,
+      action: "medical_record.update",
+      entityType: "medical_record",
+      entityId: updated.value.id,
+      beforePayload: existing.value,
+      afterPayload: updated.value,
+      metadata: { petId: updated.value.petId },
+    });
+
+    return updated;
+  }
 
   async listNotes(actor: ServiceActor, visitId: string): Promise<Result<MedicalNote[]>> {
     const visit = await this.assertVisitAccessible(actor, visitId);
@@ -396,5 +481,15 @@ export class MedicalRecordService {
       return err(AppError.forbidden("Visit outside actor clinics"));
     }
     return ok(visit.value);
+  }
+
+  private async assertPetAccessible(actor: ServiceActor, petId: string): Promise<Result<Pet>> {
+    const pet = await this.petRepository.findById(petId);
+    if (!pet.ok) return err(pet.error);
+    if (!pet.value) return err(AppError.notFound("Pet not found"));
+    if (!actor.clinicIds.includes(pet.value.clinicId)) {
+      return err(AppError.forbidden("Pet outside actor clinics"));
+    }
+    return ok(pet.value);
   }
 }

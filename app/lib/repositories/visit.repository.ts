@@ -10,9 +10,10 @@ import type {
 
 type VersionedUpdatePayload = {
   expectedVersion: number;
-  data: Partial<{
-    appointment_id: string | null;
-    status: VisitStatus;
+    data: Partial<{
+      appointment_id: string | null;
+      medical_record_id: string | null;
+      status: VisitStatus;
     chief_complaint: string | null;
     manual_visit_summary: string | null;
     completed_at: string | null;
@@ -72,6 +73,7 @@ export class VisitRepository {
         customer_id: input.customerId,
         pet_id: input.petId,
         appointment_id: input.appointmentId ?? null,
+        medical_record_id: input.medicalRecordId ?? null,
         chief_complaint: input.chiefComplaint ?? null,
         manual_visit_summary: input.manualVisitSummary ?? null,
         created_by_user_id: actorUserId,

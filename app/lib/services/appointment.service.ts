@@ -23,6 +23,8 @@ const ALLOWED_STATUS_TRANSITIONS: Record<AppointmentStatus, AppointmentStatus[]>
   no_show:          [],
   pending_approval: ["confirmed", "cancelled"],
   late_cancellation:[],
+  checked_in:        ["in_visit", "cancelled", "no_show"],
+  in_visit:          ["completed", "cancelled"],
 };
 
 function addDaysIso(date: string, days: number): string {

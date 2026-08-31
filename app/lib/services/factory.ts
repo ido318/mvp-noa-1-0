@@ -9,6 +9,7 @@ import { CustomerRepository } from "@/lib/repositories/customer.repository";
 import { InvoiceRepository } from "@/lib/repositories/invoice.repository";
 import { LabOrderRepository } from "@/lib/repositories/lab-order.repository";
 import { MedicalNoteRepository } from "@/lib/repositories/medical-note.repository";
+import { MedicalRecordRepository } from "@/lib/repositories/medical-record.repository";
 import { PetRepository } from "@/lib/repositories/pet.repository";
 import { PrescriptionRepository } from "@/lib/repositories/prescription.repository";
 import { PromptSuggestionRepository } from "@/lib/repositories/prompt-suggestion.repository";
@@ -56,6 +57,7 @@ export async function createServices() {
   const visitRepository = new VisitRepository(supabase);
   const voiceCallRepository = new VoiceCallRepository(supabase);
   const medicalNoteRepository = new MedicalNoteRepository(supabase);
+  const medicalRecordRepository = new MedicalRecordRepository(supabase);
   const vaccinationRepository = new VaccinationRepository(supabase);
   const prescriptionRepository = new PrescriptionRepository(supabase);
   const invoiceRepository = new InvoiceRepository(supabase);
@@ -67,13 +69,23 @@ export async function createServices() {
   const aiEventRepository = new AIEventRepository(admin);
   const auditService = new AuditService(auditLogRepository);
 
+  const medicalRecordService = new MedicalRecordService(
+    visitRepository,
+    medicalNoteRepository,
+    vaccinationRepository,
+    prescriptionRepository,
+    petRepository,
+    auditService,
+    medicalRecordRepository,
+  );
+
   return {
     auth: new AuthService(supabase, profileRepository, clinicRepository),
     health: new HealthService(admin),
     audit: auditService,
     aiEvent: new AIEventService(aiEventRepository),
     customer: new CustomerService(customerRepository, petRepository, auditService),
-    pet: new PetService(petRepository, customerRepository, auditService),
+    pet: new PetService(petRepository, customerRepository, auditService, medicalRecordService),
     escalation: new EscalationService(supabase),
     dashboardNotifications: new DashboardNotificationsService(supabase),
     appointment: new AppointmentService(
@@ -96,15 +108,9 @@ export async function createServices() {
       petRepository,
       appointmentRepository,
       auditService,
+      medicalRecordService,
     ),
-    medicalRecord: new MedicalRecordService(
-      visitRepository,
-      medicalNoteRepository,
-      vaccinationRepository,
-      prescriptionRepository,
-      petRepository,
-      auditService,
-    ),
+    medicalRecord: medicalRecordService,
     visitSummaryAssistant: new VisitSummaryAssistantService(
       visitRepository,
       medicalNoteRepository,

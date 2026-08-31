@@ -16,7 +16,9 @@ export type AppointmentStatus =
   | "cancelled"
   | "no_show"
   | "pending_approval"
-  | "late_cancellation";
+  | "late_cancellation"
+  | "checked_in"
+  | "in_visit";
 
 export type AppointmentSource =
   | "phone"

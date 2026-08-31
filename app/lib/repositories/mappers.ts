@@ -17,6 +17,7 @@ import type {
 import type { Invoice, InvoiceLineItem, InvoiceStatus } from "@/types/domain/invoice";
 import type { LabOrder, LabOrderStatus } from "@/types/domain/lab-order";
 import type { MedicalNote, MedicalNoteType } from "@/types/domain/medical-note";
+import type { MedicalRecord } from "@/types/domain/medical-record";
 import type { Pet, PetStatus } from "@/types/domain/pet";
 import type { Prescription, PrescriptionStatus } from "@/types/domain/prescription";
 import type { Profile } from "@/types/domain/profile";
@@ -305,6 +306,7 @@ export function mapVisitRow(row: {
   customer_id: string;
   pet_id: string;
   appointment_id: string | null;
+  medical_record_id?: string | null;
   status: VisitStatus;
   chief_complaint: string | null;
   manual_visit_summary: string | null;
@@ -325,6 +327,7 @@ export function mapVisitRow(row: {
     customerId: row.customer_id,
     petId: row.pet_id,
     appointmentId: row.appointment_id,
+    medicalRecordId: row.medical_record_id ?? null,
     status: row.status,
     chiefComplaint: row.chief_complaint,
     manualVisitSummary: row.manual_visit_summary,
@@ -347,6 +350,14 @@ export function mapMedicalNoteRow(row: {
   visit_id: string;
   note_type: MedicalNoteType;
   content: string;
+  subjective?: string | null;
+  objective?: string | null;
+  assessment?: string | null;
+  plan?: string | null;
+  status?: "draft" | "approved" | "archived";
+  approved_by_user_id?: string | null;
+  approved_at?: string | null;
+  version?: number;
   author_user_id: string;
   created_at: string;
   updated_at: string;
@@ -358,7 +369,39 @@ export function mapMedicalNoteRow(row: {
     visitId: row.visit_id,
     noteType: row.note_type,
     content: row.content,
+    subjective: row.subjective ?? null,
+    objective: row.objective ?? null,
+    assessment: row.assessment ?? null,
+    plan: row.plan ?? null,
+    status: row.status ?? "draft",
+    approvedByUserId: row.approved_by_user_id ?? null,
+    approvedAt: row.approved_at ?? null,
+    version: row.version ?? 1,
     authorUserId: row.author_user_id,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    deletedAt: row.deleted_at,
+  };
+}
+
+export function mapMedicalRecordRow(row: {
+  id: string;
+  clinic_id: string;
+  pet_id: string;
+  summary: string | null;
+  active_problem_list: unknown[] | null;
+  alerts: unknown[] | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}): MedicalRecord {
+  return {
+    id: row.id,
+    clinicId: row.clinic_id,
+    petId: row.pet_id,
+    summary: row.summary,
+    activeProblemList: row.active_problem_list ?? [],
+    alerts: row.alerts ?? [],
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     deletedAt: row.deleted_at,

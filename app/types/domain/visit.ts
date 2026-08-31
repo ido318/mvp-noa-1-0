@@ -6,6 +6,7 @@ export type Visit = {
   customerId: string;
   petId: string;
   appointmentId: string | null;
+  medicalRecordId: string | null;
   status: VisitStatus;
   chiefComplaint: string | null;
   manualVisitSummary: string | null;
@@ -26,6 +27,7 @@ export type CreateVisitInput = {
   customerId: string;
   petId: string;
   appointmentId?: string | null;
+  medicalRecordId?: string | null;
   chiefComplaint?: string | null;
   manualVisitSummary?: string | null;
 };
@@ -34,6 +36,7 @@ export type UpdateVisitInput = {
   chiefComplaint?: string | null;
   manualVisitSummary?: string | null;
   appointmentId?: string | null;
+  medicalRecordId?: string | null;
 };
 
 export type ChangeVisitStatusInput = {

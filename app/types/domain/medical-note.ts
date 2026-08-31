@@ -12,6 +12,14 @@ export type MedicalNote = {
   visitId: string;
   noteType: MedicalNoteType;
   content: string;
+  subjective: string | null;
+  objective: string | null;
+  assessment: string | null;
+  plan: string | null;
+  status: "draft" | "approved" | "archived";
+  approvedByUserId: string | null;
+  approvedAt: string | null;
+  version: number;
   authorUserId: string;
   createdAt: string;
   updatedAt: string;
@@ -21,9 +29,19 @@ export type MedicalNote = {
 export type CreateMedicalNoteInput = {
   noteType: MedicalNoteType;
   content: string;
+  subjective?: string | null;
+  objective?: string | null;
+  assessment?: string | null;
+  plan?: string | null;
+  status?: "draft" | "approved" | "archived";
 };
 
 export type UpdateMedicalNoteInput = {
   noteType?: MedicalNoteType;
   content?: string;
+  subjective?: string | null;
+  objective?: string | null;
+  assessment?: string | null;
+  plan?: string | null;
+  status?: "draft" | "approved" | "archived";
 };

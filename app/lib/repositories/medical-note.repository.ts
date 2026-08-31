@@ -45,6 +45,11 @@ export class MedicalNoteRepository {
         visit_id: visitId,
         note_type: input.noteType,
         content: input.content,
+        subjective: input.subjective ?? null,
+        objective: input.objective ?? null,
+        assessment: input.assessment ?? null,
+        plan: input.plan ?? null,
+        status: input.status ?? "draft",
         author_user_id: authorUserId,
       })
       .select("*")
@@ -59,6 +64,11 @@ export class MedicalNoteRepository {
       .update({
         note_type: input.noteType,
         content: input.content,
+        subjective: input.subjective,
+        objective: input.objective,
+        assessment: input.assessment,
+        plan: input.plan,
+        status: input.status,
       })
       .eq("id", noteId)
       .is("deleted_at", null)

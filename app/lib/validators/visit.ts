@@ -7,6 +7,7 @@ export const createVisitSchema = z.object({
   customerId: z.string().uuid(),
   petId: z.string().uuid(),
   appointmentId: z.string().uuid().optional().nullable(),
+  medicalRecordId: z.string().uuid().optional().nullable(),
   chiefComplaint: z.string().trim().max(2000).optional().nullable(),
   manualVisitSummary: z.string().trim().max(8000).optional().nullable(),
 });
@@ -20,6 +21,7 @@ export const updateVisitSchema = z
         chiefComplaint: z.string().trim().max(2000).optional().nullable(),
         manualVisitSummary: z.string().trim().max(8000).optional().nullable(),
         appointmentId: z.string().uuid().optional().nullable(),
+        medicalRecordId: z.string().uuid().optional().nullable(),
       })
       .optional(),
   })

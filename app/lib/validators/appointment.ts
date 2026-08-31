@@ -21,6 +21,8 @@ export const appointmentStatusSchema = z.enum([
   "no_show",
   "pending_approval",
   "late_cancellation",
+  "checked_in",
+  "in_visit",
 ]);
 
 export const appointmentSourceSchema = z.enum([

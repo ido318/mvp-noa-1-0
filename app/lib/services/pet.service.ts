@@ -2,6 +2,7 @@ import { AppError, err, ok, type Result } from "@/lib/errors/app-error";
 import type { CustomerRepository } from "@/lib/repositories/customer.repository";
 import type { PetRepository } from "@/lib/repositories/pet.repository";
 import type { AuditService } from "@/lib/services/audit.service";
+import type { MedicalRecordService } from "@/lib/services/medical-record.service";
 import type { ServiceActor } from "@/lib/services/service-context";
 import type { CreatePetInput, Pet, UpdatePetInput } from "@/types/domain/pet";
 
@@ -10,6 +11,7 @@ export class PetService {
     private readonly petRepository: PetRepository,
     private readonly customerRepository: CustomerRepository,
     private readonly auditService: AuditService,
+    private readonly medicalRecordService?: Pick<MedicalRecordService, "ensureRecordForPet">,
   ) {}
 
   async listPets(
@@ -55,6 +57,14 @@ export class PetService {
 
     const createdResult = await this.petRepository.insert(input);
     if (!createdResult.ok) return createdResult;
+
+    if (this.medicalRecordService) {
+      const record = await this.medicalRecordService.ensureRecordForPet(actor, {
+        clinicId: createdResult.value.clinicId,
+        petId: createdResult.value.id,
+      });
+      if (!record.ok) return err(record.error);
+    }
 
     await this.auditService.logAction({
       clinicId: createdResult.value.clinicId,

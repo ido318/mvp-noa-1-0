@@ -5,6 +5,7 @@ import type { PetRepository } from "@/lib/repositories/pet.repository";
 import type { VisitRepository } from "@/lib/repositories/visit.repository";
 import { assertMedicalDeleteAuthorized } from "@/lib/services/medical-authorization";
 import type { AuditService } from "@/lib/services/audit.service";
+import type { MedicalRecordService } from "@/lib/services/medical-record.service";
 import type { ServiceActor } from "@/lib/services/service-context";
 import type {
   ChangeVisitStatusInput,
@@ -28,6 +29,7 @@ export class VisitService {
     private readonly petRepository: PetRepository,
     private readonly appointmentRepository: AppointmentRepository,
     private readonly auditService: AuditService,
+    private readonly medicalRecordService?: Pick<MedicalRecordService, "ensureRecordForPet">,
   ) {}
 
   async listVisits(
@@ -80,7 +82,20 @@ export class VisitService {
       if (!appointmentCheck.ok) return appointmentCheck;
     }
 
-    const created = await this.visitRepository.create(input, actor.userId);
+    let medicalRecordId = input.medicalRecordId ?? null;
+    if (!medicalRecordId && this.medicalRecordService) {
+      const record = await this.medicalRecordService.ensureRecordForPet(actor, {
+        clinicId: input.clinicId,
+        petId: input.petId,
+      });
+      if (!record.ok) return err(record.error);
+      medicalRecordId = record.value.id;
+    }
+
+    const created = await this.visitRepository.create(
+      { ...input, medicalRecordId },
+      actor.userId,
+    );
     if (!created.ok) return created;
 
     await this.auditService.logAction({
@@ -128,12 +143,14 @@ export class VisitService {
       chief_complaint?: string | null;
       manual_visit_summary?: string | null;
       appointment_id?: string | null;
+      medical_record_id?: string | null;
     } = {};
     if (input.chiefComplaint !== undefined) data.chief_complaint = input.chiefComplaint;
     if (input.manualVisitSummary !== undefined) {
       data.manual_visit_summary = input.manualVisitSummary;
     }
     if (input.appointmentId !== undefined) data.appointment_id = input.appointmentId;
+    if (input.medicalRecordId !== undefined) data.medical_record_id = input.medicalRecordId;
 
     const updated = await this.visitRepository.updateVersioned(visitId, {
       expectedVersion: version,
