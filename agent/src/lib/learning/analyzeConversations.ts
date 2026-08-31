@@ -56,7 +56,7 @@ export type AnalyzeConversationsResult = {
  * once per qualifying group (>= MIN_GROUP_SIZE occurrences) to propose a fix
  * — a full suggested_prompt only when category === 'prompt', otherwise just
  * a pattern_summary + proposed_change for manual follow-through. Writes one
- * prompt_suggestions row per qualifying group.
+ * tomer_prompt_suggestions row per qualifying group.
  */
 export async function analyzeConversations(clinicId: string): Promise<AnalyzeConversationsResult> {
   const env = getEnv();
@@ -163,7 +163,7 @@ async function createSuggestionForGroup(apiKey: string, clinicId: string, group:
   const rootCauses = Array.from(new Set(group.items.map((i) => i.root_cause).filter((v): v is string => Boolean(v))));
 
   const { data: inserted, error: insertErr } = await getSupabase()
-    .from("prompt_suggestions")
+    .from("tomer_prompt_suggestions")
     .insert({
       clinic_id: clinicId,
       status: "pending",
@@ -178,7 +178,7 @@ async function createSuggestionForGroup(apiKey: string, clinicId: string, group:
     .select("id")
     .single();
 
-  if (insertErr) throw new Error(`analyzeConversations: prompt_suggestions insert failed: ${insertErr.message}`);
+  if (insertErr) throw new Error(`analyzeConversations: tomer_prompt_suggestions insert failed: ${insertErr.message}`);
 
   return inserted.id as string;
 }

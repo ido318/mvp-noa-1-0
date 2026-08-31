@@ -47,7 +47,7 @@ function mapPromptSuggestionRow(row: Record<string, unknown>): PromptSuggestion 
 }
 
 /**
- * Backed by the service-role client. `prompt_suggestions` is deny-by-default
+ * Backed by the service-role client. `tomer_prompt_suggestions` is deny-by-default
  * under RLS (same pattern as visit_shares), so this repository must be
  * constructed with the admin client. Permission checks happen one layer up,
  * in PromptSuggestionService.
@@ -57,7 +57,7 @@ export class PromptSuggestionRepository {
 
   async listByStatus(clinicIds: string[], status: PromptSuggestionStatus): Promise<Result<PromptSuggestion[]>> {
     const { data, error } = await this.client
-      .from("prompt_suggestions")
+      .from("tomer_prompt_suggestions")
       .select("*")
       .in("clinic_id", clinicIds)
       .eq("status", status)
@@ -68,7 +68,7 @@ export class PromptSuggestionRepository {
 
   async findById(id: string): Promise<Result<PromptSuggestion | null>> {
     const { data, error } = await this.client
-      .from("prompt_suggestions")
+      .from("tomer_prompt_suggestions")
       .select("*")
       .eq("id", id)
       .maybeSingle();
@@ -79,7 +79,7 @@ export class PromptSuggestionRepository {
   /** Guarded by `.eq("status", "pending")` — a concurrent review already in flight loses this race cleanly. */
   async markRejected(id: string, reviewedByUserId: string): Promise<Result<PromptSuggestion>> {
     const { data, error } = await this.client
-      .from("prompt_suggestions")
+      .from("tomer_prompt_suggestions")
       .update({
         status: "rejected",
         reviewed_by_user_id: reviewedByUserId,
@@ -101,7 +101,7 @@ export class PromptSuggestionRepository {
   /** Guarded by `.eq("status", "pending")` — a concurrent review already in flight loses this race cleanly. */
   async markApproved(id: string, reviewedByUserId: string): Promise<Result<PromptSuggestion>> {
     const { data, error } = await this.client
-      .from("prompt_suggestions")
+      .from("tomer_prompt_suggestions")
       .update({
         status: "approved",
         reviewed_by_user_id: reviewedByUserId,
@@ -129,7 +129,7 @@ export class PromptSuggestionRepository {
     input: { status: "pending" | "failed_regression"; regressionResult: Record<string, unknown>; reviewedByUserId: string },
   ): Promise<Result<PromptSuggestion>> {
     const { data, error } = await this.client
-      .from("prompt_suggestions")
+      .from("tomer_prompt_suggestions")
       .update({
         status: input.status,
         regression_result: input.regressionResult,
@@ -160,7 +160,7 @@ export class PromptSuggestionRepository {
     },
   ): Promise<Result<PromptSuggestion>> {
     const { data, error } = await this.client
-      .from("prompt_suggestions")
+      .from("tomer_prompt_suggestions")
       .update({
         status: "published",
         regression_result: input.regressionResult,

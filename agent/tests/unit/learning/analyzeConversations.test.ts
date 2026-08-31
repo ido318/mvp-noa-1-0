@@ -15,7 +15,7 @@ const { mockFrom, callReviewsSelectResult, insertedIds, insertCalls, callReviews
       if (table === "call_reviews") {
         return { select: () => ({ eq: callReviewsEqClinicId }) };
       }
-      if (table === "prompt_suggestions") {
+      if (table === "tomer_prompt_suggestions") {
         return {
           insert: (row: unknown) => {
             insertCalls.push(row);
@@ -71,7 +71,7 @@ describe("analyzeConversations", () => {
     const result = await analyzeConversations("clinic-1");
 
     expect(result).toEqual({ ranAnalysis: false, flaggedCallCount: 1, groupsConsidered: 1, suggestionIds: [] });
-    expect(mockFrom).not.toHaveBeenCalledWith("prompt_suggestions");
+    expect(mockFrom).not.toHaveBeenCalledWith("tomer_prompt_suggestions");
   });
 
   it("no-ops on zero flagged calls", async () => {
@@ -211,7 +211,7 @@ describe("analyzeConversations", () => {
     const result = await analyzeConversations("clinic-1");
 
     expect(result).toEqual({ ranAnalysis: false, flaggedCallCount: 1, groupsConsidered: 1, suggestionIds: [] });
-    expect(mockFrom).not.toHaveBeenCalledWith("prompt_suggestions");
+    expect(mockFrom).not.toHaveBeenCalledWith("tomer_prompt_suggestions");
   });
 
   it("dedupes supporting_call_review_ids when one call contributes multiple problems to the same group", async () => {
