@@ -95,14 +95,29 @@ export async function getLiveAgentConfig(): Promise<Record<string, unknown>> {
   return agent.conversation_config as unknown as Record<string, unknown>;
 }
 
-/** Publishes a new system prompt to the live agent. */
+/**
+ * Publishes a new system prompt to the live agent. Fetches the current
+ * config first and carries tools/knowledge_base/rag forward unchanged —
+ * ElevenLabs' merge semantics for nested conversation_config.agent.prompt
+ * are undocumented, so a bare `{ prompt: newPromptText }` PATCH risks
+ * silently wiping the agent's tools and knowledge base (same class of bug
+ * fixed in agent/scripts/sync-elevenlabs-agent.ts during the KB rollout).
+ */
 export async function publishPrompt(newPromptText: string): Promise<Record<string, unknown>> {
   const { apiKey, agentId } = getConfig();
-  const updated = await getClient(apiKey).conversationalAi.updateAgent(agentId, {
+  const client = getClient(apiKey);
+
+  const current = await client.conversationalAi.getAgent(agentId);
+  const currentPrompt = current.conversation_config.agent?.prompt;
+
+  const updated = await client.conversationalAi.updateAgent(agentId, {
     conversation_config: {
       agent: {
         prompt: {
           prompt: newPromptText,
+          tools: currentPrompt?.tools,
+          knowledge_base: currentPrompt?.knowledge_base,
+          rag: currentPrompt?.rag,
         },
       },
     },
