@@ -43,6 +43,10 @@ export type ChangeVisitStatusInput = {
   status: VisitStatus;
 };
 
+export type CloseVisitInput = {
+  version: number;
+};
+
 export type VisitListFilters = {
   clinicIds: string[];
   petId?: string;

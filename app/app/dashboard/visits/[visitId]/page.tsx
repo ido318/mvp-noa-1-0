@@ -4,10 +4,10 @@ import { Badge } from "@/components/dashboard/ui/badge";
 import { dashboardApiFetch } from "@/app/dashboard/api-client";
 import { VisitActions } from "@/app/dashboard/visits/visit-actions";
 import { VisitAiSummarySection } from "@/app/dashboard/visits/visit-ai-summary-section";
-import { VisitNotesSection } from "@/app/dashboard/visits/visit-notes-section";
 import { VisitPrescriptionsSection } from "@/app/dashboard/visits/visit-prescriptions-section";
 import { VisitShareSection } from "@/app/dashboard/visits/visit-share-section";
 import { VisitVaccinationsSection } from "@/app/dashboard/visits/visit-vaccinations-section";
+import { VisitWorkspace } from "@/app/dashboard/visits/visit-workspace";
 import { formatIsraelDateTime } from "@/lib/israel-date";
 import type { Appointment } from "@/types/domain/appointment";
 import type { Customer } from "@/types/domain/customer";
@@ -18,6 +18,7 @@ import type { Vaccination } from "@/types/domain/vaccination";
 import type { ClinicRole } from "@/types/domain/clinic";
 import type { MeResponse } from "@/types/api/me";
 import type { Visit, VisitStatus } from "@/types/domain/visit";
+import type { Vital } from "@/types/domain/vital";
 
 const AI_SUMMARY_ROLES: ClinicRole[] = ["owner", "admin", "veterinarian"];
 
@@ -44,12 +45,13 @@ export default async function VisitDetailPage({ params }: Params) {
     );
   }
 
-  const [notesData, prescriptionsData, vaccinationsData, customer, pet, appointment] = await Promise.all([
+  const [notesData, prescriptionsData, vaccinationsData, vitalsData, customer, pet, appointment] = await Promise.all([
     dashboardApiFetch<{ items: MedicalNote[] }>(`/api/visits/${visitId}/notes`),
     dashboardApiFetch<{ items: Prescription[] }>(`/api/visits/${visitId}/prescriptions`),
     dashboardApiFetch<{ items: Vaccination[] }>(
       `/api/pets/${visit.petId}/vaccinations?clinicId=${encodeURIComponent(visit.clinicId)}`,
     ),
+    dashboardApiFetch<{ items: Vital[] }>(`/api/visits/${visitId}/vitals`),
     dashboardApiFetch<Customer>(`/api/customers/${visit.customerId}`),
     dashboardApiFetch<Pet>(`/api/pets/${visit.petId}`),
     visit.appointmentId
@@ -126,13 +128,11 @@ export default async function VisitDetailPage({ params }: Params) {
         </div>
       </Card>
 
-      <Card>
-        <h3 className="text-[15px] font-bold text-[var(--ink)]">קליטה והיסטוריה (SOAP)</h3>
-        <p className="mt-0.5 text-xs text-[var(--muted)]">תלונת לקוח, ממצאים, הערכה ותוכנית טיפול — לפי סוג הערה</p>
-        <div className="mt-3">
-          <VisitNotesSection visitId={visit.id} initialNotes={notesData?.items ?? []} />
-        </div>
-      </Card>
+      <VisitWorkspace
+        visit={visit}
+        notes={notesData?.items ?? []}
+        vitals={vitalsData?.items ?? []}
+      />
 
       <Card>
         <h3 className="text-[15px] font-bold text-[var(--ink)]">מרשמים</h3>
@@ -171,7 +171,7 @@ export default async function VisitDetailPage({ params }: Params) {
       </Card>
 
       <Card>
-        <h3 className="text-[15px] font-bold text-[var(--ink)]">פעולות</h3>
+        <h3 className="text-[15px] font-bold text-[var(--ink)]">פעולות נוספות</h3>
         <div className="mt-3">
           <VisitActions
             visitId={visit.id}

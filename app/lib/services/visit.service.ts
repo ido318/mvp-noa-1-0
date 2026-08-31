@@ -29,7 +29,7 @@ export class VisitService {
     private readonly petRepository: PetRepository,
     private readonly appointmentRepository: AppointmentRepository,
     private readonly auditService: AuditService,
-    private readonly medicalRecordService?: Pick<MedicalRecordService, "ensureRecordForPet">,
+    private readonly medicalRecordService?: Pick<MedicalRecordService, "ensureRecordForPet" | "listNotes">,
   ) {}
 
   async listVisits(
@@ -230,6 +230,30 @@ export class VisitService {
     });
 
     return updated;
+  }
+
+  async closeVisit(
+    actor: ServiceActor,
+    visitId: string,
+    version: number,
+  ): Promise<Result<Visit>> {
+    const existing = await this.getVisitById(actor, visitId);
+    if (!existing.ok) return existing;
+
+    if (!existing.value.chiefComplaint?.trim()) {
+      return err(AppError.validation("Cannot close visit without reason"));
+    }
+    if (!this.medicalRecordService) {
+      return err(AppError.internal("Medical record service is not configured"));
+    }
+
+    const notes = await this.medicalRecordService.listNotes(actor, visitId);
+    if (!notes.ok) return err(notes.error);
+    if (notes.value.length === 0) {
+      return err(AppError.validation("Cannot close visit without at least one clinical note"));
+    }
+
+    return this.changeVisitStatus(actor, visitId, version, { status: "completed" });
   }
 
   async softDeleteVisit(

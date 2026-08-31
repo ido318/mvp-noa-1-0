@@ -33,7 +33,7 @@ import type {
 import type { Pet } from "@/types/domain/pet";
 import type { Visit } from "@/types/domain/visit";
 import type { LabOrder } from "@/types/domain/lab-order";
-import type { Vital } from "@/types/domain/vital";
+import type { CreateVitalInput, Vital } from "@/types/domain/vital";
 import type {
   MedicalRecordTimelineItem,
   MedicalRecordTimelineResponse,
@@ -253,6 +253,52 @@ export class MedicalRecordService {
     const visit = await this.assertVisitAccessible(actor, visitId);
     if (!visit.ok) return visit;
     return this.medicalNoteRepository.listByVisit(visitId);
+  }
+
+  async listVitals(actor: ServiceActor, petId: string): Promise<Result<Vital[]>> {
+    if (!this.vitalRepository) {
+      return err(AppError.internal("Vital repository is not configured"));
+    }
+    const pet = await this.assertPetAccessible(actor, petId);
+    if (!pet.ok) return err(pet.error);
+    return this.vitalRepository.listByPet(pet.value.clinicId, petId);
+  }
+
+  async recordVitals(
+    actor: ServiceActor,
+    visitId: string,
+    input: Omit<CreateVitalInput, "clinicId" | "customerId" | "petId" | "visitId">,
+  ): Promise<Result<Vital>> {
+    if (!this.vitalRepository) {
+      return err(AppError.internal("Vital repository is not configured"));
+    }
+
+    const visit = await this.assertVisitAccessible(actor, visitId);
+    if (!visit.ok) return visit;
+
+    const created = await this.vitalRepository.create(
+      {
+        ...input,
+        clinicId: visit.value.clinicId,
+        customerId: visit.value.customerId,
+        petId: visit.value.petId,
+        visitId,
+      },
+      actor.userId,
+    );
+    if (!created.ok) return created;
+
+    await this.auditService.logAction({
+      clinicId: visit.value.clinicId,
+      actorType: "user",
+      actorId: actor.userId,
+      action: "vital.create",
+      entityType: "vital",
+      entityId: created.value.id,
+      afterPayload: created.value,
+    });
+
+    return created;
   }
 
   async addNote(
