@@ -9,6 +9,7 @@ import { VisitPrescriptionsSection } from "@/app/dashboard/visits/visit-prescrip
 import { VisitShareSection } from "@/app/dashboard/visits/visit-share-section";
 import { VisitVaccinationsSection } from "@/app/dashboard/visits/visit-vaccinations-section";
 import { formatIsraelDateTime } from "@/lib/israel-date";
+import type { Appointment } from "@/types/domain/appointment";
 import type { Customer } from "@/types/domain/customer";
 import type { MedicalNote } from "@/types/domain/medical-note";
 import type { Pet } from "@/types/domain/pet";
@@ -43,7 +44,7 @@ export default async function VisitDetailPage({ params }: Params) {
     );
   }
 
-  const [notesData, prescriptionsData, vaccinationsData, customer, pet] = await Promise.all([
+  const [notesData, prescriptionsData, vaccinationsData, customer, pet, appointment] = await Promise.all([
     dashboardApiFetch<{ items: MedicalNote[] }>(`/api/visits/${visitId}/notes`),
     dashboardApiFetch<{ items: Prescription[] }>(`/api/visits/${visitId}/prescriptions`),
     dashboardApiFetch<{ items: Vaccination[] }>(
@@ -51,6 +52,9 @@ export default async function VisitDetailPage({ params }: Params) {
     ),
     dashboardApiFetch<Customer>(`/api/customers/${visit.customerId}`),
     dashboardApiFetch<Pet>(`/api/pets/${visit.petId}`),
+    visit.appointmentId
+      ? dashboardApiFetch<Appointment>(`/api/appointments/${visit.appointmentId}`)
+      : Promise.resolve(null),
   ]);
 
   return (
@@ -79,12 +83,29 @@ export default async function VisitDetailPage({ params }: Params) {
         </div>
       </div>
 
-      {visit.chiefComplaint && (
-        <Card>
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">סיבת הביקור</p>
-          <p className="mt-1 text-sm text-[var(--ink)]">{visit.chiefComplaint}</p>
-        </Card>
-      )}
+      <Card>
+        <h3 className="text-[15px] font-bold text-[var(--ink)]">Reason & Pre-Visit</h3>
+        <div className="mt-3 grid gap-3 text-sm md:grid-cols-2">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">סיבת הביקור</p>
+            <p className="mt-1 text-[var(--ink)]">{visit.chiefComplaint ?? appointment?.reason ?? "לא צוינה סיבה"}</p>
+          </div>
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">מקור</p>
+            <p className="mt-1 text-[var(--ink)]">
+              {appointment
+                ? `${appointment.source} · ${appointment.appointmentType}`
+                : "ביקור ללא תור מקושר"}
+            </p>
+          </div>
+        </div>
+        {appointment?.notes && (
+          <div className="mt-3 rounded-[var(--r-md)] bg-[var(--surface-2)] px-3 py-2">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">הערות מהתור</p>
+            <p className="mt-1 whitespace-pre-wrap text-sm text-[var(--ink)]">{appointment.notes}</p>
+          </div>
+        )}
+      </Card>
 
       <Card>
         <h3 className="text-[15px] font-bold text-[var(--ink)]">סיכומי ביקור</h3>

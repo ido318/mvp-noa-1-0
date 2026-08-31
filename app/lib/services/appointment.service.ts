@@ -3,8 +3,10 @@ import { isExpectedDuration, toIsraelLocalIso } from "@/lib/appointment-rules";
 import type { AppointmentRepository } from "@/lib/repositories/appointment.repository";
 import type { CustomerRepository } from "@/lib/repositories/customer.repository";
 import type { PetRepository } from "@/lib/repositories/pet.repository";
+import type { VisitRepository } from "@/lib/repositories/visit.repository";
 import type { AuditService } from "@/lib/services/audit.service";
 import type { DashboardNotificationsService } from "@/lib/services/dashboard-notifications.service";
+import type { MedicalRecordService } from "@/lib/services/medical-record.service";
 import type { ServiceActor } from "@/lib/services/service-context";
 import type {
   Appointment,
@@ -14,10 +16,11 @@ import type {
   CreateAppointmentInput,
   UpdateAppointmentInput,
 } from "@/types/domain/appointment";
+import type { Visit } from "@/types/domain/visit";
 
 const ALLOWED_STATUS_TRANSITIONS: Record<AppointmentStatus, AppointmentStatus[]> = {
-  scheduled:        ["confirmed", "cancelled", "no_show"],
-  confirmed:        ["completed", "cancelled", "no_show"],
+  scheduled:        ["confirmed", "checked_in", "cancelled", "no_show"],
+  confirmed:        ["checked_in", "completed", "cancelled", "no_show"],
   completed:        [],
   cancelled:        [],
   no_show:          [],
@@ -71,6 +74,8 @@ export class AppointmentService {
     private readonly petRepository: PetRepository,
     private readonly auditService: AuditService,
     private readonly dashboardNotifications?: DashboardNotificationsService,
+    private readonly visitRepository?: VisitRepository,
+    private readonly medicalRecordService?: Pick<MedicalRecordService, "ensureRecordForPet">,
   ) {}
 
   async listAppointments(
@@ -272,6 +277,116 @@ export class AppointmentService {
     });
 
     return updated;
+  }
+
+  async checkInAppointment(
+    actor: ServiceActor,
+    appointmentId: string,
+    version: number,
+  ): Promise<Result<Appointment>> {
+    const existing = await this.getAppointmentById(actor, appointmentId);
+    if (!existing.ok) return existing;
+
+    if (version !== existing.value.version) {
+      return err(
+        AppError.conflict("Appointment update conflict: stale version", {
+          expectedVersion: existing.value.version,
+          providedVersion: version,
+        }),
+      );
+    }
+
+    if (existing.value.status !== "scheduled" && existing.value.status !== "confirmed") {
+      return err(AppError.validation("Only scheduled or confirmed appointments can be checked in"));
+    }
+
+    const updated = await this.appointmentRepository.updateVersioned(appointmentId, {
+      expectedVersion: version,
+      data: { status: "checked_in", changed_via: "dashboard" },
+    });
+    if (!updated.ok) return updated;
+
+    await this.auditService.logAction({
+      clinicId: updated.value.clinicId,
+      actorType: "user",
+      actorId: actor.userId,
+      action: "appointment.check_in",
+      entityType: "appointment",
+      entityId: updated.value.id,
+      beforePayload: existing.value,
+      afterPayload: updated.value,
+    });
+
+    return updated;
+  }
+
+  async openVisitFromAppointment(
+    actor: ServiceActor,
+    appointmentId: string,
+    version: number,
+  ): Promise<Result<Visit>> {
+    if (!this.visitRepository || !this.medicalRecordService) {
+      return err(AppError.internal("Appointment visit workflow is not configured"));
+    }
+
+    const existing = await this.getAppointmentById(actor, appointmentId);
+    if (!existing.ok) return err(existing.error);
+
+    const existingVisit = await this.visitRepository.findByAppointment(appointmentId);
+    if (!existingVisit.ok) return err(existingVisit.error);
+    if (existingVisit.value) return ok(existingVisit.value);
+
+    if (version !== existing.value.version) {
+      return err(
+        AppError.conflict("Appointment update conflict: stale version", {
+          expectedVersion: existing.value.version,
+          providedVersion: version,
+        }),
+      );
+    }
+
+    if (existing.value.status !== "checked_in") {
+      return err(AppError.validation("Only checked_in appointments can be opened as visits"));
+    }
+
+    const record = await this.medicalRecordService.ensureRecordForPet(actor, {
+      clinicId: existing.value.clinicId,
+      petId: existing.value.petId,
+    });
+    if (!record.ok) return err(record.error);
+
+    const createdVisit = await this.visitRepository.create(
+      {
+        clinicId: existing.value.clinicId,
+        customerId: existing.value.customerId,
+        petId: existing.value.petId,
+        appointmentId: existing.value.id,
+        medicalRecordId: record.value.id,
+        chiefComplaint: existing.value.reason,
+      },
+      actor.userId,
+    );
+    if (!createdVisit.ok) return createdVisit;
+
+    const updatedAppointment = await this.appointmentRepository.updateVersioned(appointmentId, {
+      expectedVersion: version,
+      data: { status: "in_visit", changed_via: "dashboard" },
+    });
+    if (!updatedAppointment.ok) return err(updatedAppointment.error);
+
+    await this.auditService.logAction({
+      clinicId: existing.value.clinicId,
+      actorType: "user",
+      actorId: actor.userId,
+      action: "appointment.open_visit",
+      entityType: "appointment",
+      entityId: existing.value.id,
+      beforePayload: existing.value,
+      afterPayload: updatedAppointment.value,
+      metadata: { visitId: createdVisit.value.id },
+    });
+
+    return createdVisit;
   }
 
   async softDelete(

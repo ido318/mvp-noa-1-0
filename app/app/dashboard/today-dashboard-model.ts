@@ -44,6 +44,8 @@ export type TodayActivityItem = {
 export type TodayDashboardModel = {
   metrics: TodayMetric[];
   scheduleRows: TodayScheduleRow[];
+  checkedInRows: TodayScheduleRow[];
+  inVisitRows: TodayScheduleRow[];
   attentionItems: TodayAttentionItem[];
   activityItems: TodayActivityItem[];
 };
@@ -68,9 +70,24 @@ export function buildTodayDashboardModel({
     .sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime());
 
   const pendingApprovals = todayAppointments.filter((appointment) => appointment.status === "pending_approval");
+  const checkedInAppointments = todayAppointments.filter((appointment) => appointment.status === "checked_in");
+  const inVisitAppointments = todayAppointments.filter((appointment) => appointment.status === "in_visit");
   const activeCareCount = todayAppointments.filter((appointment) =>
-    appointment.status === "scheduled" || appointment.status === "confirmed"
+    appointment.status === "scheduled" ||
+    appointment.status === "confirmed" ||
+    appointment.status === "checked_in" ||
+    appointment.status === "in_visit"
   ).length;
+  const toScheduleRow = (appointment: Appointment): TodayScheduleRow => ({
+    id: appointment.id,
+    time: formatIsraelTime(appointment.scheduledAt),
+    petName: appointment.petName ?? "מטופל ללא שם",
+    customerName: appointment.customerName ?? "לקוח ללא שם",
+    appointmentType: appointment.appointmentType,
+    status: appointment.status,
+    reason: appointment.reason ?? "ללא סיבת ביקור",
+    appointment,
+  });
 
   return {
     metrics: [
@@ -79,16 +96,9 @@ export function buildTodayDashboardModel({
       { label: "בטיפול", value: activeCareCount, tone: "coral" },
       { label: "דורשים תשומת לב", value: escalations.length + pendingApprovals.length, tone: "red" },
     ],
-    scheduleRows: todayAppointments.map((appointment) => ({
-      id: appointment.id,
-      time: formatIsraelTime(appointment.scheduledAt),
-      petName: appointment.petName ?? "מטופל ללא שם",
-      customerName: appointment.customerName ?? "לקוח ללא שם",
-      appointmentType: appointment.appointmentType,
-      status: appointment.status,
-      reason: appointment.reason ?? "ללא סיבת ביקור",
-      appointment,
-    })),
+    scheduleRows: todayAppointments.map(toScheduleRow),
+    checkedInRows: checkedInAppointments.map(toScheduleRow),
+    inVisitRows: inVisitAppointments.map(toScheduleRow),
     attentionItems: [
       ...pendingApprovals.map((appointment): TodayAttentionItem => ({
         id: `pending-${appointment.id}`,

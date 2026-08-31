@@ -65,6 +65,17 @@ export class VisitRepository {
     return ok(data ? mapVisitRow(data) : null);
   }
 
+  async findByAppointment(appointmentId: string): Promise<Result<Visit | null>> {
+    const { data, error } = await this.client
+      .from("visits")
+      .select("*")
+      .eq("appointment_id", appointmentId)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (error) return err(AppError.externalProvider("Failed to load appointment visit", error));
+    return ok(data ? mapVisitRow(data) : null);
+  }
+
   async create(input: CreateVisitInput, actorUserId: string): Promise<Result<Visit>> {
     const { data, error } = await this.client
       .from("visits")

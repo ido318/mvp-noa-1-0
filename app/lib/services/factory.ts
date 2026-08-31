@@ -94,6 +94,8 @@ export async function createServices() {
       petRepository,
       auditService,
       new DashboardNotificationsService(supabase),
+      visitRepository,
+      medicalRecordService,
     ),
     calendar: new CalendarService(appointmentRepository, calendarBlockRepository),
     calendarBlock: new CalendarBlockService(calendarBlockRepository),

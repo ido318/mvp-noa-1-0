@@ -4,6 +4,7 @@ import { Skeleton } from "@/components/dashboard/ui/skeleton";
 import { ApproveRejectModal } from "@/components/dashboard/approve-reject-modal";
 import {
   AttentionPanel,
+  CareFlowPanel,
   RecentActivityPanel,
   ScheduleList,
   TodayEmptyState,
@@ -104,6 +105,7 @@ export default function TodayPage() {
     <div className="mx-auto w-full max-w-[1184px] space-y-5 p-6">
       <TodayPageHeading />
       <TodayMetrics metrics={model.metrics} />
+      <CareFlowPanel checkedInRows={model.checkedInRows} inVisitRows={model.inVisitRows} />
 
       <div className="grid gap-5 xl:grid-cols-[408px_minmax(0,1fr)]">
         <div className="space-y-5">

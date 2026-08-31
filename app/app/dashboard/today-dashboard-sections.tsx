@@ -138,6 +138,65 @@ export function ScheduleList({
   );
 }
 
+export function CareFlowPanel({
+  checkedInRows,
+  inVisitRows,
+}: {
+  checkedInRows: TodayScheduleRow[];
+  inVisitRows: TodayScheduleRow[];
+}) {
+  return (
+    <Card noPad className="overflow-hidden">
+      <div className="grid gap-0 md:grid-cols-2">
+        <section className="border-b border-[var(--line-2)] p-5 md:border-b-0 md:border-e">
+          <h2 className="text-[16px] font-extrabold text-[var(--ink)]">Waiting / Checked In</h2>
+          <div className="mt-3 space-y-2">
+            {checkedInRows.length === 0 ? (
+              <p className="text-sm text-[var(--faint)]">אין מטופלים שממתינים לפתיחת ביקור.</p>
+            ) : (
+              checkedInRows.map((row) => (
+                <Link
+                  key={row.id}
+                  href={`/dashboard/calendar?appointmentId=${row.appointment.id}`}
+                  className="block rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2 transition-colors hover:bg-white"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="truncate text-sm font-bold text-[var(--ink)]">{row.petName}</p>
+                    <Badge color="amber">Check In</Badge>
+                  </div>
+                  <p className="mt-0.5 truncate text-xs text-[var(--muted)]">{row.time} · {row.customerName}</p>
+                </Link>
+              ))
+            )}
+          </div>
+        </section>
+        <section className="p-5">
+          <h2 className="text-[16px] font-extrabold text-[var(--ink)]">In Visit</h2>
+          <div className="mt-3 space-y-2">
+            {inVisitRows.length === 0 ? (
+              <p className="text-sm text-[var(--faint)]">אין ביקורים פעילים כרגע.</p>
+            ) : (
+              inVisitRows.map((row) => (
+                <Link
+                  key={row.id}
+                  href={`/dashboard/pets/${row.appointment.petId}`}
+                  className="block rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2 transition-colors hover:bg-white"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="truncate text-sm font-bold text-[var(--ink)]">{row.petName}</p>
+                    <Badge color="coral">בטיפול</Badge>
+                  </div>
+                  <p className="mt-0.5 truncate text-xs text-[var(--muted)]">{row.reason} · {row.customerName}</p>
+                </Link>
+              ))
+            )}
+          </div>
+        </section>
+      </div>
+    </Card>
+  );
+}
+
 export function AttentionPanel({
   items,
   onApprove,
