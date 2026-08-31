@@ -6,12 +6,30 @@ function isNoRowsMatchedError(error: unknown): boolean {
   return (error as { code?: string } | null)?.code === "PGRST116";
 }
 
+const PROMPT_SUGGESTION_CATEGORIES: readonly PromptSuggestionCategory[] = [
+  "prompt",
+  "knowledge_base",
+  "tool",
+  "backend_logic",
+  "conversation_flow",
+];
+
+function isPromptSuggestionCategory(value: unknown): value is PromptSuggestionCategory {
+  return typeof value === "string" && (PROMPT_SUGGESTION_CATEGORIES as readonly string[]).includes(value);
+}
+
 function mapPromptSuggestionRow(row: Record<string, unknown>): PromptSuggestion {
   return {
     id: row.id as string,
     clinicId: row.clinic_id as string,
     status: row.status as PromptSuggestionStatus,
-    category: row.category as PromptSuggestionCategory,
+    // Defensive fallback: if this row predates the category migration (or the
+    // app deploys before the migration is applied — app/ auto-deploys on
+    // every push to main, the migration is a separate manual step), default
+    // to 'prompt' so approve() still runs regression+publish rather than
+    // silently skipping it via the markApproved shortcut. Never let a
+    // missing/unrecognized value take the "skip regression" path.
+    category: isPromptSuggestionCategory(row.category) ? row.category : "prompt",
     targetFile: (row.target_file as string | null) ?? null,
     patternSummary: row.pattern_summary as string,
     proposedChange: (row.proposed_change as string | null) ?? null,

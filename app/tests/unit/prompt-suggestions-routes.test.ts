@@ -103,4 +103,19 @@ describe("prompt-suggestions API routes", () => {
     expect(response.status).toBe(200);
     expect(body.data.published).toBe(true);
   });
+
+  it("POST approve reports a non-empty message for the 'approved' status (non-prompt category, no regression run)", async () => {
+    const approve = vi.fn().mockResolvedValue(ok({ id: "sugg-1", status: "approved" }));
+    mockGetActorAndServices.mockResolvedValue({ actor: ownerActor, promptSuggestion: { approve } });
+
+    const response = await approveRoute(
+      new Request("http://localhost/api/prompt-suggestions/sugg-1/approve", { method: "POST" }),
+      { params: Promise.resolve({ id: "sugg-1" }) },
+    );
+    const body = (await response.json()) as { data: { published: boolean; message: string } };
+
+    expect(response.status).toBe(200);
+    expect(body.data.published).toBe(false);
+    expect(body.data.message).not.toBe("");
+  });
 });
