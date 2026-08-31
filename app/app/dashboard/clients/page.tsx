@@ -9,11 +9,12 @@ import { Drawer } from "@/components/dashboard/ui/drawer";
 import { EmptyState } from "@/components/dashboard/ui/empty-state";
 import { Skeleton } from "@/components/dashboard/ui/skeleton";
 import { PersonAvatar, AnimalAvatar } from "@/components/dashboard/ui/avatar";
+import { useToast } from "@/components/dashboard/ui/toast";
 import { SearchIcon, PhoneIcon, MailIcon, PinIcon, ChevRightIcon } from "@/components/dashboard/icons";
 import { NewCustomerModal } from "@/components/dashboard/new-customer-modal";
 import { NewPetModal } from "@/components/dashboard/new-pet-modal";
 import { InvoicesSection } from "@/components/dashboard/invoices-section";
-import type { Customer } from "@/types/domain/customer";
+import type { Customer, PreferredContactMethod } from "@/types/domain/customer";
 import type { Pet } from "@/types/domain/pet";
 import type { Appointment } from "@/types/domain/appointment";
 import type { Visit } from "@/types/domain/visit";
@@ -81,10 +82,13 @@ function PetCard({ pet }: { pet: Pet }) {
 function ClientProfile({
   customer,
   onClose,
+  onUpdated,
 }: {
   customer: Customer;
   onClose: () => void;
+  onUpdated: (customer: Customer) => void;
 }) {
+  const { toast } = useToast();
   const [pets, setPets] = useState<Pet[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [petsLoading, setPetsLoading] = useState(true);
@@ -92,6 +96,14 @@ function ClientProfile({
   const [visits, setVisits] = useState<Visit[]>([]);
   const [visitsLoading, setVisitsLoading] = useState(true);
   const [showNewPet, setShowNewPet] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [fullName, setFullName] = useState(customer.fullName);
+  const [phone, setPhone] = useState(customer.phone ?? "");
+  const [email, setEmail] = useState(customer.email ?? "");
+  const [address, setAddress] = useState(customer.address ?? "");
+  const [preferredContactMethod, setPreferredContactMethod] = useState<PreferredContactMethod>(customer.preferredContactMethod);
+  const [notes, setNotes] = useState(customer.notes ?? "");
   const [, startTransition] = useTransition();
 
   const fetchPets = useCallback(async (showLoading = true) => {
@@ -109,6 +121,16 @@ function ClientProfile({
       void fetchPets();
     });
   }, [fetchPets, startTransition]);
+
+  useEffect(() => {
+    setEditing(false);
+    setFullName(customer.fullName);
+    setPhone(customer.phone ?? "");
+    setEmail(customer.email ?? "");
+    setAddress(customer.address ?? "");
+    setPreferredContactMethod(customer.preferredContactMethod);
+    setNotes(customer.notes ?? "");
+  }, [customer]);
 
   useEffect(() => {
     void (async () => {
@@ -145,6 +167,39 @@ function ClientProfile({
     late_cancellation: "ביטול מאוחר",
   };
 
+  async function saveCustomer(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (fullName.trim().length < 2) {
+      toast("שם מלא חייב להכיל לפחות 2 תווים", "error");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/customers/${customer.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fullName: fullName.trim(),
+          phone: phone.trim() || null,
+          email: email.trim() || null,
+          address: address.trim() || null,
+          preferredContactMethod,
+          notes: notes.trim() || null,
+        }),
+      });
+      if (!res.ok) throw new Error();
+      const updated = (await res.json()) as { data: Customer };
+      onUpdated(updated.data);
+      setEditing(false);
+      toast("פרטי הלקוח עודכנו", "success");
+    } catch {
+      toast("שגיאה בעדכון פרטי הלקוח", "error");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <>
       <Drawer
@@ -163,12 +218,91 @@ function ClientProfile({
       >
         <div className="px-5 py-4 space-y-6">
           {/* Quick actions */}
-          <Link
-            href={`/dashboard/calendar?newAppointment=1&customerId=${customer.id}`}
-            className="inline-flex items-center justify-center rounded-full bg-[var(--brand-600)] px-4 py-2 text-[13px] font-semibold text-white hover:brightness-110"
-          >
-            תור חדש
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href={`/dashboard/calendar?newAppointment=1&customerId=${customer.id}`}
+              className="inline-flex items-center justify-center rounded-full bg-[var(--brand-600)] px-4 py-2 text-[13px] font-semibold text-white hover:brightness-110"
+            >
+              תור חדש
+            </Link>
+            <Btn type="button" variant="soft" size="sm" onClick={() => setEditing((value) => !value)}>
+              {editing ? "סגור עריכה" : "ערוך פרטים"}
+            </Btn>
+          </div>
+
+          {editing && (
+            <form onSubmit={saveCustomer} className="space-y-3 rounded-[var(--r-lg)] border border-[var(--line)] p-3">
+              <div>
+                <label htmlFor="editCustomerFullName" className="mb-1 block text-xs font-semibold text-[var(--ink-2)]">שם מלא</label>
+                <input
+                  id="editCustomerFullName"
+                  value={fullName}
+                  onChange={(event) => setFullName(event.target.value)}
+                  className="w-full rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--ink)] focus:outline-none focus:border-[var(--brand-400)]"
+                />
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="editCustomerPhone" className="mb-1 block text-xs font-semibold text-[var(--ink-2)]">טלפון</label>
+                  <input
+                    id="editCustomerPhone"
+                    value={phone}
+                    onChange={(event) => setPhone(event.target.value)}
+                    dir="ltr"
+                    className="w-full rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--ink)] focus:outline-none focus:border-[var(--brand-400)]"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="editCustomerEmail" className="mb-1 block text-xs font-semibold text-[var(--ink-2)]">אימייל</label>
+                  <input
+                    id="editCustomerEmail"
+                    type="email"
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                    dir="ltr"
+                    className="w-full rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--ink)] focus:outline-none focus:border-[var(--brand-400)]"
+                  />
+                </div>
+              </div>
+              <div>
+                <label htmlFor="editCustomerAddress" className="mb-1 block text-xs font-semibold text-[var(--ink-2)]">כתובת</label>
+                <input
+                  id="editCustomerAddress"
+                  value={address}
+                  onChange={(event) => setAddress(event.target.value)}
+                  className="w-full rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--ink)] focus:outline-none focus:border-[var(--brand-400)]"
+                />
+              </div>
+              <div>
+                <label htmlFor="editCustomerPreferredContactMethod" className="mb-1 block text-xs font-semibold text-[var(--ink-2)]">ערוץ מועדף</label>
+                <select
+                  id="editCustomerPreferredContactMethod"
+                  value={preferredContactMethod}
+                  onChange={(event) => setPreferredContactMethod(event.target.value as PreferredContactMethod)}
+                  className="w-full rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--ink)] focus:outline-none focus:border-[var(--brand-400)]"
+                >
+                  <option value="phone">טלפון</option>
+                  <option value="sms">SMS</option>
+                  <option value="whatsapp">WhatsApp</option>
+                  <option value="email">אימייל</option>
+                </select>
+              </div>
+              <div>
+                <label htmlFor="editCustomerNotes" className="mb-1 block text-xs font-semibold text-[var(--ink-2)]">הערות</label>
+                <textarea
+                  id="editCustomerNotes"
+                  value={notes}
+                  onChange={(event) => setNotes(event.target.value)}
+                  rows={3}
+                  className="w-full rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--ink)] focus:outline-none focus:border-[var(--brand-400)]"
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Btn type="button" variant="ghost" size="sm" onClick={() => setEditing(false)}>ביטול</Btn>
+                <Btn type="submit" size="sm" loading={saving}>שמור</Btn>
+              </div>
+            </form>
+          )}
 
           {/* Contact info */}
           <div className="space-y-2">
@@ -437,7 +571,14 @@ export default function ClientsPage() {
 
       {/* Profile drawer */}
       {selected && (
-        <ClientProfile customer={selected} onClose={() => setSelected(null)} />
+        <ClientProfile
+          customer={selected}
+          onClose={() => setSelected(null)}
+          onUpdated={(customer) => {
+            setSelected(customer);
+            setItems((current) => current.map((item) => item.id === customer.id ? customer : item));
+          }}
+        />
       )}
 
       <NewCustomerModal

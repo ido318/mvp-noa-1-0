@@ -7,6 +7,7 @@ import type { Pet } from "@/types/domain/pet";
 import type { Vaccination } from "@/types/domain/vaccination";
 import type { Prescription } from "@/types/domain/prescription";
 import type { Visit } from "@/types/domain/visit";
+import type { MedicalRecord } from "@/types/domain/medical-record";
 
 type Params = { params: Promise<{ petId: string }> };
 
@@ -37,7 +38,7 @@ export default async function PetProfilePage({ params }: Params) {
     );
   }
 
-  const [visitsData, vaccinationsData, prescriptionsData, owner] = await Promise.all([
+  const [visitsData, vaccinationsData, prescriptionsData, owner, medicalRecordData] = await Promise.all([
     dashboardApiFetch<{ items: Visit[] }>(
       `/api/visits?petId=${encodeURIComponent(petId)}&clinicId=${encodeURIComponent(pet.clinicId)}&limit=10`,
     ),
@@ -46,6 +47,7 @@ export default async function PetProfilePage({ params }: Params) {
     ),
     dashboardApiFetch<{ items: Prescription[] }>(`/api/pets/${petId}/prescriptions`),
     dashboardApiFetch<Customer>(`/api/customers/${pet.customerId}`),
+    dashboardApiFetch<{ item: MedicalRecord }>(`/api/pets/${petId}/medical-record`),
   ]);
 
   const age = petAge(pet.birthDate);
@@ -140,6 +142,8 @@ export default async function PetProfilePage({ params }: Params) {
         visits={visitsData?.items ?? []}
         vaccinations={vaccinationsData?.items ?? []}
         prescriptions={prescriptionsData?.items ?? []}
+        medicalRecord={medicalRecordData?.item ?? null}
+        owner={owner ?? null}
       />
     </div>
   );

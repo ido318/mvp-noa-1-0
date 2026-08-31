@@ -1,9 +1,10 @@
 "use client";
 import React, { useState, useEffect, FormEvent, useTransition } from "react";
+import Link from "next/link";
 import { Modal } from "@/components/dashboard/ui/modal";
 import { Btn } from "@/components/dashboard/ui/btn";
 import { useToast } from "@/components/dashboard/ui/toast";
-import type { Customer } from "@/types/domain/customer";
+import type { Customer, CustomerDuplicate, PreferredContactMethod } from "@/types/domain/customer";
 
 const inputClass =
   "w-full rounded-[var(--r-lg)] border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--ink)] placeholder:text-[var(--faint)] focus:outline-none focus:border-[var(--brand-400)]";
@@ -20,6 +21,10 @@ export function NewCustomerModal({ open, onClose, onCreated }: NewCustomerModalP
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
+  const [address, setAddress] = useState("");
+  const [preferredContactMethod, setPreferredContactMethod] = useState<PreferredContactMethod>("phone");
+  const [notes, setNotes] = useState("");
+  const [duplicateCustomers, setDuplicateCustomers] = useState<CustomerDuplicate[]>([]);
   const [loading, setLoading] = useState(false);
   const [, startTransition] = useTransition();
 
@@ -27,6 +32,10 @@ export function NewCustomerModal({ open, onClose, onCreated }: NewCustomerModalP
     setFullName("");
     setPhone("");
     setEmail("");
+    setAddress("");
+    setPreferredContactMethod("phone");
+    setNotes("");
+    setDuplicateCustomers([]);
   }
 
   // Clear stale input whenever the modal closes, whether via cancel, the X
@@ -45,6 +54,7 @@ export function NewCustomerModal({ open, onClose, onCreated }: NewCustomerModalP
     }
 
     setLoading(true);
+    setDuplicateCustomers([]);
     try {
       const meRes = await fetch("/api/me");
       if (!meRes.ok) throw new Error();
@@ -60,8 +70,20 @@ export function NewCustomerModal({ open, onClose, onCreated }: NewCustomerModalP
           fullName: fullName.trim(),
           phone: phone.trim() || null,
           email: email.trim() || null,
+          address: address.trim() || null,
+          preferredContactMethod,
+          notes: notes.trim() || null,
         }),
       });
+      if (res.status === 409) {
+        const body = (await res.json().catch(() => null)) as {
+          error?: { details?: { duplicates?: CustomerDuplicate[] } };
+        } | null;
+        const duplicates = body?.error?.details?.duplicates ?? [];
+        setDuplicateCustomers(duplicates);
+        toast("נמצא לקוח קיים עם אותו טלפון או אימייל", "error");
+        return;
+      }
       if (!res.ok) throw new Error();
 
       const created = (await res.json()) as { data: Customer };
@@ -110,6 +132,56 @@ export function NewCustomerModal({ open, onClose, onCreated }: NewCustomerModalP
             dir="ltr"
           />
         </div>
+        <div>
+          <label htmlFor="address" className={labelClass}>כתובת</label>
+          <input
+            id="address"
+            value={address}
+            onChange={(e) => setAddress(e.target.value)}
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label htmlFor="preferredContactMethod" className={labelClass}>ערוץ מועדף</label>
+          <select
+            id="preferredContactMethod"
+            value={preferredContactMethod}
+            onChange={(e) => setPreferredContactMethod(e.target.value as PreferredContactMethod)}
+            className={inputClass}
+          >
+            <option value="phone">טלפון</option>
+            <option value="sms">SMS</option>
+            <option value="whatsapp">WhatsApp</option>
+            <option value="email">אימייל</option>
+          </select>
+        </div>
+        <div>
+          <label htmlFor="notes" className={labelClass}>הערות</label>
+          <textarea
+            id="notes"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            className={inputClass}
+            rows={3}
+          />
+        </div>
+        {duplicateCustomers.length > 0 && (
+          <div className="rounded-[var(--r-md)] border border-[var(--amber-500)] bg-[var(--amber-50)] p-3">
+            <p className="text-xs font-bold text-[var(--amber-600)]">ייתכן שהלקוח כבר קיים</p>
+            <div className="mt-2 space-y-1">
+              {duplicateCustomers.map((duplicate) => (
+                <Link
+                  key={duplicate.id}
+                  href={`/dashboard/clients?customerId=${duplicate.id}`}
+                  className="block rounded-[var(--r-sm)] px-2 py-1 text-xs font-semibold text-[var(--ink)] hover:bg-white/70"
+                  onClick={onClose}
+                >
+                  {duplicate.fullName} · {duplicate.phone ?? duplicate.email ?? "ללא פרטי קשר"}
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
         <div className="flex justify-end gap-2 pt-2">
           <Btn type="button" variant="ghost" size="sm" onClick={onClose}>ביטול</Btn>
           <Btn type="submit" variant="primary" size="sm" loading={loading}>הוסף לקוח</Btn>

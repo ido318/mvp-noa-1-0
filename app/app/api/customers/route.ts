@@ -13,7 +13,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const parsed = parseOrThrow(customerSearchSchema.partial(), {
       clinicId: searchParams.get("clinicId") ?? undefined,
-      q: searchParams.get("q") ?? undefined,
+      q: searchParams.get("q") ?? searchParams.get("query") ?? undefined,
       limit: searchParams.get("limit") ?? undefined,
     });
 

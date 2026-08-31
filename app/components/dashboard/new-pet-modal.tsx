@@ -23,6 +23,13 @@ export function NewPetModal({ open, onClose, clinicId, customerId, onCreated }: 
   const [species, setSpecies] = useState("");
   const [breed, setBreed] = useState("");
   const [sex, setSex] = useState("");
+  const [birthDate, setBirthDate] = useState("");
+  const [weight, setWeight] = useState("");
+  const [chipNumber, setChipNumber] = useState("");
+  const [isNeutered, setIsNeutered] = useState(false);
+  const [allergies, setAllergies] = useState("");
+  const [chronicConditions, setChronicConditions] = useState("");
+  const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
   const [, startTransition] = useTransition();
 
@@ -31,6 +38,13 @@ export function NewPetModal({ open, onClose, clinicId, customerId, onCreated }: 
     setSpecies("");
     setBreed("");
     setSex("");
+    setBirthDate("");
+    setWeight("");
+    setChipNumber("");
+    setIsNeutered(false);
+    setAllergies("");
+    setChronicConditions("");
+    setNotes("");
   }
 
   // Clear stale input whenever the modal closes, whether via cancel, the X
@@ -64,6 +78,13 @@ export function NewPetModal({ open, onClose, clinicId, customerId, onCreated }: 
           species: species.trim(),
           breed: breed.trim() || null,
           sex: sex.trim() || null,
+          birthDate: birthDate || null,
+          weight: weight.trim() ? Number(weight) : null,
+          chipNumber: chipNumber.trim() || null,
+          isNeutered,
+          allergies: allergies.trim() || null,
+          chronicConditions: chronicConditions.trim() || null,
+          notes: notes.trim() || null,
         }),
       });
       if (!res.ok) throw new Error();
@@ -129,6 +150,78 @@ export function NewPetModal({ open, onClose, clinicId, customerId, onCreated }: 
             <option value="male">זכר</option>
             <option value="female">נקבה</option>
           </select>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div>
+            <label htmlFor="petBirthDate" className={labelClass}>תאריך לידה</label>
+            <input
+              id="petBirthDate"
+              type="date"
+              value={birthDate}
+              onChange={(e) => setBirthDate(e.target.value)}
+              className={inputClass}
+            />
+          </div>
+          <div>
+            <label htmlFor="petWeight" className={labelClass}>משקל בק״ג</label>
+            <input
+              id="petWeight"
+              type="number"
+              step="0.01"
+              min="0"
+              value={weight}
+              onChange={(e) => setWeight(e.target.value)}
+              className={inputClass}
+            />
+          </div>
+        </div>
+        <div>
+          <label htmlFor="petChipNumber" className={labelClass}>מספר שבב</label>
+          <input
+            id="petChipNumber"
+            value={chipNumber}
+            onChange={(e) => setChipNumber(e.target.value)}
+            className={inputClass}
+          />
+        </div>
+        <label className="flex items-center gap-2 rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm font-semibold text-[var(--ink-2)]">
+          <input
+            id="petIsNeutered"
+            type="checkbox"
+            checked={isNeutered}
+            onChange={(e) => setIsNeutered(e.target.checked)}
+          />
+          מעוקר / מסורס
+        </label>
+        <div>
+          <label htmlFor="petAllergies" className={labelClass}>אלרגיות</label>
+          <textarea
+            id="petAllergies"
+            value={allergies}
+            onChange={(e) => setAllergies(e.target.value)}
+            className={inputClass}
+            rows={2}
+          />
+        </div>
+        <div>
+          <label htmlFor="petChronicConditions" className={labelClass}>מחלות כרוניות</label>
+          <textarea
+            id="petChronicConditions"
+            value={chronicConditions}
+            onChange={(e) => setChronicConditions(e.target.value)}
+            className={inputClass}
+            rows={2}
+          />
+        </div>
+        <div>
+          <label htmlFor="petNotes" className={labelClass}>הערות</label>
+          <textarea
+            id="petNotes"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            className={inputClass}
+            rows={2}
+          />
         </div>
         <div className="flex justify-end gap-2 pt-2">
           <Btn type="button" variant="ghost" size="sm" onClick={onClose}>ביטול</Btn>

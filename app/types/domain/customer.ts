@@ -16,6 +16,11 @@ export type Customer = {
   deletedAt: string | null;
 };
 
+export type CustomerDuplicate = Pick<
+  Customer,
+  "id" | "clinicId" | "fullName" | "phone" | "email"
+>;
+
 export type CreateCustomerInput = {
   clinicId: string;
   fullName: string;

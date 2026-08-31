@@ -5,6 +5,7 @@ import { mapCustomerRow } from "@/lib/repositories/mappers";
 import type {
   CreateCustomerInput,
   Customer,
+  CustomerDuplicate,
   CustomerListFilters,
   UpdateCustomerInput,
 } from "@/types/domain/customer";
@@ -58,6 +59,46 @@ export class CustomerRepository {
       (row) => row.phone && phonesMatch(row.phone, phone),
     );
     return ok(match ? mapCustomerRow(match) : null);
+  }
+
+  async findPotentialDuplicates(
+    clinicId: string,
+    input: { phone?: string | null; email?: string | null },
+  ): Promise<Result<CustomerDuplicate[]>> {
+    const phone = input.phone?.trim() || null;
+    const email = input.email?.trim().toLowerCase() || null;
+    if (!phone && !email) return ok([]);
+
+    const { data, error } = await this.client
+      .from("customers")
+      .select("*")
+      .eq("clinic_id", clinicId)
+      .is("deleted_at", null);
+
+    if (error) {
+      return err(AppError.externalProvider("Failed to check duplicate customers", error));
+    }
+
+    const duplicates = (data ?? [])
+      .map(mapCustomerRow)
+      .filter((customer) => {
+        const phoneMatches = Boolean(phone && customer.phone && phonesMatch(customer.phone, phone));
+        const emailMatches = Boolean(
+          email &&
+            customer.email &&
+            customer.email.trim().toLowerCase() === email,
+        );
+        return phoneMatches || emailMatches;
+      })
+      .map((customer) => ({
+        id: customer.id,
+        clinicId: customer.clinicId,
+        fullName: customer.fullName,
+        phone: customer.phone,
+        email: customer.email,
+      }));
+
+    return ok(duplicates);
   }
 
   async findById(customerId: string): Promise<Result<Customer | null>> {

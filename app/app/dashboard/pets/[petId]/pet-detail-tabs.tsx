@@ -3,14 +3,18 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { Card } from "@/components/dashboard/ui/card";
 import { Badge } from "@/components/dashboard/ui/badge";
+import { Btn } from "@/components/dashboard/ui/btn";
 import { EmptyState } from "@/components/dashboard/ui/empty-state";
 import { InvoicesSection } from "@/components/dashboard/invoices-section";
+import { PatientContextDrawer } from "@/components/dashboard/patient-context-drawer";
 import { PetProfileForm } from "@/app/dashboard/pets/[petId]/pet-profile-form";
 import { formatIsraelDate, formatIsraelDateTime } from "@/lib/israel-date";
+import type { Customer } from "@/types/domain/customer";
 import type { Pet } from "@/types/domain/pet";
 import type { Vaccination } from "@/types/domain/vaccination";
 import type { Prescription } from "@/types/domain/prescription";
 import type { Visit, VisitStatus } from "@/types/domain/visit";
+import type { MedicalRecord } from "@/types/domain/medical-record";
 
 const VISIT_STATUS_LABELS: Record<VisitStatus, string> = {
   in_progress: "בטיפול",
@@ -23,10 +27,11 @@ const PRESCRIPTION_STATUS_LABELS: Record<string, string> = {
   discontinued: "הופסק",
 };
 
-type Tab = "overview" | "visits" | "vaccinations" | "medications" | "billing";
+type Tab = "overview" | "medicalRecord" | "visits" | "vaccinations" | "medications" | "billing";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "overview", label: "סקירה" },
+  { id: "medicalRecord", label: "תיק רפואי" },
   { id: "visits", label: "ביקורים" },
   { id: "vaccinations", label: "חיסונים" },
   { id: "medications", label: "תרופות" },
@@ -39,17 +44,28 @@ export function PetDetailTabs({
   visits,
   vaccinations,
   prescriptions,
+  medicalRecord,
+  owner,
 }: {
   pet: Pet;
   clinicId: string;
   visits: Visit[];
   vaccinations: Vaccination[];
   prescriptions: Prescription[];
+  medicalRecord: MedicalRecord | null;
+  owner: Customer | null;
 }) {
   const [tab, setTab] = useState<Tab>("overview");
+  const [contextOpen, setContextOpen] = useState(false);
 
   return (
     <div>
+      <div className="mb-3 flex justify-end">
+        <Btn type="button" variant="soft" size="sm" onClick={() => setContextOpen(true)}>
+          הקשר מטופל
+        </Btn>
+      </div>
+
       <div className="flex gap-1 border-b border-[var(--line)]">
         {TABS.map((t) => (
           <button
@@ -74,6 +90,97 @@ export function PetDetailTabs({
             <Card>
               <PetProfileForm pet={pet} />
             </Card>
+          </div>
+        )}
+
+        {tab === "medicalRecord" && (
+          <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
+            <Card noPad>
+              <div className="border-b border-[var(--line-2)] px-5 py-4">
+                <h3 className="text-[15px] font-bold text-[var(--ink)]">כניסה לתיק רפואי</h3>
+                <p className="mt-1 text-xs text-[var(--muted)]">סיכום, אזהרות וקישורים לרשומות המקור של {pet.name}</p>
+              </div>
+              <div className="space-y-4 px-5 py-4">
+                <section>
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">סיכום</p>
+                  <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-[var(--ink)]">
+                    {medicalRecord?.summary || "אין עדיין סיכום רפואי קבוע."}
+                  </p>
+                </section>
+
+                <section>
+                  <div className="mb-2 flex items-center justify-between">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">ביקורים אחרונים</p>
+                    <Link href={`/dashboard/visits/new?petId=${pet.id}`} className="text-xs font-semibold text-[var(--brand-600)] hover:underline">
+                      ביקור חדש
+                    </Link>
+                  </div>
+                  {visits.length === 0 ? (
+                    <p className="text-sm text-[var(--faint)]">אין ביקורים רפואיים עדיין.</p>
+                  ) : (
+                    <div className="divide-y divide-[var(--line-2)] rounded-[var(--r-md)] border border-[var(--line)]">
+                      {visits.slice(0, 5).map((visit) => (
+                        <Link
+                          key={visit.id}
+                          href={`/dashboard/visits/${visit.id}`}
+                          className="block px-3 py-2.5 transition-colors hover:bg-[var(--surface-2)]"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-[13px] font-semibold text-[var(--ink)]">{formatIsraelDateTime(visit.startedAt)}</p>
+                            <Badge color={visit.status === "completed" ? "green" : visit.status === "cancelled" ? "muted" : "brand"}>
+                              {VISIT_STATUS_LABELS[visit.status]}
+                            </Badge>
+                          </div>
+                          <p className="mt-0.5 truncate text-xs text-[var(--muted)]">{visit.chiefComplaint ?? "ללא תלונה ראשית"}</p>
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </section>
+              </div>
+            </Card>
+
+            <div className="space-y-3">
+              <Card>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">אזהרות</p>
+                <div className="mt-2 space-y-2">
+                  {pet.allergies && <Badge color="red">אלרגיה: {pet.allergies}</Badge>}
+                  {pet.chronicConditions && <Badge color="amber">כרוני: {pet.chronicConditions}</Badge>}
+                  {(medicalRecord?.alerts ?? []).map((alert, index) => (
+                    <p key={index} className="rounded-[var(--r-sm)] bg-[var(--red-50)] px-2 py-1 text-xs font-semibold text-[var(--red-700)]">
+                      {String(alert)}
+                    </p>
+                  ))}
+                  {!pet.allergies && !pet.chronicConditions && (medicalRecord?.alerts ?? []).length === 0 && (
+                    <p className="text-sm text-[var(--faint)]">אין אזהרות רשומות.</p>
+                  )}
+                </div>
+              </Card>
+
+              <Card>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">בעיות פעילות</p>
+                <div className="mt-2 space-y-1">
+                  {(medicalRecord?.activeProblemList ?? []).length === 0 ? (
+                    <p className="text-sm text-[var(--faint)]">אין בעיות פעילות רשומות.</p>
+                  ) : (
+                    medicalRecord!.activeProblemList.map((problem, index) => (
+                      <p key={index} className="rounded-[var(--r-sm)] bg-[var(--surface-2)] px-2 py-1 text-xs font-semibold text-[var(--ink)]">
+                        {String(problem)}
+                      </p>
+                    ))
+                  )}
+                </div>
+              </Card>
+
+              <Card>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">מניעה ותרופות</p>
+                <div className="mt-2 space-y-2 text-xs text-[var(--ink)]">
+                  <p>{vaccinations.length} חיסונים רשומים</p>
+                  <p>{prescriptions.filter((rx) => rx.status === "active").length} מרשמים פעילים</p>
+                  <p>{pet.currentMedications || "אין תרופות קבועות בפרופיל"}</p>
+                </div>
+              </Card>
+            </div>
           </div>
         )}
 
@@ -163,6 +270,17 @@ export function PetDetailTabs({
           </Card>
         )}
       </div>
+
+      <PatientContextDrawer
+        open={contextOpen}
+        onClose={() => setContextOpen(false)}
+        pet={pet}
+        owner={owner}
+        visits={visits}
+        vaccinations={vaccinations}
+        prescriptions={prescriptions}
+        medicalRecord={medicalRecord}
+      />
     </div>
   );
 }

@@ -42,6 +42,19 @@ export class CustomerService {
       return err(AppError.forbidden("Cannot create customer in this clinic"));
     }
 
+    const duplicates = await this.customerRepository.findPotentialDuplicates(input.clinicId, {
+      phone: input.phone,
+      email: input.email,
+    });
+    if (!duplicates.ok) return err(duplicates.error);
+    if (duplicates.value.length > 0) {
+      return err(
+        AppError.conflict("Customer duplicate detected", {
+          duplicates: duplicates.value,
+        }),
+      );
+    }
+
     const createdResult = await this.customerRepository.insert(input);
     if (!createdResult.ok) return createdResult;
 
