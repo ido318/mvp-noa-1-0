@@ -195,4 +195,49 @@ describe("analyzeConversations", () => {
     expect(result.suggestionIds).toHaveLength(1);
     expect(insertCalls).toHaveLength(1);
   });
+
+  it("does not let a single call's multiple same-group problems alone satisfy the recurrence threshold", async () => {
+    callReviewsSelectResult.data = [
+      {
+        id: "r1",
+        problems: [
+          { problem: "בעיה א", category: "tool", target_file: "check-availability" },
+          { problem: "בעיה ב", category: "tool", target_file: "check-availability" },
+        ],
+        transcript_summary: "s1",
+      },
+    ];
+
+    const result = await analyzeConversations("clinic-1");
+
+    expect(result).toEqual({ ranAnalysis: false, flaggedCallCount: 1, groupsConsidered: 1, suggestionIds: [] });
+    expect(mockFrom).not.toHaveBeenCalledWith("prompt_suggestions");
+  });
+
+  it("dedupes supporting_call_review_ids when one call contributes multiple problems to the same group", async () => {
+    callReviewsSelectResult.data = [
+      {
+        id: "r1",
+        problems: [
+          { problem: "בעיה א", category: "tool", target_file: "check-availability" },
+          { problem: "בעיה ב", category: "tool", target_file: "check-availability" },
+        ],
+        transcript_summary: "s1",
+      },
+      {
+        id: "r2",
+        problems: [{ problem: "בעיה ג", category: "tool", target_file: "check-availability" }],
+        transcript_summary: "s2",
+      },
+    ];
+
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(claudeResponse("דפוס", "תיקון")));
+
+    const result = await analyzeConversations("clinic-1");
+
+    expect(result.suggestionIds).toHaveLength(1);
+    expect(insertCalls[0]).toMatchObject({
+      supporting_call_review_ids: ["r1", "r2"],
+    });
+  });
 });

@@ -77,7 +77,7 @@ export async function analyzeConversations(clinicId: string): Promise<AnalyzeCon
 
   const reviews = (flaggedReviews ?? []) as FlaggedCallReview[];
   const groups = groupProblems(reviews);
-  const qualifyingGroups = groups.filter((g) => g.items.length >= MIN_GROUP_SIZE);
+  const qualifyingGroups = groups.filter((g) => countDistinctReviewIds(g) >= MIN_GROUP_SIZE);
 
   if (qualifyingGroups.length === 0) {
     logger.info(
@@ -144,6 +144,17 @@ function groupProblems(reviews: FlaggedCallReview[]): ProblemGroup[] {
   return Array.from(groupsByKey.values());
 }
 
+function countDistinctReviewIds(group: ProblemGroup): number {
+  return new Set(group.items.map((i) => i.reviewId)).size;
+}
+
+const MAX_ROOT_CAUSE_LENGTH = 1000;
+
+function capRootCause(joined: string): string {
+  if (joined.length <= MAX_ROOT_CAUSE_LENGTH) return joined;
+  return joined.slice(0, MAX_ROOT_CAUSE_LENGTH - 3) + "...";
+}
+
 type SuggestionDraft = { pattern_summary: string; proposed_change: string; suggested_prompt: string | null };
 
 async function createSuggestionForGroup(apiKey: string, clinicId: string, group: ProblemGroup): Promise<string> {
@@ -160,9 +171,9 @@ async function createSuggestionForGroup(apiKey: string, clinicId: string, group:
       target_file: group.targetFile,
       pattern_summary: draft.pattern_summary,
       proposed_change: draft.proposed_change,
-      root_cause: rootCauses.length > 0 ? rootCauses.join(" | ") : null,
+      root_cause: rootCauses.length > 0 ? capRootCause(rootCauses.join(" | ")) : null,
       suggested_prompt: draft.suggested_prompt,
-      supporting_call_review_ids: group.items.map((i) => i.reviewId),
+      supporting_call_review_ids: Array.from(new Set(group.items.map((i) => i.reviewId))),
     })
     .select("id")
     .single();
