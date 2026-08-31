@@ -58,6 +58,7 @@ describe("publishPrompt", () => {
         },
       },
     });
+    expect(mockGetAgent).toHaveBeenCalledWith("test-agent");
   });
 
   it("still publishes with undefined tools/knowledge_base/rag when the live agent has none set", async () => {
@@ -83,5 +84,6 @@ describe("publishPrompt", () => {
         },
       },
     });
+    expect(mockGetAgent).toHaveBeenCalledWith("test-agent");
   });
 });
