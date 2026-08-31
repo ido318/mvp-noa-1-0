@@ -120,6 +120,34 @@ describe("PromptSuggestionService.approve", () => {
     expect(mockRunRegressionTests).not.toHaveBeenCalled();
   });
 
+  it("forbids approving without owner/admin role even for a non-prompt category", async () => {
+    const { service, repo } = buildService({
+      findById: vi.fn().mockResolvedValue(ok(suggestion({ category: "knowledge_base", suggestedPrompt: null }))),
+    });
+
+    const result = await service.approve(staffActor, "sugg-1");
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.status).toBe(403);
+    expect(repo.markApproved).not.toHaveBeenCalled();
+    expect(mockRunRegressionTests).not.toHaveBeenCalled();
+  });
+
+  it("returns an internal error if a 'prompt' category suggestion is somehow missing suggested_prompt", async () => {
+    const { service, repo } = buildService({
+      findById: vi.fn().mockResolvedValue(ok(suggestion({ category: "prompt", suggestedPrompt: null }))),
+    });
+
+    const result = await service.approve(adminActor, "sugg-1");
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.status).toBe(500);
+    expect(repo.markApproved).not.toHaveBeenCalled();
+    expect(mockRunRegressionTests).not.toHaveBeenCalled();
+  });
+
   it("refuses to re-approve a suggestion that was already reviewed", async () => {
     const { service } = buildService({
       findById: vi.fn().mockResolvedValue(ok(suggestion({ status: "published" }))),
