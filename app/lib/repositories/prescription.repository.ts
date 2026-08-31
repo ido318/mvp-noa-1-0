@@ -58,7 +58,7 @@ export class PrescriptionRepository {
         pet_id: petId,
         medication_name: input.medicationName,
         instructions: input.instructions,
-        status: input.status ?? "active",
+        status: input.status ?? "draft",
         notes: input.notes ?? null,
         prescribed_by_user_id: actorUserId,
       })

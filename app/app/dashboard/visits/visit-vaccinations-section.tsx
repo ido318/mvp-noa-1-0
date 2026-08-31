@@ -25,6 +25,7 @@ export function VisitVaccinationsSection({
   const [vaccineName, setVaccineName] = useState("");
   const [administeredAt, setAdministeredAt] = useState("");
   const [batchNumber, setBatchNumber] = useState("");
+  const [nextDueAt, setNextDueAt] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -45,6 +46,7 @@ export function VisitVaccinationsSection({
         administeredAt: new Date(administeredAt).toISOString(),
         visitId,
         batchNumber: batchNumber || null,
+        nextDueAt: nextDueAt || null,
       }),
     });
 
@@ -60,6 +62,7 @@ export function VisitVaccinationsSection({
     setVaccineName("");
     setAdministeredAt("");
     setBatchNumber("");
+    setNextDueAt("");
     router.refresh();
   }
 
@@ -75,6 +78,7 @@ export function VisitVaccinationsSection({
               <p className="text-[var(--ink-2)]">
                 {formatIsraelDateTime(v.administeredAt)}
                 {v.batchNumber ? ` · אצווה ${v.batchNumber}` : ""}
+                {v.nextDueAt ? ` · תזכורת ${new Intl.DateTimeFormat("he-IL", { timeZone: "Asia/Jerusalem" }).format(new Date(v.nextDueAt))}` : ""}
               </p>
             </li>
           ))
@@ -100,6 +104,12 @@ export function VisitVaccinationsSection({
           value={batchNumber}
           onChange={(event) => setBatchNumber(event.target.value)}
           placeholder="מספר אצווה (לא חובה)"
+          className="w-full rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-[var(--brand-400)]"
+        />
+        <input
+          type="date"
+          value={nextDueAt}
+          onChange={(event) => setNextDueAt(event.target.value)}
           className="w-full rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-[var(--brand-400)]"
         />
         {error ? <p className="text-sm font-semibold text-[var(--red-700)]">{error}</p> : null}

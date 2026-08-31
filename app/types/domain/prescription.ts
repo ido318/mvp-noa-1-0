@@ -1,4 +1,4 @@
-export type PrescriptionStatus = "active" | "discontinued";
+export type PrescriptionStatus = "draft" | "active" | "discontinued";
 
 export type Prescription = {
   id: string;

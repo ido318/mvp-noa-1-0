@@ -1,11 +1,11 @@
 import { z } from "zod";
 
-export const prescriptionStatusSchema = z.enum(["active", "discontinued"]);
+export const prescriptionStatusSchema = z.enum(["draft", "active", "discontinued"]);
 
 export const createPrescriptionSchema = z.object({
   medicationName: z.string().trim().min(1).max(200),
   instructions: z.string().trim().min(1).max(4000),
-  status: prescriptionStatusSchema.optional(),
+  status: z.enum(["draft"]).optional(),
   notes: z.string().trim().max(2000).optional().nullable(),
 });
 

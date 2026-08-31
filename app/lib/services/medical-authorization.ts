@@ -3,6 +3,7 @@ import type { ServiceActor } from "@/lib/services/service-context";
 import type { ClinicRole } from "@/types/domain/clinic";
 
 const MEDICAL_DELETE_ROLES: ClinicRole[] = ["owner", "admin", "veterinarian"];
+const PRESCRIPTION_APPROVE_ROLES: ClinicRole[] = ["owner", "admin", "veterinarian"];
 
 export function assertVisitSummaryAiAuthorized(
   actor: ServiceActor,
@@ -23,6 +24,24 @@ export function assertMedicalDeleteAuthorized(
     return err(
       AppError.forbidden(
         "Elevated clinic role required to delete medical records (owner, admin, or veterinarian)",
+      ),
+    );
+  }
+  return ok(undefined);
+}
+
+export function assertPrescriptionApproveAuthorized(
+  actor: ServiceActor,
+  clinicId: string,
+): Result<void> {
+  const membership = actor.memberships.find((item) => item.clinicId === clinicId);
+  if (!membership) {
+    return err(AppError.forbidden("No clinic membership for prescription approval"));
+  }
+  if (!PRESCRIPTION_APPROVE_ROLES.includes(membership.role)) {
+    return err(
+      AppError.forbidden(
+        "Elevated clinic role required to approve prescriptions (owner, admin, or veterinarian)",
       ),
     );
   }

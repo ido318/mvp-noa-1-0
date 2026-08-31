@@ -176,6 +176,7 @@ export default function LabPage() {
   const [clinicId, setClinicId] = useState<string | null>(null);
   const [showNew, setShowNew] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [resultDrafts, setResultDrafts] = useState<Record<string, string>>({});
   const { toast } = useToast();
 
   const fetchOrders = useCallback(async () => {
@@ -201,10 +202,15 @@ export default function LabPage() {
   async function updateStatus(order: LabOrder, status: LabOrderStatus) {
     setSavingId(order.id);
     try {
+      const resultText = resultDrafts[order.id]?.trim();
       const res = await fetch(`/api/lab-orders/${order.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ version: order.version, status }),
+        body: JSON.stringify({
+          version: order.version,
+          status,
+          ...(status === "completed" ? { resultText } : {}),
+        }),
       });
       if (!res.ok) throw new Error();
       await fetchOrders();
@@ -233,7 +239,7 @@ export default function LabPage() {
         <Card noPad className="overflow-hidden">
           <div className="divide-y divide-[var(--line-2)]">
             {orders.map((order) => (
-              <div key={order.id} className="flex items-center justify-between gap-3 px-5 py-3.5">
+              <div key={order.id} className="flex flex-col gap-3 px-5 py-3.5 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <p className="text-[13.5px] font-bold text-[var(--ink)]">{order.testName}</p>
@@ -245,14 +251,34 @@ export default function LabPage() {
                     </Link>
                     {" · "}{order.customerName ?? order.customerId} · {fmtDateTime(order.orderedAt)}
                   </p>
+                  {order.resultText ? (
+                    <p className="mt-1 whitespace-pre-wrap text-xs text-[var(--ink-2)]">{order.resultText}</p>
+                  ) : null}
                 </div>
-                <div className="flex flex-shrink-0 items-center gap-2">
+                <div className="flex flex-shrink-0 flex-col gap-2 sm:items-end">
                   <Badge color={STATUS_COLOR[order.status]}>{STATUS_LABEL[order.status]}</Badge>
+                  {order.status === "in_progress" && (
+                    <textarea
+                      value={resultDrafts[order.id] ?? ""}
+                      onChange={(event) => setResultDrafts((drafts) => ({ ...drafts, [order.id]: event.target.value }))}
+                      rows={2}
+                      placeholder="תוצאת מעבדה לפני השלמה"
+                      className="w-full min-w-[260px] rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-[var(--brand-400)] sm:w-[320px]"
+                    />
+                  )}
                   {order.status === "ordered" && (
                     <Btn size="sm" variant="soft" loading={savingId === order.id} onClick={() => updateStatus(order, "in_progress")}>התחל</Btn>
                   )}
                   {order.status === "in_progress" && (
-                    <Btn size="sm" variant="soft" loading={savingId === order.id} onClick={() => updateStatus(order, "completed")}>סמן כהושלם</Btn>
+                    <Btn
+                      size="sm"
+                      variant="soft"
+                      loading={savingId === order.id}
+                      disabled={!(resultDrafts[order.id]?.trim() || order.resultText?.trim())}
+                      onClick={() => updateStatus(order, "completed")}
+                    >
+                      סמן כהושלם
+                    </Btn>
                   )}
                 </div>
               </div>

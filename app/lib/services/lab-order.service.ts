@@ -53,6 +53,12 @@ export class LabOrderService {
 
     const columnPatch: Record<string, unknown> = {};
     if (patch.status !== undefined) {
+      if (patch.status === "completed") {
+        const resultText = patch.resultText ?? existing.value.resultText;
+        if (!resultText?.trim()) {
+          return err(AppError.validation("Lab result text is required before completing the lab order"));
+        }
+      }
       Object.assign(columnPatch, buildLabOrderStatusPatch(patch.status));
     }
     if (patch.resultText !== undefined) columnPatch.result_text = patch.resultText;

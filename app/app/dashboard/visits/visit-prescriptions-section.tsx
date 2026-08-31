@@ -7,6 +7,7 @@ import { Badge } from "@/components/dashboard/ui/badge";
 import type { Prescription } from "@/types/domain/prescription";
 
 const PRESCRIPTION_STATUS_LABELS: Record<string, string> = {
+  draft: "טיוטה",
   active: "פעיל",
   discontinued: "הופסק",
 };
@@ -23,6 +24,7 @@ export function VisitPrescriptionsSection({ visitId, initialPrescriptions }: Pro
   const [notes, setNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [approvingId, setApprovingId] = useState<string | null>(null);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -54,6 +56,26 @@ export function VisitPrescriptionsSection({ visitId, initialPrescriptions }: Pro
     router.refresh();
   }
 
+  async function approvePrescription(prescriptionId: string) {
+    setApprovingId(prescriptionId);
+    setError(null);
+
+    const response = await fetch(`/api/prescriptions/${prescriptionId}/approve`, {
+      method: "POST",
+    });
+
+    setApprovingId(null);
+    if (!response.ok) {
+      const payload = (await response.json()) as {
+        error?: { message?: string };
+      };
+      setError(payload.error?.message ?? "אישור המרשם נכשל");
+      return;
+    }
+
+    router.refresh();
+  }
+
   return (
     <div className="space-y-4">
       <p className="text-xs text-[var(--muted)]">
@@ -67,11 +89,24 @@ export function VisitPrescriptionsSection({ visitId, initialPrescriptions }: Pro
             <li key={rx.id} className="rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--surface-2)] p-3 text-sm">
               <div className="flex items-center justify-between gap-2">
                 <p className="font-bold text-[var(--ink)]">{rx.medicationName}</p>
-                <Badge color={rx.status === "active" ? "green" : "muted"}>
+                <Badge color={rx.status === "active" ? "green" : rx.status === "draft" ? "amber" : "muted"}>
                   {PRESCRIPTION_STATUS_LABELS[rx.status] ?? rx.status}
                 </Badge>
               </div>
               <p className="mt-1 whitespace-pre-wrap text-[var(--ink-2)]">{rx.instructions}</p>
+              {rx.status === "draft" ? (
+                <div className="mt-3">
+                  <Btn
+                    type="button"
+                    size="sm"
+                    variant="soft"
+                    loading={approvingId === rx.id}
+                    onClick={() => void approvePrescription(rx.id)}
+                  >
+                    אשר מרשם
+                  </Btn>
+                </div>
+              ) : null}
             </li>
           ))
         )}
@@ -100,7 +135,7 @@ export function VisitPrescriptionsSection({ visitId, initialPrescriptions }: Pro
           className="w-full rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-[var(--brand-400)]"
         />
         {error ? <p className="text-sm font-semibold text-[var(--red-700)]">{error}</p> : null}
-        <Btn type="submit" size="sm" loading={loading}>הוסף מרשם</Btn>
+        <Btn type="submit" size="sm" loading={loading}>שמור טיוטת מרשם</Btn>
       </form>
     </div>
   );

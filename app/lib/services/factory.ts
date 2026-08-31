@@ -70,6 +70,7 @@ export async function createServices() {
   const auditLogRepository = new AuditLogRepository(admin);
   const aiEventRepository = new AIEventRepository(admin);
   const auditService = new AuditService(auditLogRepository);
+  const dashboardNotificationsService = new DashboardNotificationsService(supabase);
 
   const medicalRecordService = new MedicalRecordService(
     visitRepository,
@@ -81,6 +82,8 @@ export async function createServices() {
     medicalRecordRepository,
     vitalRepository,
     labOrderRepository,
+    customerRepository,
+    dashboardNotificationsService,
   );
 
   return {
@@ -91,13 +94,13 @@ export async function createServices() {
     customer: new CustomerService(customerRepository, petRepository, auditService),
     pet: new PetService(petRepository, customerRepository, auditService, medicalRecordService),
     escalation: new EscalationService(supabase),
-    dashboardNotifications: new DashboardNotificationsService(supabase),
+    dashboardNotifications: dashboardNotificationsService,
     appointment: new AppointmentService(
       appointmentRepository,
       customerRepository,
       petRepository,
       auditService,
-      new DashboardNotificationsService(supabase),
+      dashboardNotificationsService,
       visitRepository,
       medicalRecordService,
     ),

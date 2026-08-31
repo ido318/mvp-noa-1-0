@@ -133,6 +133,17 @@ export interface RejectNotificationParams {
   petName: string;
 }
 
+export interface VaccinationReminderParams {
+  vaccinationId: string;
+  clinicId: string;
+  customerId: string;
+  phone: string;
+  customerName: string;
+  petName: string;
+  vaccineName: string;
+  nextDueAt: string;
+}
+
 export class DashboardNotificationsService {
   constructor(private readonly client: SupabaseClient) {}
 
@@ -202,6 +213,26 @@ export class DashboardNotificationsService {
     });
 
     if (error) return err(AppError.externalProvider("Failed to enqueue rejection notification", error));
+    return ok(undefined);
+  }
+
+  async enqueueVaccinationReminder(p: VaccinationReminderParams): Promise<Result<void>> {
+    const { date } = israelDT(`${p.nextDueAt}T08:00:00+02:00`);
+    const { error } = await this.client.from("notifications_log").insert({
+      clinic_id: p.clinicId,
+      customer_id: p.customerId,
+      vaccination_id: p.vaccinationId,
+      phone: p.phone,
+      status: "pending",
+      type: "vaccination_reminder",
+      body:
+        `שלום ${p.customerName}, תזכורת מ-Get A Vet:\n` +
+        `הגיע הזמן לתאם את חיסון ${p.vaccineName} ל${p.petName}, סביב ${date}.\n` +
+        `לתיאום מועד, חייגו אלינו ונמצא זמן מתאים.`,
+      scheduled_for: `${p.nextDueAt}T06:00:00.000Z`,
+    });
+
+    if (error) return err(AppError.externalProvider("Failed to enqueue vaccination reminder", error));
     return ok(undefined);
   }
 }

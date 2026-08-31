@@ -1,5 +1,6 @@
 import { AppError, err, ok, type Result } from "@/lib/errors/app-error";
 import type { LabOrderRepository } from "@/lib/repositories/lab-order.repository";
+import type { CustomerRepository } from "@/lib/repositories/customer.repository";
 import type { MedicalNoteRepository } from "@/lib/repositories/medical-note.repository";
 import type { MedicalRecordRepository } from "@/lib/repositories/medical-record.repository";
 import type { PetRepository } from "@/lib/repositories/pet.repository";
@@ -7,8 +8,12 @@ import type { PrescriptionRepository } from "@/lib/repositories/prescription.rep
 import type { VaccinationRepository } from "@/lib/repositories/vaccination.repository";
 import type { VisitRepository } from "@/lib/repositories/visit.repository";
 import type { VitalRepository } from "@/lib/repositories/vital.repository";
-import { assertMedicalDeleteAuthorized } from "@/lib/services/medical-authorization";
+import {
+  assertMedicalDeleteAuthorized,
+  assertPrescriptionApproveAuthorized,
+} from "@/lib/services/medical-authorization";
 import type { AuditService } from "@/lib/services/audit.service";
+import type { DashboardNotificationsService } from "@/lib/services/dashboard-notifications.service";
 import type { ServiceActor } from "@/lib/services/service-context";
 import type {
   CreateMedicalNoteInput,
@@ -60,6 +65,8 @@ export class MedicalRecordService {
     private readonly medicalRecordRepository?: MedicalRecordRepository,
     private readonly vitalRepository?: VitalRepository,
     private readonly labOrderRepository?: LabOrderRepository,
+    private readonly customerRepository?: CustomerRepository,
+    private readonly dashboardNotifications?: DashboardNotificationsService,
   ) {}
 
   async getRecordByPet(actor: ServiceActor, petId: string): Promise<Result<MedicalRecord>> {
@@ -430,6 +437,24 @@ export class MedicalRecordService {
     const created = await this.vaccinationRepository.create(input, actor.userId, petId);
     if (!created.ok) return created;
 
+    if (created.value.nextDueAt && this.customerRepository && this.dashboardNotifications) {
+      const customer = await this.customerRepository.findById(created.value.customerId);
+      if (!customer.ok) return err(customer.error);
+      if (customer.value?.phone) {
+        const reminder = await this.dashboardNotifications.enqueueVaccinationReminder({
+          vaccinationId: created.value.id,
+          clinicId: created.value.clinicId,
+          customerId: created.value.customerId,
+          phone: customer.value.phone,
+          customerName: customer.value.fullName,
+          petName: pet.value.name,
+          vaccineName: created.value.vaccineName,
+          nextDueAt: created.value.nextDueAt,
+        });
+        if (!reminder.ok) return err(reminder.error);
+      }
+    }
+
     await this.auditService.logAction({
       clinicId: created.value.clinicId,
       actorType: "user",
@@ -585,6 +610,40 @@ export class MedicalRecordService {
       actorType: "user",
       actorId: actor.userId,
       action: "prescription.update",
+      entityType: "prescription",
+      entityId: updated.value.id,
+      beforePayload: existing.value,
+      afterPayload: updated.value,
+    });
+
+    return updated;
+  }
+
+  async approvePrescription(
+    actor: ServiceActor,
+    prescriptionId: string,
+  ): Promise<Result<Prescription>> {
+    const existing = await this.prescriptionRepository.findById(prescriptionId);
+    if (!existing.ok) return existing;
+    if (!existing.value) return err(AppError.notFound("Prescription not found"));
+    if (!actor.clinicIds.includes(existing.value.clinicId)) {
+      return err(AppError.forbidden("Prescription outside actor clinics"));
+    }
+
+    const approval = assertPrescriptionApproveAuthorized(actor, existing.value.clinicId);
+    if (!approval.ok) return approval;
+
+    const updated = await this.prescriptionRepository.update(prescriptionId, {
+      status: "active",
+      discontinuedAt: null,
+    });
+    if (!updated.ok) return updated;
+
+    await this.auditService.logAction({
+      clinicId: existing.value.clinicId,
+      actorType: "user",
+      actorId: actor.userId,
+      action: "prescription.approve",
       entityType: "prescription",
       entityId: updated.value.id,
       beforePayload: existing.value,
