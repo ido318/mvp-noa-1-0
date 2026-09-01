@@ -1,34 +1,49 @@
 import React from "react";
+import { Badge } from "@/components/dashboard/ui/badge";
 
-export type CallStatus = "done" | "missed" | "escalated" | "active" | "completed" | "failed" | "in_progress";
+export type CallStatus =
+  | "done" | "missed" | "escalated" | "active"
+  | "completed" | "failed" | "in_progress"
+  | "ringing" | "queued" | "busy" | "no_answer" | "canceled";
 
-const STATUS_MAP: Record<CallStatus, { label: string; fg: string; bg: string; pulse?: boolean }> = {
-  done:        { label: "הושלמה",   fg: "#2F7D5B", bg: "#E9F5EF" },
-  completed:   { label: "הושלמה",   fg: "#2F7D5B", bg: "#E9F5EF" },
-  missed:      { label: "נכשלה",    fg: "#6B7785", bg: "#EEF2F5" },
-  failed:      { label: "נכשלה",    fg: "#6B7785", bg: "#EEF2F5" },
-  escalated:   { label: "הוסלמה",   fg: "#B91C1C", bg: "#FEF2F2" },
-  active:      { label: "בתהליך",   fg: "#D97706", bg: "#FEF6E9", pulse: true },
-  in_progress: { label: "בתהליך",   fg: "#D97706", bg: "#FEF6E9", pulse: true },
+const CALL_STATUS: Record<CallStatus, { label: string; tone: "done" | "pending" | "critical" | "neutral" }> = {
+  ringing:     { label: "מצלצל",   tone: "pending" },
+  queued:      { label: "בתור",    tone: "neutral" },
+  in_progress: { label: "בשיחה",   tone: "pending" },
+  active:      { label: "בשיחה",   tone: "pending" },
+  completed:   { label: "הושלמה",  tone: "neutral" },
+  done:        { label: "הושלמה",  tone: "neutral" },
+  failed:      { label: "נכשלה",   tone: "neutral" },
+  missed:      { label: "אין מענה", tone: "neutral" },
+  busy:        { label: "תפוס",    tone: "neutral" },
+  no_answer:   { label: "אין מענה", tone: "neutral" },
+  canceled:    { label: "בוטלה",   tone: "neutral" },
+  escalated:   { label: "הוסלמה",  tone: "critical" },
 };
 
 interface CallStatusBadgeProps {
   status: string;
+  plain?: boolean;
   className?: string;
 }
 
-export function CallStatusBadge({ status, className = "" }: CallStatusBadgeProps) {
-  const s = STATUS_MAP[status as CallStatus] ?? STATUS_MAP.missed;
+export function CallStatusBadge({ status, plain, className = "" }: CallStatusBadgeProps) {
+  const s = CALL_STATUS[status as CallStatus] ?? CALL_STATUS.failed;
+  // Neutral outcomes read as plain text; only a live or escalated call gets a chip.
+  const isPlain = plain ?? s.tone === "neutral";
   return (
-    <span
-      className={["inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold", className].join(" ")}
-      style={{ color: s.fg, backgroundColor: s.bg }}
-    >
-      <span
-        className={["w-1.5 h-1.5 rounded-full flex-shrink-0", s.pulse ? "animate-[pulseRing_2s_ease-in-out_infinite]" : ""].join(" ")}
-        style={{ backgroundColor: s.fg }}
-      />
+    <Badge tone={s.tone} plain={isPlain} className={className}>
       {s.label}
+    </Badge>
+  );
+}
+
+export function CallDirection({ direction = "inbound" }: { direction?: string }) {
+  return (
+    <span className="text-[12px]" style={{ color: "var(--text-muted)" }}>
+      {direction === "outbound" ? "יוצאת" : "נכנסת"}
     </span>
   );
 }
+
+export { CALL_STATUS };

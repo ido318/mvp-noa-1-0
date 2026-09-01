@@ -10,7 +10,7 @@ export function PreVisitBriefCard({ calls }: { calls: VoiceCall[] }) {
   return (
     <Card>
       <div className="flex items-center justify-between gap-3">
-        <h3 className="text-[15px] font-bold text-[var(--ink)]">Pre-visit brief</h3>
+        <h3 className="text-[15px] font-semibold text-[var(--ink)]">Pre-visit brief</h3>
         <Badge color="brand">שיחות אחרונות</Badge>
       </div>
       <div className="mt-3 space-y-3">

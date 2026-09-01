@@ -13,7 +13,21 @@ type Params = { params: Promise<{ token: string }> };
 function ExpiredNotice() {
   return (
     <main dir="rtl" className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-3 p-6 text-center">
-      <div className="text-4xl">🐾</div>
+      <span
+        aria-hidden="true"
+        className="h-9 w-9"
+        style={{
+          background: "var(--text-faint)",
+          WebkitMaskImage: "url(/logo-mark.svg)",
+          maskImage: "url(/logo-mark.svg)",
+          WebkitMaskRepeat: "no-repeat",
+          maskRepeat: "no-repeat",
+          WebkitMaskPosition: "center",
+          maskPosition: "center",
+          WebkitMaskSize: "contain",
+          maskSize: "contain",
+        }}
+      />
       <h1 className="text-lg font-semibold text-zinc-900">הקישור אינו זמין</h1>
       <p className="text-sm text-zinc-600">
         ייתכן שהקישור פג תוקף או בוטל. לפרטים, אנא פנו ישירות למרפאה.
@@ -54,7 +68,21 @@ export default async function VisitSharePage({ params }: Params) {
   return (
     <main dir="rtl" className="mx-auto min-h-screen max-w-md bg-zinc-50 p-5 text-zinc-900">
       <header className="mb-5 flex items-center gap-3 border-b border-zinc-200 pb-4">
-        <div className="text-3xl">🐾</div>
+        <span
+        aria-hidden="true"
+        className="h-8 w-8"
+        style={{
+          background: "var(--text-faint)",
+          WebkitMaskImage: "url(/logo-mark.svg)",
+          maskImage: "url(/logo-mark.svg)",
+          WebkitMaskRepeat: "no-repeat",
+          maskRepeat: "no-repeat",
+          WebkitMaskPosition: "center",
+          maskPosition: "center",
+          WebkitMaskSize: "contain",
+          maskSize: "contain",
+        }}
+      />
         <div>
           <p className="text-xs font-medium uppercase tracking-wide text-emerald-700">
             מרפאת Get A Vet

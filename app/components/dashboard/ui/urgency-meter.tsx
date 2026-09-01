@@ -1,38 +1,49 @@
 import React from "react";
 
-function urgencyColor(value: number): { bar: string; label: string } {
-  if (value >= 8) return { bar: "#DC2626", label: "#B91C1C" };
-  if (value >= 6) return { bar: "#F97316", label: "#C2410C" };
-  if (value >= 4) return { bar: "#F59E0B", label: "#B45309" };
-  return { bar: "#3E9C86", label: "#2F7D5B" };
-}
+/**
+ * Urgency stays on its real 1–10 scale. The old four-step orange ramp is gone:
+ * the meter reads secondary ink until it crosses 6, then critical red.
+ */
 
 interface UrgencyMeterProps {
-  value: number; // 1–10
+  value: number;
   showLabel?: boolean;
+  compact?: boolean;
   className?: string;
 }
 
-export function UrgencyMeter({ value, showLabel = true, className = "" }: UrgencyMeterProps) {
-  const { bar, label } = urgencyColor(value);
+export function UrgencyMeter({ value, showLabel = true, compact = false, className = "" }: UrgencyMeterProps) {
   const clamped = Math.max(0, Math.min(10, value));
+  const critical = clamped >= 6;
+  const fill = critical ? "var(--status-critical-text)" : "var(--text-secondary)";
 
   return (
-    <div className={["flex items-center gap-2", className].join(" ")}>
-      <div className="flex gap-0.5">
+    <span className={["inline-flex items-center gap-2", className].join(" ")}>
+      <span className="inline-flex gap-[2px]" aria-hidden="true">
         {Array.from({ length: 10 }, (_, i) => (
           <span
             key={i}
-            className="block h-[18px] w-1.5 rounded-sm"
-            style={{ backgroundColor: i < clamped ? bar : "var(--line)" }}
+            className="block"
+            style={{
+              width: 3,
+              height: compact ? 10 : 12,
+              borderRadius: "1px",
+              background: i < clamped ? fill : "var(--border-hairline)",
+            }}
           />
         ))}
-      </div>
+      </span>
       {showLabel && (
-        <span className="text-xs font-semibold tabular-nums" style={{ color: label }}>
+        <span
+          className="gv-data text-[12px]"
+          style={{
+            fontWeight: "var(--w-medium)",
+            color: critical ? "var(--status-critical-text)" : "var(--text-muted)",
+          }}
+        >
           {clamped}/10
         </span>
       )}
-    </div>
+    </span>
   );
 }

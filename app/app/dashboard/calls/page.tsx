@@ -31,7 +31,7 @@ function TranscriptBubble({ item }: { item: TranscriptItem }) {
     <div className={`flex gap-2 ${isAgent ? "flex-row-reverse" : ""}`}>
       <span
         className={[
-          "mt-0.5 flex-shrink-0 h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-bold",
+          "mt-0.5 flex-shrink-0 h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-semibold",
           isAgent
             ? "bg-[var(--coral-100)] text-[var(--coral-700)]"
             : "bg-[var(--surface-2)] text-[var(--ink-2)]",
@@ -134,7 +134,7 @@ function CallDrawer({
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[var(--line)] px-5 py-4">
           <div>
-            <p className="text-[14px] font-bold text-[var(--ink)]">{call.fromNumber}</p>
+            <p className="text-[14px] font-semibold text-[var(--ink)]">{call.fromNumber}</p>
             <p className="text-xs text-[var(--muted)]">{fmtDate(call.startedAt)}</p>
           </div>
           <button onClick={onClose} className="rounded-full p-1.5 hover:bg-[var(--surface-2)]">
@@ -187,7 +187,7 @@ function CallDrawer({
                 <div className="rounded-[var(--r-md)] bg-[var(--brand-50)] p-3">
                   <div className="flex items-center gap-1.5 mb-1.5">
                     <SparkleIcon size={13} className="text-[var(--brand-600)]" />
-                    <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--brand-700)]">סיכום AI</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--brand-700)]">סיכום AI</p>
                   </div>
                   <p className="text-[13px] text-[var(--ink)] leading-relaxed">{call.aiSummary}</p>
                 </div>
@@ -196,7 +196,7 @@ function CallDrawer({
               )}
               {call.customerId ? (
                 <div className="space-y-2 rounded-[var(--r-md)] border border-[var(--line)] p-3">
-                  <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--muted)]">משימת המשך מהשיחה</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">משימת המשך מהשיחה</p>
                   <input
                     type="datetime-local"
                     value={taskDueAt}
@@ -308,7 +308,7 @@ export default function CallsPage() {
     <div className="p-6 space-y-5">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-extrabold text-[var(--ink)]">שיחות</h1>
+        <h1 className="text-xl font-semibold text-[var(--ink)]">שיחות</h1>
 
         {/* Category filter */}
         <div className="flex rounded-[var(--r-md)] border border-[var(--line)] overflow-hidden">

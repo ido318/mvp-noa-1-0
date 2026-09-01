@@ -24,7 +24,7 @@ const STATUS_LABEL: Record<string, string> = {
   no_show: "לא הגיע",
   pending_approval: "ממתין לאישור",
   late_cancellation: "ביטול מאוחר",
-  checked_in: "Check In",
+  checked_in: "צ׳ק־אין",
   in_visit: "בביקור",
 };
 
@@ -84,10 +84,10 @@ export function AppointmentDrawer({
         body: JSON.stringify({ version: appointment.version }),
       });
       if (!res.ok) throw new Error();
-      toast("המטופל סומן כ-Check In", "success");
+      toast("המטופל סומן כצ׳ק־אין", "success");
       onChanged();
     } catch {
-      toast("Check In נכשל", "error");
+      toast("סימון הצ׳ק־אין נכשל", "error");
     } finally {
       setSavingStatus(false);
     }
@@ -124,7 +124,7 @@ export function AppointmentDrawer({
             <div className="flex items-center gap-3">
               <AnimalIcon species={appointment.petSpecies ?? "dog"} size={28} />
               <div className="min-w-0">
-                <p className="truncate text-[16px] font-extrabold text-[var(--ink)]">{appointment.petName ?? "חיה"}</p>
+                <p className="truncate text-[16px] font-semibold text-[var(--ink)]">{appointment.petName ?? "חיה"}</p>
                 <p className="truncate text-[13px] text-[var(--muted)]">{appointment.customerName ?? "לקוח"}</p>
               </div>
               <Badge color={appointment.status === "pending_approval" ? "amber" : "muted"} className="ms-auto">
@@ -188,7 +188,7 @@ export function AppointmentDrawer({
               </div>
             ) : appointment.status === "scheduled" || appointment.status === "confirmed" ? (
               <div className="flex gap-2 border-t border-[var(--line-2)] pt-4">
-                <Btn variant="soft" size="sm" loading={savingStatus} onClick={checkIn}>Check In</Btn>
+                <Btn variant="soft" size="sm" loading={savingStatus} onClick={checkIn}>צ׳ק־אין</Btn>
                 <Btn variant="dangerSoft" size="sm" onClick={() => setConfirmingCancel("cancelled")}>ביטול תור</Btn>
                 <Btn variant="dangerSoft" size="sm" onClick={() => setConfirmingCancel("no_show")}>סימון כלא הגיע</Btn>
               </div>

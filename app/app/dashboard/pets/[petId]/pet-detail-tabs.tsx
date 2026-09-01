@@ -137,7 +137,7 @@ export function PetDetailTabs({
         {tab === "visits" && (
           <Card noPad>
             <div className="flex items-center justify-between px-5 pb-3 pt-5">
-              <h3 className="text-[15px] font-bold text-[var(--ink)]">ביקורים</h3>
+              <h3 className="text-[15px] font-semibold text-[var(--ink)]">ביקורים</h3>
               <Link href={`/dashboard/visits/new?petId=${pet.id}`} className="text-[13px] font-semibold text-[var(--brand-600)] hover:underline">
                 + ביקור חדש
               </Link>
@@ -168,7 +168,7 @@ export function PetDetailTabs({
 
         {tab === "vaccinations" && (
           <Card noPad>
-            <h3 className="px-5 pb-3 pt-5 text-[15px] font-bold text-[var(--ink)]">חיסונים</h3>
+            <h3 className="px-5 pb-3 pt-5 text-[15px] font-semibold text-[var(--ink)]">חיסונים</h3>
             {vaccinations.length === 0 ? (
               <EmptyState title="לא נרשמו חיסונים" className="pb-6" />
             ) : (
@@ -193,7 +193,7 @@ export function PetDetailTabs({
 
         {tab === "medications" && (
           <Card noPad>
-            <h3 className="px-5 pb-3 pt-5 text-[15px] font-bold text-[var(--ink)]">תרופות ומרשמים</h3>
+            <h3 className="px-5 pb-3 pt-5 text-[15px] font-semibold text-[var(--ink)]">תרופות ומרשמים</h3>
             {prescriptions.length === 0 ? (
               <EmptyState title="אין מרשמים רשומים" className="pb-6" />
             ) : (

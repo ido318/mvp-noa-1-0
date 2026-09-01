@@ -89,30 +89,32 @@ function fmtWeekRange(start: Date, end: Date) {
   return `${startText} - ${endText}`;
 }
 
-type AppointmentAccent = { bg: string; border: string; text: string; dot: string };
-
-const DEFAULT_ACCENT: AppointmentAccent = { bg: "#F4F6F8", border: "#E2E8ED", text: "#6B7785", dot: "#97A2AD" };
-
-const VISIT_ACCENTS: Record<string, AppointmentAccent> = {
-  checkup: { bg: "#E7F4F0", border: "#72B9A7", text: "#237665", dot: "#3E9C86" },
-  consultation: { bg: "#E7F4F0", border: "#72B9A7", text: "#237665", dot: "#3E9C86" },
-  vaccination: { bg: "#EEF1FE", border: "#8EA0FF", text: "#4A63D9", dot: "#5B7CFA" },
-  vaccine: { bg: "#EEF1FE", border: "#8EA0FF", text: "#4A63D9", dot: "#5B7CFA" },
-  neutering: { bg: "#FBEAEB", border: "#EF8C90", text: "#B94E52", dot: "#E0696D" },
-  urgent: { bg: "#FEF2F2", border: "#F87171", text: "#B91C1C", dot: "#EF4444" },
-  home_visit: { bg: "#EEF8F6", border: "#5CC0B6", text: "#0F766E", dot: "#14877D" },
-  phone_consultation: { bg: "#EEF1FE", border: "#8EA0FF", text: "#4A63D9", dot: "#5B7CFA" },
-  follow_up: { bg: "#FBF2DD", border: "#E4B54D", text: "#9A6A10", dot: "#C2891E" },
-  followup: { bg: "#FBF2DD", border: "#E4B54D", text: "#9A6A10", dot: "#C2891E" },
-  other: DEFAULT_ACCENT,
+/**
+ * A block is a white sheet with a hairline and a 2px type-coloured edge —
+ * colour appears only where it changes a decision, so no coloured region
+ * background larger than a chip. The 12 source keys sit on the four hues.
+ */
+const VISIT_MARK: Record<string, string> = {
+  checkup: "var(--type-checkup)",
+  consultation: "var(--type-consultation)",
+  vaccination: "var(--type-vaccination)",
+  vaccine: "var(--type-vaccination)",
+  surgery: "var(--type-surgery)",
+  neutering: "var(--type-neutering)",
+  urgent: "var(--type-urgent)",
+  home_visit: "var(--type-home-visit)",
+  phone_consultation: "var(--type-phone-consultation)",
+  follow_up: "var(--type-follow-up)",
+  followup: "var(--type-follow-up)",
+  other: "var(--type-other)",
 };
 
 const CALENDAR_LEGEND: Array<{ label: string; color: string }> = [
-  { label: "בדיקה", color: "#0F766E" },
-  { label: "חיסון", color: "#5B7CFA" },
-  { label: "ניתוח", color: "#E0696D" },
-  { label: "מעקב", color: "#C2891E" },
-  { label: "טיפול", color: "#14877D" },
+  { label: "בדיקה וייעוץ", color: "var(--type-checkup)" },
+  { label: "חיסון וייעוץ טלפוני", color: "var(--type-vaccination)" },
+  { label: "ניתוח ועיקור", color: "var(--type-surgery)" },
+  { label: "מעקב", color: "var(--type-follow-up)" },
+  { label: "ביקור בית", color: "var(--type-home-visit)" },
 ];
 
 // A couple of legacy aliases ("vaccine", "followup") can still exist on older rows written
@@ -128,11 +130,8 @@ function visitLabel(type: string) {
   return VISIT_TYPE_CONFIG[canonical]?.labelHe ?? type;
 }
 
-function appointmentAccent(type: string, status: string) {
-  if (status === "pending_approval") {
-    return { bg: "#FFF4DC", border: "#E7B84D", text: "#9A6A10", dot: "#D99A16" };
-  }
-  return VISIT_ACCENTS[type] ?? DEFAULT_ACCENT;
+function typeMark(type: string) {
+  return VISIT_MARK[type] ?? VISIT_MARK.other;
 }
 
 function appointmentTime(iso: string) {
@@ -145,7 +144,8 @@ function appointmentTime(iso: string) {
 function ApptBlock({ appt, onClick }: { appt: Appointment; onClick: () => void }) {
   const top  = topPx(appt.scheduledAt);
   const h    = heightPx(appt.durationMinutes);
-  const accent = appointmentAccent(appt.appointmentType, appt.status);
+  const mark = typeMark(appt.appointmentType);
+  const pending = appt.status === "pending_approval";
   const petName = appt.petName ?? "חיה";
   const customerName = appt.customerName ?? "לקוח";
   const title = `${petName} · ${customerName} · ${visitLabel(appt.appointmentType)}`;
@@ -154,30 +154,38 @@ function ApptBlock({ appt, onClick }: { appt: Appointment; onClick: () => void }
     <button
       type="button"
       onClick={onClick}
-      className="absolute inset-x-3 z-10 overflow-hidden rounded-[12px] border px-3 py-2.5 text-start text-[12px] shadow-[0_10px_22px_rgba(31,41,51,0.10)] transition-transform hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(31,41,51,0.16)]"
+      className="absolute inset-x-2 z-10 overflow-hidden px-2 py-1.5 text-start text-[12px]"
       style={{
         top: `${top}px`,
         height: `${Math.max(h, 72)}px`,
-        borderColor: accent.border,
-        backgroundColor: accent.bg,
-        color: accent.text,
         minHeight: "72px",
+        background: "var(--surface-raised)",
+        borderRadius: "var(--radius-1)",
+        border: "1px solid var(--border-row)",
+        borderStyle: pending ? "dashed" : "solid",
+        borderInlineStart: `2px solid ${mark}`,
+        borderInlineStartStyle: "solid",
+        color: "var(--text-primary)",
+        boxShadow: "var(--shadow-hairline)",
+        transition: "var(--transition-color)",
       }}
       title={title}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <div className="truncate text-[14px] font-extrabold leading-tight">{petName}</div>
-          <div className="mt-0.5 truncate text-[11px] font-semibold opacity-80">{customerName}</div>
+          <div className="truncate text-[14px] font-semibold leading-tight">{petName}</div>
+          <div className="mt-0.5 truncate text-[11px]" style={{ color: "var(--text-muted)" }}>{customerName}</div>
         </div>
-        <AnimalIcon species={appt.petSpecies ?? "dog"} size={17} className="mt-0.5 flex-shrink-0 opacity-80" />
+        <AnimalIcon species={appt.petSpecies ?? "dog"} size={16} className="mt-0.5 flex-shrink-0 text-[var(--text-faint)]" />
       </div>
-      <div className="mt-2 flex items-center justify-between gap-1 text-[11px] font-bold">
+      <div className="mt-2 flex items-center justify-between gap-1 text-[11px]" style={{ color: "var(--text-muted)" }}>
         <span className="truncate">{visitLabel(appt.appointmentType)}</span>
-        <span className="shrink-0 opacity-85">{appointmentTime(appt.scheduledAt)}</span>
+        <span className="gv-data shrink-0">{appointmentTime(appt.scheduledAt)}</span>
       </div>
-      {appt.status === "pending_approval" && (
-        <div className="mt-1 text-[10px] font-extrabold">ממתין לאישור</div>
+      {pending && (
+        <div className="mt-1 text-[10px]" style={{ color: "var(--status-pending-text)", fontWeight: "var(--w-semibold)" }}>
+          ממתין לאישור
+        </div>
       )}
     </button>
   );
@@ -195,8 +203,12 @@ function CalendarBlockOverlay({
 
   return (
     <div
-      className="absolute inset-x-2 overflow-hidden rounded-[10px] border border-[#E2E8ED] bg-[#F9FAFB] px-2 py-1.5 text-[10px] text-[var(--muted)] shadow-[inset_3px_0_0_#97A2AD]"
+      className="absolute inset-x-[2px] overflow-hidden px-2 py-1.5 text-[10px]"
       style={{
+        background: "var(--hatch)",
+        borderRadius: "var(--radius-1)",
+        border: "1px solid var(--border-row)",
+        color: "var(--text-faint)",
         top: `${Math.max(0, top)}px`,
         height: `${Math.max(h, 48)}px`,
         minHeight: "26px",
@@ -204,7 +216,7 @@ function CalendarBlockOverlay({
       title={block.reason ?? "חסימת יומן"}
     >
       <div className="flex items-center justify-between gap-1">
-        <span className="font-bold text-[var(--ink-2)]">חסום</span>
+        <span className="font-semibold text-[var(--ink-2)]">חסום</span>
         <button
           type="button"
           className="rounded px-1 text-[9px] text-[var(--red-700)] hover:bg-[var(--red-50)]"
@@ -242,7 +254,7 @@ function DayColumn({
 
   if (isSaturday) {
     return (
-      <div className="relative min-w-[156px] flex-1 border-s border-[#E2E8ED] bg-[#F9FAFB]">
+      <div className="relative min-w-[156px] flex-1 border-s border-[var(--border-hairline)] bg-[var(--surface-sunken)]">
         <div className="absolute inset-0 flex items-center justify-center opacity-60">
           <span className="text-xs text-[var(--faint)]">סגור</span>
         </div>
@@ -253,7 +265,7 @@ function DayColumn({
   return (
     <div
       className={[
-        "relative min-w-[156px] flex-1 border-s border-[#E2E8ED]",
+        "relative min-w-[156px] flex-1 border-s border-[var(--border-hairline)]",
         isToday ? "bg-white" : "bg-white",
       ].join(" ")}
     >
@@ -261,7 +273,7 @@ function DayColumn({
       {Array.from({ length: HOUR_SPAN + 1 }, (_, i) => i + HOUR_START).map(h => (
         <div
           key={h}
-          className="absolute inset-x-0 border-t border-[#EEF2F5]"
+          className="absolute inset-x-0 border-t border-[var(--border-row)]"
           style={{ top: `${(h - HOUR_START) * HOUR_HEIGHT_PX}px` }}
         />
       ))}
@@ -458,11 +470,11 @@ export default function CalendarPage() {
   const weekRange = fmtWeekRange(weekStart, weekEnd);
 
   return (
-    <div className="min-h-full bg-[#F4F6F8] p-6">
+    <div className="min-h-full bg-[var(--surface-canvas)] p-6">
       <div className="mx-auto max-w-[1280px] space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-[28px] font-extrabold leading-tight text-[var(--ink)]">יומן</h1>
+          <h1 className="text-[28px] font-semibold leading-tight text-[var(--ink)]">יומן</h1>
           <p className="mt-1 text-sm font-semibold text-[var(--muted)]">
             {weekRange} · בחרו תור כדי לשנות מועד
           </p>
@@ -477,12 +489,12 @@ export default function CalendarPage() {
           <button
             type="button"
             onClick={() => setWizardOpen(true)}
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-[12px] bg-[var(--brand-600)] px-4 text-sm font-semibold text-white shadow-[var(--sh-sm)] transition-all hover:brightness-110 active:brightness-95"
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-[var(--radius-2)] bg-[var(--accent)] px-4 text-sm font-semibold text-white shadow-[var(--sh-sm)] transition-all"
           >
             <PlusIcon size={15} />
             תור חדש
           </button>
-          <div className="flex h-10 items-center overflow-hidden rounded-[12px] border border-[#E2E8ED] bg-white shadow-[var(--sh-sm)]">
+          <div className="flex h-10 items-center overflow-hidden rounded-[var(--radius-2)] bg-[var(--surface-raised)] shadow-[var(--shadow-raised)]">
             <button
               type="button"
               className="flex h-full w-11 items-center justify-center text-[var(--ink-2)] transition-colors hover:bg-[var(--surface-2)]"
@@ -490,7 +502,7 @@ export default function CalendarPage() {
             >
               <ChevRightIcon size={14} />
             </button>
-            <span className="min-w-[112px] border-x border-[#E2E8ED] px-4 text-center text-sm font-extrabold text-[var(--ink)]">
+            <span className="min-w-[112px] border-x border-[var(--border-hairline)] px-4 text-center text-sm font-semibold text-[var(--ink)]">
               השבוע
             </span>
             <button
@@ -507,10 +519,10 @@ export default function CalendarPage() {
         </div>
       </div>
 
-      <Card className="space-y-3 border-[#E2E8ED] bg-white/82 shadow-[0_14px_34px_rgba(31,41,51,0.07)]">
+      <Card className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="text-sm font-bold text-[var(--ink)]">חסימת יומן</h2>
+            <h2 className="text-sm font-semibold text-[var(--ink)]">חסימת יומן</h2>
             <p className="text-xs text-[var(--muted)]">חסום שעות שבהן נועה לא זמינה. תומר לא יציע תורים בטווחים האלה.</p>
           </div>
           <Badge color="muted">{blocks.length} חסימות השבוע</Badge>
@@ -560,9 +572,9 @@ export default function CalendarPage() {
       {loading ? (
         <Skeleton className="h-[560px]" />
       ) : (
-        <Card noPad className="overflow-hidden rounded-[18px] border-[#E2E8ED] bg-white shadow-[0_18px_50px_rgba(31,41,51,0.10)]">
-          <div className="flex items-center justify-between gap-3 border-b border-[#E2E8ED] bg-white px-6 py-4">
-            <div className="flex flex-wrap items-center gap-4 text-[11px] font-bold text-[var(--muted)]">
+        <Card noPad className="overflow-hidden">
+          <div className="flex items-center justify-between gap-3 border-b border-[var(--border-hairline)] bg-white px-6 py-4">
+            <div className="flex flex-wrap items-center gap-4 text-[11px] font-semibold text-[var(--muted)]">
               {CALENDAR_LEGEND.map(({ label, color }) => (
                 <span key={label} className="inline-flex items-center gap-1.5">
                   <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />
@@ -575,7 +587,7 @@ export default function CalendarPage() {
             </span>
           </div>
 
-          <div className="flex border-b border-[#E2E8ED] bg-white">
+          <div className="flex border-b border-[var(--border-hairline)] bg-white">
             <div className="w-16 flex-shrink-0" />
             {weekDays.map((day, i) => {
               const isToday = isoOfDate(day) === today;
@@ -584,13 +596,13 @@ export default function CalendarPage() {
                 <div
                   key={i}
                   className={[
-                    "min-w-[156px] flex-1 border-s border-[#EEF2F5] py-3 text-center",
-                    isToday ? "bg-[#EEF8F6] text-[var(--brand-700)]" : "text-[var(--ink-2)]",
+                    "min-w-[156px] flex-1 border-s border-[var(--border-row)] py-3 text-center",
+                    isToday ? "bg-[var(--active-wash)] text-[var(--brand-700)]" : "text-[var(--ink-2)]",
                     isSat ? "text-[var(--faint)]" : "",
                   ].join(" ")}
                 >
-                  <div className="text-[12px] font-bold">{HE_DAYS[day.getDay()]}</div>
-                  <div className="mt-0.5 text-[22px] font-extrabold leading-none">{new Intl.DateTimeFormat("he-IL", { timeZone: TZ, day: "2-digit" }).format(day)}</div>
+                  <div className="text-[12px] font-semibold">{HE_DAYS[day.getDay()]}</div>
+                  <div className="mt-0.5 text-[22px] font-semibold leading-none">{new Intl.DateTimeFormat("he-IL", { timeZone: TZ, day: "2-digit" }).format(day)}</div>
                 </div>
               );
             })}

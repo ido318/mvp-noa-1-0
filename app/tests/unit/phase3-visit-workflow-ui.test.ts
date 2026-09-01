@@ -12,7 +12,7 @@ describe("phase3 appointment to visit UI", () => {
 
     expect(drawer).toContain("/check-in");
     expect(drawer).toContain("/open-visit");
-    expect(drawer).toContain("Check In");
+    expect(drawer).toContain("צ׳ק־אין");
     expect(drawer).toContain("פתח ביקור");
   });
 
@@ -22,8 +22,8 @@ describe("phase3 appointment to visit UI", () => {
 
     expect(model).toContain("checkedInRows");
     expect(model).toContain("inVisitRows");
-    expect(sections).toContain("Waiting / Checked In");
-    expect(sections).toContain("In Visit");
+    expect(sections).toContain("ממתינים לביקור");
+    expect(sections).toContain("בטיפול");
   });
 
   it("keeps SOAP structured fields visible in the visit workspace", () => {

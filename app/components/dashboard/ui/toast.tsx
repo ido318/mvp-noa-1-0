@@ -1,6 +1,6 @@
 "use client";
 import React, { createContext, useContext, useCallback, useState } from "react";
-import { CheckIcon, EscalationIcon, XIcon } from "@/components/dashboard/icons";
+import { XIcon } from "@/components/dashboard/icons";
 
 type ToastVariant = "success" | "error" | "warning" | "info";
 
@@ -20,18 +20,12 @@ export function useToast() {
   return useContext(ToastContext);
 }
 
-const VARIANT_ICON: Record<ToastVariant, React.ReactNode> = {
-  success: <CheckIcon size={14} />,
-  error:   <XIcon size={14} />,
-  warning: <EscalationIcon size={14} />,
-  info:    <CheckIcon size={14} />,
-};
-
-const VARIANT_COLOR: Record<ToastVariant, string> = {
-  success: "bg-[var(--brand-600)]",
-  error:   "bg-[var(--red-600)]",
-  warning: "bg-[var(--amber-600)]",
-  info:    "bg-[var(--brand-500)]",
+/** A single colour mark carries the variant — the system uses no icon badge here. */
+const VARIANT_MARK: Record<ToastVariant, string> = {
+  success: "var(--status-done-text)",
+  error:   "var(--clay-700)",
+  warning: "var(--status-pending-text)",
+  info:    "var(--slate-600)",
 };
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
@@ -63,16 +57,29 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: (id: string)
 
   return (
     <div
-      className="pointer-events-auto flex items-center gap-3 min-w-[260px] max-w-sm px-4 py-3 rounded-[var(--r-md)] shadow-[var(--sh-pop)] toast-enter"
-      style={{ backgroundColor: "var(--ink)", color: "#fff" }}
+      className="pointer-events-auto flex items-center gap-3 min-w-[260px] max-w-sm px-4 py-3 toast-enter"
+      style={{
+        background: "var(--graphite-800)",
+        color: "#fff",
+        borderRadius: "var(--radius-2)",
+        boxShadow: "var(--shadow-modal)",
+      }}
     >
-      <span className={["flex-shrink-0 flex h-5 w-5 items-center justify-center rounded-full text-white", VARIANT_COLOR[variant]].join(" ")}>
-        {VARIANT_ICON[variant]}
-      </span>
-      <p className="flex-1 text-sm font-medium">{toast.message}</p>
+      <span
+        aria-hidden="true"
+        className="flex-shrink-0"
+        style={{
+          width: "var(--mark-size)",
+          height: "var(--mark-size)",
+          borderRadius: "1px",
+          background: VARIANT_MARK[variant],
+        }}
+      />
+      <p className="flex-1 text-[13px]" style={{ fontWeight: "var(--w-medium)" }}>{toast.message}</p>
       <button
         onClick={() => onDismiss(toast.id)}
-        className="flex-shrink-0 opacity-60 hover:opacity-100 transition-opacity"
+        className="flex-shrink-0 opacity-60 hover:opacity-100"
+        style={{ transition: "opacity var(--dur-fast) var(--ease)" }}
         aria-label="סגור"
       >
         <XIcon size={14} />

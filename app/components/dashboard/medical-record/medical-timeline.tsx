@@ -56,7 +56,7 @@ export function MedicalTimeline({ items }: { items: MedicalRecordTimelineItem[] 
                     <Badge color={TYPE_COLORS[item.type]}>{TYPE_LABELS[item.type]}</Badge>
                     <p className="text-[13px] font-semibold text-[var(--muted)]">{formatIsraelDateTime(item.occurredAt)}</p>
                   </div>
-                  <Link href={item.sourceHref} className="mt-2 block text-sm font-bold text-[var(--ink)] hover:text-[var(--brand-700)]">
+                  <Link href={item.sourceHref} className="mt-2 block text-sm font-semibold text-[var(--ink)] hover:text-[var(--brand-700)]">
                     {item.title}
                   </Link>
                   {item.subtitle && (

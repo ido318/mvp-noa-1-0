@@ -18,20 +18,48 @@ async function LoginContent({
 
 export default function LoginPage({ searchParams }: LoginPageProps) {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-zinc-50 px-4">
-      <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm">
-        <p className="text-xs font-medium tracking-wide text-emerald-700">
-          Maya · קליניקה וטרינרית
-        </p>
-        <h1 className="mt-1 text-2xl font-semibold text-zinc-900">
+    <main
+      className="flex min-h-screen items-center justify-center px-4"
+      style={{ background: "var(--surface-canvas)" }}
+    >
+      <div
+        className="w-full p-8"
+        style={{
+          maxWidth: "var(--modal-w)",
+          background: "var(--surface-raised)",
+          borderRadius: "var(--radius-3)",
+          boxShadow: "var(--shadow-raised)",
+        }}
+      >
+        <div className="flex items-center gap-2">
+          <span
+            aria-hidden="true"
+            className="block h-5 w-5 flex-shrink-0"
+            style={{
+              background: "var(--text-secondary)",
+              WebkitMaskImage: "url(/logo-mark.svg)",
+              maskImage: "url(/logo-mark.svg)",
+              WebkitMaskRepeat: "no-repeat",
+              maskRepeat: "no-repeat",
+              WebkitMaskPosition: "center",
+              maskPosition: "center",
+              WebkitMaskSize: "contain",
+              maskSize: "contain",
+            }}
+          />
+          <p className="text-[12px]" style={{ color: "var(--text-secondary)" }}>
+            Get A Vet · קליניקה וטרינרית
+          </p>
+        </div>
+        <h1 className="mt-3" style={{ font: "var(--type-page-title)", letterSpacing: "var(--track-title)" }}>
           התחברות למערכת
         </h1>
-        <p className="mt-2 text-sm text-zinc-600">
+        <p className="mt-2 text-[13px]" style={{ color: "var(--text-muted)" }}>
           הזיני את פרטי ההתחברות שלך כדי להמשיך
         </p>
 
         <Suspense
-          fallback={<p className="mt-8 text-sm text-zinc-500">טוען...</p>}
+          fallback={<p className="mt-8 text-[13px]" style={{ color: "var(--text-muted)" }}>טוען...</p>}
         >
           <LoginContent searchParams={searchParams} />
         </Suspense>

@@ -18,7 +18,7 @@ export default async function PetsPage() {
     <div className="p-6 space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-extrabold text-[var(--ink)]">חיות מחמד</h1>
+          <h1 className="text-xl font-semibold text-[var(--ink)]">חיות מחמד</h1>
           <p className="mt-1 text-sm text-[var(--muted)]">פרופילים, תרופות קבועות, חיסונים וביקורים.</p>
         </div>
         <Badge color="muted">{pets.length} חיות</Badge>
@@ -37,7 +37,7 @@ export default async function PetsPage() {
               <Card className="h-full transition hover:border-[var(--brand-300)] hover:shadow-[var(--sh-sm)]">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <h2 className="truncate text-base font-extrabold text-[var(--ink)]">{pet.name}</h2>
+                    <h2 className="truncate text-base font-semibold text-[var(--ink)]">{pet.name}</h2>
                     <p className="mt-1 text-xs text-[var(--muted)]">{petMeta(pet)}</p>
                   </div>
                   <Badge color={pet.status === "active" ? "green" : "muted"}>

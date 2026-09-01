@@ -87,10 +87,10 @@ export function VisitNotesSection({ visitId, initialNotes }: Props) {
               <p className="mt-1.5 whitespace-pre-wrap text-[var(--ink)]">{note.content}</p>
               {(note.subjective || note.objective || note.assessment || note.plan) && (
                 <dl className="mt-3 grid gap-2 text-xs text-[var(--ink-2)] sm:grid-cols-2">
-                  {note.subjective && <div><dt className="font-bold">S</dt><dd className="whitespace-pre-wrap">{note.subjective}</dd></div>}
-                  {note.objective && <div><dt className="font-bold">O</dt><dd className="whitespace-pre-wrap">{note.objective}</dd></div>}
-                  {note.assessment && <div><dt className="font-bold">A</dt><dd className="whitespace-pre-wrap">{note.assessment}</dd></div>}
-                  {note.plan && <div><dt className="font-bold">P</dt><dd className="whitespace-pre-wrap">{note.plan}</dd></div>}
+                  {note.subjective && <div><dt className="font-semibold">S</dt><dd className="whitespace-pre-wrap">{note.subjective}</dd></div>}
+                  {note.objective && <div><dt className="font-semibold">O</dt><dd className="whitespace-pre-wrap">{note.objective}</dd></div>}
+                  {note.assessment && <div><dt className="font-semibold">A</dt><dd className="whitespace-pre-wrap">{note.assessment}</dd></div>}
+                  {note.plan && <div><dt className="font-semibold">P</dt><dd className="whitespace-pre-wrap">{note.plan}</dd></div>}
                 </dl>
               )}
             </li>

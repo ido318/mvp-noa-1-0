@@ -58,7 +58,7 @@ export function VisitChargesPanel({
         ) : charges.map((charge) => (
           <li key={charge.id} className="flex items-center justify-between gap-2 rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--surface-2)] p-3 text-sm">
             <div>
-              <p className="font-bold text-[var(--ink)]">{charge.description}</p>
+              <p className="font-semibold text-[var(--ink)]">{charge.description}</p>
               <p className="text-[var(--muted)]">₪{(charge.quantity * charge.unitPrice).toFixed(2)}</p>
             </div>
             <div className="flex items-center gap-2">

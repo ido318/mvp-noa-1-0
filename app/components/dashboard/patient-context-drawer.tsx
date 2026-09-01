@@ -51,7 +51,7 @@ export function PatientContextDrawer({
         <div className="flex items-center gap-3">
           <AnimalAvatar species={pet.species} size={42} />
           <div>
-            <p className="text-[15px] font-extrabold text-[var(--ink)]">{pet.name}</p>
+            <p className="text-[15px] font-semibold text-[var(--ink)]">{pet.name}</p>
             <p className="text-xs font-normal text-[var(--muted)]">{pet.species}{pet.breed ? ` · ${pet.breed}` : ""}</p>
           </div>
         </div>
@@ -67,7 +67,7 @@ export function PatientContextDrawer({
             >
               <PersonAvatar initials={initials(owner.fullName)} size={34} />
               <div className="min-w-0">
-                <p className="truncate text-sm font-bold text-[var(--ink)]">{owner.fullName}</p>
+                <p className="truncate text-sm font-semibold text-[var(--ink)]">{owner.fullName}</p>
                 <p className="truncate text-xs text-[var(--muted)]">{owner.phone ?? owner.email ?? "ללא פרטי קשר"}</p>
               </div>
             </Link>
@@ -136,11 +136,11 @@ export function PatientContextDrawer({
           <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">מניעה ותרופות</p>
           <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-[var(--ink)]">
             <div className="rounded-[var(--r-md)] bg-[var(--surface-2)] p-3">
-              <p className="font-bold">{vaccinations.length}</p>
+              <p className="font-semibold">{vaccinations.length}</p>
               <p className="text-[var(--muted)]">חיסונים</p>
             </div>
             <div className="rounded-[var(--r-md)] bg-[var(--surface-2)] p-3">
-              <p className="font-bold">{activePrescriptions.length}</p>
+              <p className="font-semibold">{activePrescriptions.length}</p>
               <p className="text-[var(--muted)]">מרשמים פעילים</p>
             </div>
           </div>

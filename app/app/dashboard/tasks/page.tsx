@@ -202,7 +202,7 @@ export default function TasksPage() {
   return (
     <div className="mx-auto w-full max-w-[1000px] space-y-5 p-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-[28px] font-extrabold text-[var(--ink)]">משימות ופריטים לטיפול</h1>
+        <h1 className="text-[28px] font-semibold text-[var(--ink)]">משימות ופריטים לטיפול</h1>
         <Btn size="md" onClick={() => setShowNew(true)}>
           <PlusIcon size={15} />
           משימה חדשה
@@ -239,7 +239,7 @@ export default function TasksPage() {
               const content = (
                 <div className="flex items-center justify-between gap-3 px-5 py-3.5">
                   <div className="min-w-0">
-                    <p className="text-[13.5px] font-bold text-[var(--ink)]">{row.title}</p>
+                    <p className="text-[13.5px] font-semibold text-[var(--ink)]">{row.title}</p>
                     <p className="text-xs text-[var(--muted)]">{row.subtitle}</p>
                   </div>
                   <div className="flex flex-shrink-0 items-center gap-2">

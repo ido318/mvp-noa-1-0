@@ -76,7 +76,7 @@ export function PetProfileForm({ pet }: Props) {
     <form onSubmit={onSubmit}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h3 className="text-[15px] font-bold text-[var(--ink)]">פרופיל רפואי</h3>
+          <h3 className="text-[15px] font-semibold text-[var(--ink)]">פרופיל רפואי</h3>
           <p className="mt-0.5 text-xs text-[var(--muted)]">פרטים קבועים שחייבים להיות זמינים בכל ביקור</p>
         </div>
         <Btn type="submit" size="sm" loading={saving}>שמור פרטים</Btn>

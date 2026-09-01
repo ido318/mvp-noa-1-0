@@ -57,7 +57,7 @@ function ResolveModal({
         className="w-full max-w-md rounded-[var(--r-xl)] bg-[var(--surface)] p-6 shadow-[var(--sh-lg)] modal-enter"
         onClick={(e) => e.stopPropagation()}
       >
-        <h3 className="text-[15px] font-bold text-[var(--ink)]">סגירת אסקלציה</h3>
+        <h3 className="text-[15px] font-semibold text-[var(--ink)]">סגירת אסקלציה</h3>
         <p className="mt-1 text-sm text-[var(--muted)] truncate">{escalation.reason}</p>
 
         <div className="mt-4">
@@ -104,7 +104,7 @@ function EscalationCard({
             {isResolved && <Badge color="green">טופלה</Badge>}
           </div>
 
-          <p className="text-[14px] font-bold text-[var(--ink)] leading-snug">{escalation.reason}</p>
+          <p className="text-[14px] font-semibold text-[var(--ink)] leading-snug">{escalation.reason}</p>
 
           <div className="mt-2 flex flex-wrap gap-3 text-[11px] text-[var(--muted)]">
             <span className="flex items-center gap-1">
@@ -172,9 +172,9 @@ export default function EscalationsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <h1 className="text-xl font-extrabold text-[var(--ink)]">אסקלציות</h1>
+          <h1 className="text-xl font-semibold text-[var(--ink)]">אסקלציות</h1>
           {openCount > 0 && (
-            <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-[var(--red-500)] text-white text-[11px] font-bold px-1.5">
+            <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-[var(--red-500)] text-white text-[11px] font-semibold px-1.5">
               {openCount}
             </span>
           )}

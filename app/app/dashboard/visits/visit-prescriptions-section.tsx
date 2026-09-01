@@ -88,7 +88,7 @@ export function VisitPrescriptionsSection({ visitId, initialPrescriptions }: Pro
           initialPrescriptions.map((rx) => (
             <li key={rx.id} className="rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--surface-2)] p-3 text-sm">
               <div className="flex items-center justify-between gap-2">
-                <p className="font-bold text-[var(--ink)]">{rx.medicationName}</p>
+                <p className="font-semibold text-[var(--ink)]">{rx.medicationName}</p>
                 <Badge color={rx.status === "active" ? "green" : rx.status === "draft" ? "amber" : "muted"}>
                   {PRESCRIPTION_STATUS_LABELS[rx.status] ?? rx.status}
                 </Badge>

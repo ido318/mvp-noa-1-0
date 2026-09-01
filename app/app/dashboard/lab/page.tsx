@@ -224,7 +224,7 @@ export default function LabPage() {
   return (
     <div className="mx-auto w-full max-w-[1000px] space-y-5 p-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-[28px] font-extrabold text-[var(--ink)]">מעבדה</h1>
+        <h1 className="text-[28px] font-semibold text-[var(--ink)]">מעבדה</h1>
         <Btn size="md" onClick={() => setShowNew(true)}>
           <PlusIcon size={15} />
           בדיקה חדשה
@@ -242,7 +242,7 @@ export default function LabPage() {
               <div key={order.id} className="flex flex-col gap-3 px-5 py-3.5 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <p className="text-[13.5px] font-bold text-[var(--ink)]">{order.testName}</p>
+                    <p className="text-[13.5px] font-semibold text-[var(--ink)]">{order.testName}</p>
                     {order.flagged && <Badge color="red">חריג</Badge>}
                   </div>
                   <p className="text-xs text-[var(--muted)]">

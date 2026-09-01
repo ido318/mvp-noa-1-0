@@ -25,31 +25,31 @@ export function VisitWorkspace({
         <VisitSectionNav />
       </Card>
       <Card>
-        <h3 id="reason-and-pre-visit" className="text-[15px] font-bold text-[var(--ink)]">Anamnesis</h3>
+        <h3 id="reason-and-pre-visit" className="text-[15px] font-semibold text-[var(--ink)]">Anamnesis</h3>
         <div className="mt-3">
           <AnamnesisForm chiefComplaint={visit.chiefComplaint} manualVisitSummary={visit.manualVisitSummary} />
         </div>
       </Card>
       <Card>
-        <h3 id="vitals" className="text-[15px] font-bold text-[var(--ink)]">Vitals</h3>
+        <h3 id="vitals" className="text-[15px] font-semibold text-[var(--ink)]">Vitals</h3>
         <div className="mt-3">
           <VitalsForm visitId={visit.id} initialVitals={vitals} />
         </div>
       </Card>
       <Card>
-        <h3 className="text-[15px] font-bold text-[var(--ink)]">Physical Exam</h3>
+        <h3 className="text-[15px] font-semibold text-[var(--ink)]">Physical Exam</h3>
         <div className="mt-3">
           <ExamForm />
         </div>
       </Card>
       <Card>
-        <h3 className="text-[15px] font-bold text-[var(--ink)]">SOAP</h3>
+        <h3 className="text-[15px] font-semibold text-[var(--ink)]">SOAP</h3>
         <div className="mt-3">
           <SoapEditor visitId={visit.id} initialNotes={notes} />
         </div>
       </Card>
       <Card>
-        <h3 id="actions" className="text-[15px] font-bold text-[var(--ink)]">Close Visit</h3>
+        <h3 id="actions" className="text-[15px] font-semibold text-[var(--ink)]">Close Visit</h3>
         <div className="mt-3">
           <CloseVisitModal visitId={visit.id} version={visit.version} />
         </div>

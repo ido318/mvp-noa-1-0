@@ -27,7 +27,7 @@ function WaitlistRow({ entry }: { entry: WaitlistEntry }) {
     <div className="flex items-center gap-3 px-[18px] py-3">
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <p className="text-[13.5px] font-bold text-[var(--ink)]">{entry.customerName ?? "לקוח לא ידוע"}</p>
+          <p className="text-[13.5px] font-semibold text-[var(--ink)]">{entry.customerName ?? "לקוח לא ידוע"}</p>
           {entry.petName && <span className="text-xs text-[var(--muted)]">· {entry.petName}</span>}
         </div>
         <div className="mt-1 flex items-center gap-3 text-xs text-[var(--muted)]">
@@ -68,7 +68,7 @@ export default function WaitlistPage() {
   return (
     <div className="p-6 space-y-5">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-extrabold text-[var(--ink)]">המתנה</h1>
+        <h1 className="text-xl font-semibold text-[var(--ink)]">המתנה</h1>
         <span className="text-sm text-[var(--muted)]">{items.length} רשומים</span>
       </div>
 

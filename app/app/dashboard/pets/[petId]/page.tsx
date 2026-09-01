@@ -67,19 +67,19 @@ export default async function PetProfilePage({ params }: Params) {
           {pet.weight != null && (
             <div className="text-end">
               <p className="text-[11px] text-[var(--muted)]">משקל אחרון</p>
-              <p className="text-[20px] font-bold tabular-nums text-[var(--ink)]">{pet.weight} ק״ג</p>
+              <p className="text-[20px] font-semibold tabular-nums text-[var(--ink)]">{pet.weight} ק״ג</p>
             </div>
           )}
           {age && (
             <div className="text-end">
               <p className="text-[11px] text-[var(--muted)]">גיל</p>
-              <p className="text-[20px] font-bold text-[var(--ink)]">{age}</p>
+              <p className="text-[20px] font-semibold text-[var(--ink)]">{age}</p>
             </div>
           )}
           {owner && (
             <div className="text-end">
               <p className="text-[11px] text-[var(--muted)]">בעלים</p>
-              <Link href={`/dashboard/clients?customerId=${owner.id}`} className="text-[16px] font-bold text-[var(--brand-600)] hover:underline">
+              <Link href={`/dashboard/clients?customerId=${owner.id}`} className="text-[16px] font-semibold text-[var(--brand-600)] hover:underline">
                 {owner.fullName}
               </Link>
               {owner.phone && <p className="text-xs text-[var(--muted)]">{owner.phone}</p>}
@@ -91,7 +91,7 @@ export default async function PetProfilePage({ params }: Params) {
           <div className="text-end">
             <div className="flex items-center gap-2">
               {pet.isNeutered && <span className="rounded px-1.5 py-0.5 text-[11px] font-semibold text-[#1d4ed8] bg-[#eff6ff]">מעוקר/ת</span>}
-              <p className="text-[20px] font-bold text-[var(--ink)]">{pet.name}</p>
+              <p className="text-[20px] font-semibold text-[var(--ink)]">{pet.name}</p>
             </div>
             <p className="text-sm text-[var(--ink-2)]">
               {pet.species}{pet.breed ? ` · ${pet.breed}` : ""}
@@ -109,12 +109,12 @@ export default async function PetProfilePage({ params }: Params) {
         <div className="space-y-2">
           {pet.allergies && (
             <div className="flex items-start gap-2 rounded-[var(--r-md)] border border-[var(--red-500)] bg-[var(--red-50)] p-3">
-              <p className="text-[13px] font-bold text-[var(--red-700)]">אלרגיה: {pet.allergies}</p>
+              <p className="text-[13px] font-semibold text-[var(--red-700)]">אלרגיה: {pet.allergies}</p>
             </div>
           )}
           {pet.chronicConditions && (
             <div className="flex items-start gap-2 rounded-[var(--r-md)] border border-[var(--amber-500)] bg-[var(--amber-50)] p-3">
-              <p className="text-[13px] font-bold text-[var(--amber-600)]">מצב כרוני: {pet.chronicConditions}</p>
+              <p className="text-[13px] font-semibold text-[var(--amber-600)]">מצב כרוני: {pet.chronicConditions}</p>
             </div>
           )}
         </div>
@@ -133,7 +133,7 @@ export default async function PetProfilePage({ params }: Params) {
         >
           קבע תור
         </Link>
-        <Link href={`/dashboard/visits/new?petId=${pet.id}`} className="rounded-full bg-[var(--brand-600)] px-4 py-2 text-[13px] font-semibold text-white hover:brightness-110">
+        <Link href={`/dashboard/visits/new?petId=${pet.id}`} className="rounded-full bg-[var(--brand-600)] px-4 py-2 text-[13px] font-semibold text-white">
           פתח ביקור חדש
         </Link>
       </div>

@@ -167,7 +167,7 @@ export function NewCustomerModal({ open, onClose, onCreated }: NewCustomerModalP
         </div>
         {duplicateCustomers.length > 0 && (
           <div className="rounded-[var(--r-md)] border border-[var(--amber-500)] bg-[var(--amber-50)] p-3">
-            <p className="text-xs font-bold text-[var(--amber-600)]">ייתכן שהלקוח כבר קיים</p>
+            <p className="text-xs font-semibold text-[var(--amber-600)]">ייתכן שהלקוח כבר קיים</p>
             <div className="mt-2 space-y-1">
               {duplicateCustomers.map((duplicate) => (
                 <Link

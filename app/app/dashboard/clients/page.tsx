@@ -55,7 +55,7 @@ function PetCard({ pet }: { pet: Pet }) {
           <AnimalAvatar species={pet.species} size={36} />
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <p className="font-bold text-[14px] text-[var(--ink)]">{pet.name}</p>
+              <p className="font-semibold text-[14px] text-[var(--ink)]">{pet.name}</p>
               {pet.isNeutered && <Badge color="muted">מעוקר/ת</Badge>}
             </div>
             <p className="text-xs text-[var(--muted)]">
@@ -210,7 +210,7 @@ function ClientProfile({
           <div className="flex items-center gap-3">
             <PersonAvatar initials={initials(customer.fullName)} size={44} />
             <div>
-              <p className="text-[15px] font-extrabold text-[var(--ink)]">{customer.fullName}</p>
+              <p className="text-[15px] font-semibold text-[var(--ink)]">{customer.fullName}</p>
               <p className="text-xs font-normal text-[var(--muted)]">לקוח/ה מאז {fmtDate(customer.createdAt)}</p>
             </div>
           </div>
@@ -221,7 +221,7 @@ function ClientProfile({
           <div className="flex flex-wrap gap-2">
             <Link
               href={`/dashboard/calendar?newAppointment=1&customerId=${customer.id}`}
-              className="inline-flex items-center justify-center rounded-full bg-[var(--brand-600)] px-4 py-2 text-[13px] font-semibold text-white hover:brightness-110"
+              className="inline-flex items-center justify-center rounded-full bg-[var(--brand-600)] px-4 py-2 text-[13px] font-semibold text-white"
             >
               תור חדש
             </Link>
@@ -462,7 +462,7 @@ function ClientCard({ customer, onClick }: { customer: Customer; onClick: () => 
       <div className="flex items-center gap-3">
         <PersonAvatar initials={initials(customer.fullName)} size={36} />
         <div className="flex-1 min-w-0">
-          <p className="font-bold text-[14px] text-[var(--ink)] truncate">{customer.fullName}</p>
+          <p className="font-semibold text-[14px] text-[var(--ink)] truncate">{customer.fullName}</p>
           <p className="text-xs text-[var(--muted)] truncate">{customer.phone ?? customer.email ?? "—"}</p>
         </div>
         <ChevRightIcon size={14} className="flex-shrink-0 text-[var(--faint)]" />
@@ -526,7 +526,7 @@ export default function ClientsPage() {
     <div className="p-6 space-y-5">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-extrabold text-[var(--ink)]">לקוחות</h1>
+        <h1 className="text-xl font-semibold text-[var(--ink)]">לקוחות</h1>
         <span className="text-sm text-[var(--muted)]">{items.length} רשומים</span>
         <Btn size="sm" onClick={() => setShowNewCustomer(true)}>לקוח חדש</Btn>
       </div>
