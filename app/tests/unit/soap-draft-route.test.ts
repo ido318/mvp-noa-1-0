@@ -191,7 +191,7 @@ describe("POST /api/visits/[visitId]/soap-draft", () => {
     expect(body.error.message).toMatch(/rate limit/);
   });
 
-  it("propagates a transcription failure through handleRouteError instead of swallowing it", async () => {
+  it("propagates a transcription failure as a clean external-provider error, not a generic 500", async () => {
     const getVisitById = vi.fn().mockResolvedValue({
       ok: true,
       value: { id: "visit-1", clinicId: "clinic-1" },
@@ -214,7 +214,13 @@ describe("POST /api/visits/[visitId]/soap-draft", () => {
       { params: Promise.resolve({ visitId: "visit-1" }) },
     );
 
-    expect(response.status).toBe(500);
+    // Matches AiArtifactService.generateSoapDraft's own handling of its
+    // parseTranscript failure one function away: caught, not swallowed,
+    // and turned into a clean 502 external-provider error rather than an
+    // opaque 500.
+    expect(response.status).toBe(502);
+    const body = await response.json();
+    expect(body.error.code).toBe("EXTERNAL_PROVIDER_ERROR");
     expect(generateArtifact).not.toHaveBeenCalled();
   });
 });

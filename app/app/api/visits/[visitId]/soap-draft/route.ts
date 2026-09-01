@@ -5,12 +5,17 @@ import {
 import { getActorAndServices } from "@/lib/api/actor";
 import { createRequestId } from "@/lib/api/request-id";
 import { handleRouteError, jsonSuccess } from "@/lib/api/response";
+import { assertStoragePathMatchesVisit } from "@/lib/api/storage-path-guard";
 import { parseOrThrow } from "@/lib/api/validation";
 import { AppError } from "@/lib/errors/app-error";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { soapDraftFromRecordingSchema } from "@/lib/validators/ai-summary";
 
 const SOAP_RECORDINGS_BUCKET = "soap-recordings";
+
+// Mirrors AiArtifactService's SOAP_DRAFT_FAILED_MESSAGE wording/style for
+// the sibling failure mode one function away (parseTranscript failing).
+const TRANSCRIPTION_FAILED_MESSAGE = "תמלול ההקלטה נכשל. נסה שוב מאוחר יותר.";
 
 type Params = { params: Promise<{ visitId: string }> };
 
@@ -40,16 +45,12 @@ export async function POST(request: Request, { params }: Params) {
     const { storagePath } = body;
 
     // Critical security check — the admin client below bypasses RLS
-    // entirely, so this in-application check is the only thing preventing
-    // a draft from being generated off a recording that belongs to a
-    // different visit (possibly in a different clinic the actor also
-    // happens to have access to). Checking `actor.clinicIds` membership
-    // alone isn't enough for a multi-clinic actor — the segments must
-    // match THIS visit exactly. It MUST run before any Storage download.
-    const [clinicSegment, visitSegment] = storagePath.split("/");
-    if (clinicSegment !== visitResult.value.clinicId || visitSegment !== visitId) {
-      throw AppError.forbidden("Cannot access recording outside this visit");
-    }
+    // entirely, so `assertStoragePathMatchesVisit` is the only thing
+    // preventing a draft from being generated off a recording that
+    // belongs to a different visit (possibly in a different clinic the
+    // actor also happens to have access to). It MUST run before any
+    // Storage download.
+    assertStoragePathMatchesVisit(storagePath, visitResult.value.clinicId, visitId);
 
     const admin = createSupabaseAdminClient();
     const { data, error } = await admin.storage
@@ -63,9 +64,18 @@ export async function POST(request: Request, { params }: Params) {
     const audioBytes = new Uint8Array(await data.arrayBuffer());
 
     // Transcription errors (e.g. missing OPENAI_API_KEY, provider failure)
-    // are intentionally not swallowed — they propagate to handleRouteError.
-    const provider = resolveSoapNoteProvider();
-    const { transcriptText } = await provider.transcribeAudio(audioBytes, "audio/webm");
+    // are caught and turned into a clean external-provider error — not
+    // swallowed, but not a bare 500 either — matching how
+    // AiArtifactService.generateSoapDraft handles its own parseTranscript
+    // failure one function away.
+    let transcriptText: string;
+    try {
+      const provider = resolveSoapNoteProvider();
+      ({ transcriptText } = await provider.transcribeAudio(audioBytes, "audio/webm"));
+    } catch (transcriptionError) {
+      console.error("[soap-draft] audio transcription failed", transcriptionError);
+      throw AppError.externalProvider(TRANSCRIPTION_FAILED_MESSAGE);
+    }
 
     // sourceId must always be the visit's id: it's what makes the service's
     // per-(sourceId, "soap_note_generated") rate limiting actually apply.

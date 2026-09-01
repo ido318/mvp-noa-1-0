@@ -2,6 +2,7 @@ import { randomUUID } from "crypto";
 import { getActorAndServices } from "@/lib/api/actor";
 import { createRequestId } from "@/lib/api/request-id";
 import { handleRouteError, jsonSuccess } from "@/lib/api/response";
+import { assertStoragePathMatchesVisit } from "@/lib/api/storage-path-guard";
 import { AppError } from "@/lib/errors/app-error";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
@@ -67,13 +68,12 @@ export async function POST(request: Request, { params }: Params) {
 
 /**
  * Returns a short-lived signed URL for playback of a previously uploaded
- * recording. The admin client bypasses RLS entirely, so the check below —
- * that the storagePath's clinic_id and visit_id segments match THIS visit
- * exactly (not merely that the clinic_id is one of the actor's clinics) —
- * is the only thing preventing one clinic's staff from reading a recording
- * that belongs to a different visit (possibly in a different clinic they
- * also happen to have access to) by supplying an arbitrary storagePath. It
- * MUST run before any Storage call.
+ * recording. The admin client bypasses RLS entirely, so
+ * `assertStoragePathMatchesVisit` below is the only thing preventing one
+ * clinic's staff from reading a recording that belongs to a different
+ * visit (possibly in a different clinic they also happen to have access
+ * to) by supplying an arbitrary storagePath. It MUST run before any
+ * Storage call.
  */
 export async function GET(request: Request, { params }: Params) {
   const requestId = createRequestId();
@@ -91,10 +91,7 @@ export async function GET(request: Request, { params }: Params) {
       throw AppError.validation("Query parameter 'path' is required");
     }
 
-    const [clinicSegment, visitSegment] = storagePath.split("/");
-    if (clinicSegment !== visitResult.value.clinicId || visitSegment !== visitId) {
-      throw AppError.forbidden("Cannot access recording outside this visit");
-    }
+    assertStoragePathMatchesVisit(storagePath, visitResult.value.clinicId, visitId);
 
     const admin = createSupabaseAdminClient();
     const { data, error } = await admin.storage
