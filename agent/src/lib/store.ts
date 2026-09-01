@@ -35,6 +35,16 @@ export type Customer = {
   notes: string | null;
 };
 
+// Pet summary including id — used by listCustomerPets, which (unlike
+// findCustomerByPhone above) must let the calling LLM reference a specific
+// pet by id in a later tool call (getPatientReminders, etc.).
+export type PetSummary = { id: string; name: string; species: string };
+
+export type ListCustomerPetsResult = {
+  result: string;
+  pets: PetSummary[];
+};
+
 export type EscalationEntry = {
   reason: string;
   urgency: number;
@@ -581,6 +591,234 @@ export async function joinWaitlist(params: JoinWaitlistParams): Promise<string> 
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Patient lookup (Voice SOAP Generator support)
+//
+// These four tools let Tomer answer follow-up questions about a specific
+// pet during a call (vaccination reminders, chronic conditions, last visit's
+// plan). Every one of the three pet-scoped lookups below (all but
+// listCustomerPets) MUST go through verifyPetOwnership first — see the
+// "Private helpers" section — so a confused/hallucinating LLM can never use
+// a stale or wrong pet_id from an earlier turn or a different call to read
+// another customer's pet data.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const REMINDER_WINDOW_DAYS = 60;
+
+export async function listCustomerPets(phone: string): Promise<ListCustomerPetsResult> {
+  const normalised = normalisePhone(phone);
+  const env = getEnv();
+
+  const { data, error } = await getSupabase()
+    .from("customers")
+    .select("full_name, pets(id, name, species)")
+    .eq("clinic_id", env.AGENT_CLINIC_ID)
+    .eq("phone", normalised)
+    .is("deleted_at", null)
+    .eq("status", "active")
+    .maybeSingle();
+
+  if (error) throw new Error(`listCustomerPets failed: ${error.message}`);
+
+  if (!data) {
+    return {
+      result: "לקוח לא מוכר במערכת. לא נמצאו חיות רשומות למספר הטלפון הזה.",
+      pets: [],
+    };
+  }
+
+  const row = data as { full_name: string; pets: PetSummary[] | null };
+  const pets = row.pets ?? [];
+
+  if (pets.length === 0) {
+    return { result: `לא נמצאו חיות רשומות עבור ${row.full_name}.`, pets: [] };
+  }
+
+  if (pets.length === 1) {
+    const p = pets[0]!;
+    return {
+      result: `החיה הרשומה עבור ${row.full_name} היא ${p.name} (${p.species}), מזהה pet_id: ${p.id}.`,
+      pets,
+    };
+  }
+
+  const listHe = pets.map((p) => `${p.name} (${p.species}, pet_id: ${p.id})`).join(", ");
+  return {
+    result:
+      `ל${row.full_name} יש כמה חיות רשומות: ${listHe}. ` +
+      "יש לשאול לאיזו חיה מתייחסת הפנייה, ולהשתמש ב-pet_id המתאים בקריאות הבאות.",
+    pets,
+  };
+}
+
+export async function getPatientReminders(phone: string, petId: string): Promise<string> {
+  const pet = await verifyPetOwnership(phone, petId);
+  if (!pet) return PET_NOT_FOUND_HE;
+
+  const env = getEnv();
+  const { data, error } = await getSupabase()
+    .from("vaccinations")
+    .select("vaccine_name, next_due_at")
+    .eq("clinic_id", env.AGENT_CLINIC_ID)
+    .eq("pet_id", pet.id)
+    .is("deleted_at", null)
+    .not("next_due_at", "is", null)
+    .order("next_due_at", { ascending: true });
+
+  if (error) throw new Error(`getPatientReminders failed: ${error.message}`);
+
+  const rows = (data ?? []) as Array<{ vaccine_name: string; next_due_at: string }>;
+  if (rows.length === 0) {
+    return `אין תזכורות חיסון ממתינות עבור ${pet.name}.`;
+  }
+
+  // next_due_at is a plain `date` column (no time/timezone component), so
+  // "YYYY-MM-DD" string comparison against today's Israel-local date is both
+  // correct and simpler than round-tripping through Date/ms.
+  const todayIso = toIsraelDateIso(new Date());
+  const windowEndMs =
+    new Date(toIso(todayIso, 0, 0)).getTime() + REMINDER_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+
+  const overdue: string[] = [];
+  const upcoming: string[] = [];
+
+  for (const row of rows) {
+    if (!row.next_due_at) continue;
+    const dueDateIso = row.next_due_at.slice(0, 10);
+    const dateLabel = formatDateHe(dueDateIso);
+
+    if (dueDateIso < todayIso) {
+      overdue.push(`${row.vaccine_name} (${dateLabel})`);
+    } else if (new Date(toIso(dueDateIso, 0, 0)).getTime() <= windowEndMs) {
+      upcoming.push(`${row.vaccine_name} (${dateLabel})`);
+    }
+  }
+
+  if (overdue.length === 0 && upcoming.length === 0) {
+    return `אין תזכורות חיסון קרובות עבור ${pet.name} בטווח הקרוב.`;
+  }
+
+  const parts: string[] = [];
+  if (overdue.length > 0) {
+    parts.push(`חיסונים באיחור עבור ${pet.name}: ${overdue.join(", ")}.`);
+  }
+  if (upcoming.length > 0) {
+    parts.push(`חיסונים קרובים עבור ${pet.name}: ${upcoming.join(", ")}.`);
+  }
+
+  return parts.join(" ");
+}
+
+export async function getPatientChronicConditions(phone: string, petId: string): Promise<string> {
+  const pet = await verifyPetOwnership(phone, petId);
+  if (!pet) return PET_NOT_FOUND_HE;
+
+  const env = getEnv();
+
+  const { data: petRow, error: petErr } = await getSupabase()
+    .from("pets")
+    .select("chronic_conditions")
+    .eq("id", pet.id)
+    .eq("clinic_id", env.AGENT_CLINIC_ID)
+    .maybeSingle();
+  if (petErr) throw new Error(`getPatientChronicConditions pet query failed: ${petErr.message}`);
+
+  const chronicText = extractString(petRow, "chronic_conditions");
+
+  const { data: recordRow, error: recordErr } = await getSupabase()
+    .from("medical_records")
+    .select("active_problem_list")
+    .eq("clinic_id", env.AGENT_CLINIC_ID)
+    .eq("pet_id", pet.id)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (recordErr) {
+    throw new Error(`getPatientChronicConditions medical_records query failed: ${recordErr.message}`);
+  }
+
+  const conditionNames = extractProblemList(recordRow)
+    .map((entry) => entry.condition)
+    .filter((c): c is string => typeof c === "string" && c.trim().length > 0);
+
+  const hasChronicText = !!chronicText?.trim();
+  const hasProblems = conditionNames.length > 0;
+
+  if (!hasChronicText && !hasProblems) {
+    return `אין רשומות של מצבים כרוניים עבור ${pet.name}.`;
+  }
+
+  const parts: string[] = [];
+  if (hasChronicText) {
+    parts.push(`מצבים כרוניים ידועים עבור ${pet.name}: ${chronicText!.trim()}.`);
+  }
+  if (hasProblems) {
+    parts.push(`רשימת בעיות פעילה: ${conditionNames.join(", ")}.`);
+  }
+  parts.push(
+    'אם בעל החיה מדווח כרגע על החמרה במצב — יש להציע את התור המוקדם ביותר האפשרי ולשקול הפניה לד"ר נועה.',
+  );
+
+  return parts.join(" ");
+}
+
+export async function getLastVisitPlan(phone: string, petId: string): Promise<string> {
+  const pet = await verifyPetOwnership(phone, petId);
+  if (!pet) return PET_NOT_FOUND_HE;
+
+  const env = getEnv();
+  const visitIds = await findPetVisitIds(env.AGENT_CLINIC_ID, pet.id);
+
+  if (visitIds.length > 0) {
+    const { data, error } = await getSupabase()
+      .from("medical_notes")
+      .select("plan, created_at")
+      .eq("clinic_id", env.AGENT_CLINIC_ID)
+      .in("visit_id", visitIds)
+      .eq("note_type", "soap_full")
+      .eq("status", "approved")
+      .is("deleted_at", null)
+      .not("plan", "is", null)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) throw new Error(`getLastVisitPlan notes query failed: ${error.message}`);
+
+    const plan = extractString(data, "plan");
+    if (plan && plan.trim()) {
+      const createdAt = extractString(data, "created_at");
+      const dateLabel = createdAt ? formatDateHe(toIsraelDateIso(new Date(createdAt))) : null;
+      return dateLabel
+        ? `בביקור האחרון, בתאריך ${dateLabel}, ד"ר נועה קבעה את התוכנית הבאה עבור ${pet.name}: ${plan.trim()}`
+        : `בביקור האחרון ד"ר נועה קבעה את התוכנית הבאה עבור ${pet.name}: ${plan.trim()}`;
+    }
+  }
+
+  // Fallback: no approved soap_full plan on record — try the most recent
+  // visit's manual/AI summary instead. Never fall back to a draft note's
+  // plan — an unapproved plan may still change before Noa signs off on it.
+  const { data: visitRow, error: visitErr } = await getSupabase()
+    .from("visits")
+    .select("manual_visit_summary, ai_visit_summary")
+    .eq("clinic_id", env.AGENT_CLINIC_ID)
+    .eq("pet_id", pet.id)
+    .is("deleted_at", null)
+    .order("started_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (visitErr) throw new Error(`getLastVisitPlan visit fallback query failed: ${visitErr.message}`);
+
+  const summary =
+    extractString(visitRow, "manual_visit_summary") ?? extractString(visitRow, "ai_visit_summary");
+
+  if (summary && summary.trim()) {
+    return `לא נמצאה תוכנית טיפול מאושרת מהביקור האחרון עבור ${pet.name}. תקציר הביקור האחרון: ${summary.trim()}`;
+  }
+
+  return `לא נמצאה תוכנית המשך רשומה עבור ${pet.name}.`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Voice calls
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -697,6 +935,88 @@ export async function saveVoiceCall(
 // ─────────────────────────────────────────────────────────────────────────────
 // Private helpers
 // ─────────────────────────────────────────────────────────────────────────────
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Generic, non-leaking message for every failure mode of verifyPetOwnership:
+// unknown phone, malformed pet_id, non-existent pet, or a pet that exists
+// but belongs to a different customer/clinic. Never hint at which case it was.
+const PET_NOT_FOUND_HE = "לא מצאתי חיה כזו ברשומות שלך.";
+
+type ProblemListEntry = {
+  condition: string;
+  onsetDate?: string | null;
+  severity?: string | null;
+  notes?: string | null;
+};
+
+function extractProblemList(row: unknown): ProblemListEntry[] {
+  if (row === null || typeof row !== "object") return [];
+  const val = (row as Record<string, unknown>)["active_problem_list"];
+  if (!Array.isArray(val)) return [];
+  return val.filter(
+    (item): item is ProblemListEntry =>
+      item !== null &&
+      typeof item === "object" &&
+      typeof (item as Record<string, unknown>)["condition"] === "string",
+  );
+}
+
+/**
+ * Mandatory cross-check reused by every pet-scoped lookup (getPatientReminders,
+ * getPatientChronicConditions, getLastVisitPlan): confirms petId is a
+ * syntactically valid UUID AND actually belongs to a pet owned by the
+ * customer identified by phone, within AGENT_CLINIC_ID. Returns null for
+ * every failure mode (malformed UUID, unknown phone, non-existent pet, or a
+ * pet belonging to a different customer/clinic) — callers must map a null
+ * result to the single generic PET_NOT_FOUND_HE message and must never leak
+ * which failure mode occurred (e.g. never reveal that the pet_id belongs to
+ * someone else). This defends against a confused/hallucinating LLM reusing a
+ * stale or wrong pet_id from an earlier turn or a different call.
+ */
+async function verifyPetOwnership(phone: string, petId: string): Promise<PetSummary | null> {
+  if (!UUID_RE.test(petId)) return null;
+
+  const normalised = normalisePhone(phone);
+  const customerId = await findCustomerIdByPhone(normalised);
+  if (!customerId) return null;
+
+  const env = getEnv();
+  const { data, error } = await getSupabase()
+    .from("pets")
+    .select("id, name, species")
+    .eq("id", petId)
+    .eq("clinic_id", env.AGENT_CLINIC_ID)
+    .eq("customer_id", customerId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (error) throw new Error(`verifyPetOwnership failed: ${error.message}`);
+  if (!data) return null;
+
+  const id = extractId(data);
+  const name = extractString(data, "name");
+  const species = extractString(data, "species");
+  if (!id || !name || !species) return null;
+
+  return { id, name, species };
+}
+
+async function findPetVisitIds(clinicId: string, petId: string): Promise<string[]> {
+  const { data, error } = await getSupabase()
+    .from("visits")
+    .select("id")
+    .eq("clinic_id", clinicId)
+    .eq("pet_id", petId)
+    .is("deleted_at", null);
+
+  if (error) throw new Error(`findPetVisitIds failed: ${error.message}`);
+
+  return (data ?? []).flatMap((row) => {
+    const id = extractId(row);
+    return id ? [id] : [];
+  });
+}
 
 async function findActiveAppointmentNear(
   clinicId: string,

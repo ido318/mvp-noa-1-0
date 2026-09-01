@@ -11,6 +11,10 @@ import {
   cancelAppointment,
   rescheduleAppointment,
   joinWaitlist,
+  listCustomerPets,
+  getPatientReminders,
+  getPatientChronicConditions,
+  getLastVisitPlan,
 } from "../../lib/store.js";
 import {
   decideTriage,
@@ -431,5 +435,111 @@ toolsRoutes.post("/tools/join-waitlist", async (c) => {
   } catch (err) {
     logger.error({ err }, "tool: join-waitlist — internal error");
     return c.json({ result: "שגיאה פנימית ברישום לרשימת ההמתנה. נסה שוב." }, 500);
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /tools/list-customer-pets
+// ─────────────────────────────────────────────────────────────────────────────
+
+const listCustomerPetsSchema = z.object({ phone: z.string().min(5) });
+
+toolsRoutes.post("/tools/list-customer-pets", async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const parsed = listCustomerPetsSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ result: "פרמטר phone חסר או שגוי." }, 400);
+  }
+
+  logger.info({ phone: maskPhone(parsed.data.phone) }, "tool: list-customer-pets");
+
+  try {
+    const { result, pets } = await listCustomerPets(parsed.data.phone);
+    // `pets` is extra structured data alongside `result` (mirrors
+    // /tools/request-human-handoff's transfer/number fields above) — ElevenLabs
+    // passes the full tool JSON to the model, so it can reference pet_id even
+    // though this array itself is never spoken aloud.
+    return c.json({ result, pets });
+  } catch (err) {
+    logger.error({ err }, "tool: list-customer-pets — internal error");
+    return c.json({ result: "שגיאה פנימית באחזור רשימת החיות. נסה שוב." }, 500);
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /tools/get-patient-reminders
+// POST /tools/get-patient-chronic-conditions
+// POST /tools/get-last-visit-plan
+//
+// All three share the same request shape: {phone, pet_id}. Ownership of
+// pet_id by the phone's customer (and rejection of a malformed pet_id) is
+// enforced inside store.ts's shared verifyPetOwnership helper, not here.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const petLookupSchema = z.object({
+  phone: z.string().min(5),
+  pet_id: z.string().min(1),
+});
+
+toolsRoutes.post("/tools/get-patient-reminders", async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const parsed = petLookupSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ result: "פרמטרים חסרים: phone, pet_id." }, 400);
+  }
+
+  logger.info(
+    { phone: maskPhone(parsed.data.phone), pet_id: parsed.data.pet_id },
+    "tool: get-patient-reminders",
+  );
+
+  try {
+    const result = await getPatientReminders(parsed.data.phone, parsed.data.pet_id);
+    return c.json({ result });
+  } catch (err) {
+    logger.error({ err }, "tool: get-patient-reminders — internal error");
+    return c.json({ result: "שגיאה פנימית באחזור תזכורות חיסון. נסה שוב." }, 500);
+  }
+});
+
+toolsRoutes.post("/tools/get-patient-chronic-conditions", async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const parsed = petLookupSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ result: "פרמטרים חסרים: phone, pet_id." }, 400);
+  }
+
+  logger.info(
+    { phone: maskPhone(parsed.data.phone), pet_id: parsed.data.pet_id },
+    "tool: get-patient-chronic-conditions",
+  );
+
+  try {
+    const result = await getPatientChronicConditions(parsed.data.phone, parsed.data.pet_id);
+    return c.json({ result });
+  } catch (err) {
+    logger.error({ err }, "tool: get-patient-chronic-conditions — internal error");
+    return c.json({ result: "שגיאה פנימית באחזור מצבים כרוניים. נסה שוב." }, 500);
+  }
+});
+
+toolsRoutes.post("/tools/get-last-visit-plan", async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const parsed = petLookupSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ result: "פרמטרים חסרים: phone, pet_id." }, 400);
+  }
+
+  logger.info(
+    { phone: maskPhone(parsed.data.phone), pet_id: parsed.data.pet_id },
+    "tool: get-last-visit-plan",
+  );
+
+  try {
+    const result = await getLastVisitPlan(parsed.data.phone, parsed.data.pet_id);
+    return c.json({ result });
+  } catch (err) {
+    logger.error({ err }, "tool: get-last-visit-plan — internal error");
+    return c.json({ result: "שגיאה פנימית באחזור תוכנית הטיפול. נסה שוב." }, 500);
   }
 });
