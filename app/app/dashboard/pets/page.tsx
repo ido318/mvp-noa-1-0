@@ -34,7 +34,7 @@ export default async function PetsPage() {
         <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
           {pets.map((pet) => (
             <Link key={pet.id} href={`/dashboard/pets/${pet.id}`} className="block">
-              <Card className="h-full transition hover:border-[var(--brand-300)] hover:shadow-[var(--sh-sm)]">
+              <Card className="h-full">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <h2 className="truncate text-base font-semibold text-[var(--ink)]">{pet.name}</h2>

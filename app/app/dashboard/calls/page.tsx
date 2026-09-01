@@ -32,12 +32,10 @@ function TranscriptBubble({ item }: { item: TranscriptItem }) {
       <span
         className={[
           "mt-0.5 flex-shrink-0 h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-semibold",
-          isAgent
-            ? "bg-[var(--coral-100)] text-[var(--coral-700)]"
-            : "bg-[var(--surface-2)] text-[var(--ink-2)]",
+          "bg-[var(--surface-field)] text-[var(--text-secondary)]",
         ].join(" ")}
       >
-        {isAgent ? "ת'" : "👤"}
+        {isAgent ? "ת" : "ל"}
       </span>
       <div
         className={[

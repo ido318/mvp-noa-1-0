@@ -39,7 +39,7 @@ function ResolveModal({
         body: JSON.stringify({ notes: notes.trim() || undefined }),
       });
       if (!res.ok) throw new Error();
-      toast("האסקלציה סומנה כטופלה ✓", "success");
+      toast("האסקלציה סומנה כטופלה", "success");
       onResolved();
     } catch {
       toast("שגיאה בעדכון האסקלציה", "error");
@@ -174,7 +174,10 @@ export default function EscalationsPage() {
         <div className="flex items-center gap-2">
           <h1 className="text-xl font-semibold text-[var(--ink)]">אסקלציות</h1>
           {openCount > 0 && (
-            <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-[var(--red-500)] text-white text-[11px] font-semibold px-1.5">
+            <span
+              className="gv-data text-[13px]"
+              style={{ color: "var(--status-critical-text)", fontWeight: "var(--w-semibold)" }}
+            >
               {openCount}
             </span>
           )}

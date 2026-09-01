@@ -20,12 +20,17 @@ export function useToast() {
   return useContext(ToastContext);
 }
 
-/** A single colour mark carries the variant — the system uses no icon badge here. */
+/**
+ * A single colour mark carries the variant — the system uses no icon badge here.
+ * The toast sits on dark graphite, so these take the light end of each hue: the
+ * status *text* tones are built for light washes and would sink into this
+ * surface. Same reasoning as the rail's lightened critical count.
+ */
 const VARIANT_MARK: Record<ToastVariant, string> = {
-  success: "var(--status-done-text)",
-  error:   "var(--clay-700)",
-  warning: "var(--status-pending-text)",
-  info:    "var(--slate-600)",
+  success: "var(--green-100)",
+  error:   "var(--red-100)",
+  warning: "var(--amber-100)",
+  info:    "var(--steel-100)",
 };
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {

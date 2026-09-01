@@ -513,7 +513,7 @@ export default function CalendarPage() {
               <ChevLeftIcon size={14} />
             </button>
           </div>
-          <Btn variant="soft" size="md" className="h-10 rounded-[12px]" onClick={() => setWeekStart(weekStartSun(today))}>
+          <Btn variant="soft" size="md" className="h-10" onClick={() => setWeekStart(weekStartSun(today))}>
             היום
           </Btn>
         </div>

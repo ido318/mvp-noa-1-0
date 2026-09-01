@@ -34,7 +34,7 @@ export default async function RecordsPage() {
         </div>
         <Link
           href="/dashboard/visits/new"
-          className="rounded-[11px] bg-[var(--brand-600)] px-4 py-2 text-sm font-semibold text-white transition"
+          className="rounded-[var(--radius-2)] bg-[var(--accent)] hover:bg-[var(--accent-hover)] px-4 py-2 text-[13px] font-medium text-[var(--text-on-accent)] transition"
         >
           ביקור חדש
         </Link>

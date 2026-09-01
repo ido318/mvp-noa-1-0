@@ -378,14 +378,15 @@ function ClientProfile({
                       </p>
                       <p className="text-xs text-[var(--muted)]">{appt.appointmentType}</p>
                     </div>
-                    <span className={[
-                      "text-[11px] font-semibold px-2 py-0.5 rounded-full",
-                      appt.status === "completed" ? "bg-[#E9F5EF] text-[#2F7D5B]"
-                        : appt.status === "cancelled" ? "bg-[var(--line-2)] text-[var(--muted)]"
-                        : "bg-[var(--brand-50)] text-[var(--brand-700)]",
-                    ].join(" ")}>
+                    <Badge
+                      tone={
+                        appt.status === "completed" ? "done"
+                          : appt.status === "cancelled" ? "neutral"
+                          : "info"
+                      }
+                    >
                       {APPT_STATUS_LABELS[appt.status] ?? appt.status}
-                    </span>
+                    </Badge>
                   </div>
                 ))}
               </div>
