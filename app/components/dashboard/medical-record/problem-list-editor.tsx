@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Btn } from "@/components/dashboard/ui/btn";
 import { useToast } from "@/components/dashboard/ui/toast";
-import { PROBLEM_SEVERITY_LABELS } from "@/components/dashboard/medical-record/active-problems";
+import { PROBLEM_SEVERITY_LABELS } from "@/components/dashboard/medical-record/problem-severity";
 import type { ProblemListEntry, ProblemListSeverity } from "@/types/domain/medical-record";
 
 type Props = {

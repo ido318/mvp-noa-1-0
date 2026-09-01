@@ -1,24 +1,19 @@
 import { z } from "zod";
 
 export const problemListEntrySchema = z.object({
-  condition: z.string().trim().min(1),
-  // Matches the value an <input type="date"> produces (YYYY-MM-DD). Rejecting
-  // anything else here keeps unparseable strings out of the DB — formatIsraelDate
-  // throws on invalid dates, so a bad value here would crash the record view.
-  onsetDate: z
-    .string()
-    .trim()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, "onsetDate must be an ISO date (YYYY-MM-DD)")
-    .optional()
-    .nullable(),
+  condition: z.string().trim().min(1).max(500),
+  // A real calendar-date check, not just a YYYY-MM-DD shape check — z.iso.date()
+  // rejects things like "2024-13-45" or "2023-02-29". formatIsraelDate throws on
+  // an unparseable date, so a bad value here would crash the record view.
+  onsetDate: z.iso.date().optional().nullable(),
   severity: z.enum(["mild", "moderate", "severe"]).optional().nullable(),
-  notes: z.string().trim().optional().nullable(),
+  notes: z.string().trim().max(2000).optional().nullable(),
 });
 
 export const updateMedicalRecordSchema = z
   .object({
     summary: z.string().trim().max(12000).optional().nullable(),
-    activeProblemList: z.array(problemListEntrySchema).optional(),
+    activeProblemList: z.array(problemListEntrySchema).max(50).optional(),
     alerts: z.array(z.unknown()).optional(),
   })
   .refine((value) => Object.keys(value).length > 0, {
