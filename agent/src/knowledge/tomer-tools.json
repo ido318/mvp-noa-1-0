@@ -336,5 +336,105 @@
         "required": []
       }
     }
+  },
+  {
+    "type": "webhook",
+    "name": "list-customer-pets",
+    "description": "מאתר את כל חיות המחמד הרשומות ללקוח לפי מספר טלפון, ומחזיר שם, סוג ומזהה (pet_id) לכל חיה. יש לקרוא לכלי זה מיד אחרי ש-lookup-customer מזהה לקוח מוכר עם חיה אחת או יותר, כדי לקבל pet_id לשימוש בשלושת הכלים הבאים. אם יש יותר מחיה אחת, יש לשאול על איזו חיה מדובר לפני שממשיכים.",
+    "api_schema": {
+      "url": "{{AGENT_PUBLIC_URL}}/tools/list-customer-pets",
+      "method": "POST",
+      "request_headers": {
+        "Authorization": "Bearer {{AGENT_TOOLS_BEARER_TOKEN}}"
+      },
+      "request_body_schema": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "description": "מספר טלפון הלקוח"
+          }
+        },
+        "required": ["phone"]
+      }
+    }
+  },
+  {
+    "type": "webhook",
+    "name": "get-patient-reminders",
+    "description": "מחזיר תזכורות חיסון באיחור או קרובות עבור חיה ספציפית שכבר זוהתה דרך list-customer-pets. יש לקרוא לכלי זה ביוזמתך ברגע שידוע pet_id, כדי לציין חיסון שמגיע מועדו באופן טבעי במהלך השיחה.",
+    "api_schema": {
+      "url": "{{AGENT_PUBLIC_URL}}/tools/get-patient-reminders",
+      "method": "POST",
+      "request_headers": {
+        "Authorization": "Bearer {{AGENT_TOOLS_BEARER_TOKEN}}"
+      },
+      "request_body_schema": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "description": "מספר טלפון הלקוח"
+          },
+          "pet_id": {
+            "type": "string",
+            "description": "מזהה החיה (UUID) שהתקבל מ-list-customer-pets"
+          }
+        },
+        "required": ["phone", "pet_id"]
+      }
+    }
+  },
+  {
+    "type": "webhook",
+    "name": "get-patient-chronic-conditions",
+    "description": "מחזיר מצבים כרוניים רשומים עבור חיה ספציפית שכבר זוהתה דרך list-customer-pets. אם בעל החיה מדווח כרגע על החמרה בתסמינים ויש מצב כרוני רשום — יש לתעדף את הטיפול, למשל להציע את התור המוקדם ביותר או להעביר לד\"ר נועה.",
+    "api_schema": {
+      "url": "{{AGENT_PUBLIC_URL}}/tools/get-patient-chronic-conditions",
+      "method": "POST",
+      "request_headers": {
+        "Authorization": "Bearer {{AGENT_TOOLS_BEARER_TOKEN}}"
+      },
+      "request_body_schema": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "description": "מספר טלפון הלקוח"
+          },
+          "pet_id": {
+            "type": "string",
+            "description": "מזהה החיה (UUID) שהתקבל מ-list-customer-pets"
+          }
+        },
+        "required": ["phone", "pet_id"]
+      }
+    }
+  },
+  {
+    "type": "webhook",
+    "name": "get-last-visit-plan",
+    "description": "מחזיר את תוכנית הטיפול/המעקב מהרשומה הרפואית המאושרת האחרונה של החיה. יש לקרוא לכלי זה כשהלקוח מזכיר 'המעקב מהפעם הקודמת' או ניסוח דומה.",
+    "api_schema": {
+      "url": "{{AGENT_PUBLIC_URL}}/tools/get-last-visit-plan",
+      "method": "POST",
+      "request_headers": {
+        "Authorization": "Bearer {{AGENT_TOOLS_BEARER_TOKEN}}"
+      },
+      "request_body_schema": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "description": "מספר טלפון הלקוח"
+          },
+          "pet_id": {
+            "type": "string",
+            "description": "מזהה החיה (UUID) שהתקבל מ-list-customer-pets"
+          }
+        },
+        "required": ["phone", "pet_id"]
+      }
+    }
   }
 ]
