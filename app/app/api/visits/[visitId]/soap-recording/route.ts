@@ -27,10 +27,19 @@ export async function POST(request: Request, { params }: Params) {
     const visitResult = await visit.getVisitById(actor, visitId);
     if (!visitResult.ok) return handleRouteError(visitResult.error, requestId);
 
-    const formData = await request.formData();
+    let formData: FormData;
+    try {
+      formData = await request.formData();
+    } catch {
+      throw AppError.validation("Request body must be multipart/form-data");
+    }
+
     const file = formData.get("file");
     if (!(file instanceof Blob)) {
       throw AppError.validation("An audio file field named 'file' is required");
+    }
+    if (!file.type.startsWith("audio/")) {
+      throw AppError.validation("Uploaded file must have an audio/* content type");
     }
 
     const bytes = new Uint8Array(await file.arrayBuffer());
@@ -58,16 +67,23 @@ export async function POST(request: Request, { params }: Params) {
 
 /**
  * Returns a short-lived signed URL for playback of a previously uploaded
- * recording. The admin client bypasses RLS entirely, so the clinic-segment
- * check below (against `actor.clinicIds`) is the only thing preventing one
- * clinic's staff from reading another clinic's recording by supplying an
- * arbitrary storagePath — it MUST run before any Storage call.
+ * recording. The admin client bypasses RLS entirely, so the check below —
+ * that the storagePath's clinic_id and visit_id segments match THIS visit
+ * exactly (not merely that the clinic_id is one of the actor's clinics) —
+ * is the only thing preventing one clinic's staff from reading a recording
+ * that belongs to a different visit (possibly in a different clinic they
+ * also happen to have access to) by supplying an arbitrary storagePath. It
+ * MUST run before any Storage call.
  */
-export async function GET(request: Request, _: Params) {
+export async function GET(request: Request, { params }: Params) {
   const requestId = createRequestId();
 
   try {
-    const { actor } = await getActorAndServices();
+    const { visitId } = await params;
+    const { actor, visit } = await getActorAndServices();
+
+    const visitResult = await visit.getVisitById(actor, visitId);
+    if (!visitResult.ok) return handleRouteError(visitResult.error, requestId);
 
     const url = new URL(request.url);
     const storagePath = url.searchParams.get("path");
@@ -75,9 +91,9 @@ export async function GET(request: Request, _: Params) {
       throw AppError.validation("Query parameter 'path' is required");
     }
 
-    const clinicSegment = storagePath.split("/")[0];
-    if (!clinicSegment || !actor.clinicIds.includes(clinicSegment)) {
-      throw AppError.forbidden("Cannot access recording outside actor clinics");
+    const [clinicSegment, visitSegment] = storagePath.split("/");
+    if (clinicSegment !== visitResult.value.clinicId || visitSegment !== visitId) {
+      throw AppError.forbidden("Cannot access recording outside this visit");
     }
 
     const admin = createSupabaseAdminClient();

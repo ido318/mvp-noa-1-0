@@ -41,11 +41,14 @@ export async function POST(request: Request, { params }: Params) {
 
     // Critical security check — the admin client below bypasses RLS
     // entirely, so this in-application check is the only thing preventing
-    // one clinic's staff from reading another clinic's recording. It MUST
-    // run before any Storage download.
-    const clinicSegment = storagePath.split("/")[0];
-    if (!clinicSegment || !actor.clinicIds.includes(clinicSegment)) {
-      throw AppError.forbidden("Cannot access recording outside actor clinics");
+    // a draft from being generated off a recording that belongs to a
+    // different visit (possibly in a different clinic the actor also
+    // happens to have access to). Checking `actor.clinicIds` membership
+    // alone isn't enough for a multi-clinic actor — the segments must
+    // match THIS visit exactly. It MUST run before any Storage download.
+    const [clinicSegment, visitSegment] = storagePath.split("/");
+    if (clinicSegment !== visitResult.value.clinicId || visitSegment !== visitId) {
+      throw AppError.forbidden("Cannot access recording outside this visit");
     }
 
     const admin = createSupabaseAdminClient();

@@ -125,6 +125,36 @@ describe("POST /api/visits/[visitId]/soap-draft", () => {
     expect(generateArtifact).not.toHaveBeenCalled();
   });
 
+  it("rejects a storagePath for a different visit within the same accessible clinic, before downloading anything", async () => {
+    // Regression guard: actor.clinicIds includes "clinic-1" and the
+    // requested path's clinic segment is also "clinic-1", so a check that
+    // only tested clinic membership (rather than matching THIS visit
+    // exactly) would incorrectly allow this — letting a multi-clinic staff
+    // member attach a recording from a different visit's folder.
+    const getVisitById = vi.fn().mockResolvedValue({
+      ok: true,
+      value: { id: "visit-1", clinicId: "clinic-1" },
+    });
+    const generateArtifact = vi.fn();
+    mockGetActorAndServices.mockResolvedValue({
+      actor,
+      visit: { getVisitById },
+      aiArtifact: { generateArtifact },
+    });
+
+    const { POST } = await import("@/app/api/visits/[visitId]/soap-draft/route");
+
+    const response = await POST(
+      jsonRequest({ storagePath: "clinic-1/visit-999/some-uuid.webm" }),
+      { params: Promise.resolve({ visitId: "visit-1" }) },
+    );
+
+    expect(response.status).toBe(403);
+    expect(mockDownload).not.toHaveBeenCalled();
+    expect(mockTranscribeAudio).not.toHaveBeenCalled();
+    expect(generateArtifact).not.toHaveBeenCalled();
+  });
+
   it("propagates a generateArtifact rate-limit failure as a structured error, not a crash", async () => {
     const getVisitById = vi.fn().mockResolvedValue({
       ok: true,
