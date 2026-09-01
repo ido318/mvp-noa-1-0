@@ -13,18 +13,19 @@ import type {
  * so the repository can map it to a 409 conflict instead of the generic 502
  * that AppError.externalProvider() would otherwise produce.
  *
- * A plain `RAISE EXCEPTION` with no explicit SQLSTATE defaults to Postgres
- * code P0001, which the Supabase/PostgREST client surfaces on `error.code`
- * (the same field the codebase already branches on for PGRST116 elsewhere,
- * e.g. appointment.repository.ts's updateVersioned()). We also match on the
- * exception's exact message text as a second, independent signal in case the
- * code ever surfaces differently through a client upgrade.
+ * We match on the exception's message text only, not on error.code. A plain
+ * `RAISE EXCEPTION` with no explicit SQLSTATE always surfaces as Postgres
+ * code P0001 (the Supabase/PostgREST client puts it on `error.code`), but
+ * that code is not specific to this trigger — any future trigger on this
+ * table that raises a bare exception for an unrelated reason would carry the
+ * same P0001 code, and branching on the code alone would mislabel it as a
+ * lock conflict. The message text, by contrast, is fully within this
+ * codebase's control (defined in the same migration as the trigger), so
+ * it's the reliable signal to match on.
  */
 function isMedicalNoteLockError(error: unknown): boolean {
-  const pgError = error as { code?: string; message?: string } | null | undefined;
-  if (!pgError) return false;
-  if (pgError.code === "P0001") return true;
-  return typeof pgError.message === "string" && pgError.message.includes("medical note is locked");
+  const pgError = error as { message?: string } | null | undefined;
+  return typeof pgError?.message === "string" && pgError.message.includes("medical note is locked");
 }
 
 export class MedicalNoteRepository {

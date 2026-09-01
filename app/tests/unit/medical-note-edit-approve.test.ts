@@ -165,6 +165,26 @@ describe("MedicalRecordService.updateNote", () => {
     expect(medicalNoteRepository.update).toHaveBeenCalledWith("note1", { status: "draft" });
   });
 
+  it("rejects setting noteType to addendum via plain update, even with a parentNoteId (must go through addAddendum instead)", async () => {
+    const medicalNoteRepository = {
+      findById: vi.fn(),
+      update: vi.fn(),
+    };
+    const { service } = buildService(medicalNoteRepository);
+
+    const result = await service.updateNote(vetActor, "note1", {
+      noteType: "addendum",
+      parentNoteId: "parent1",
+    } as never);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("VALIDATION_ERROR");
+    }
+    expect(medicalNoteRepository.findById).not.toHaveBeenCalled();
+    expect(medicalNoteRepository.update).not.toHaveBeenCalled();
+  });
+
   it("returns not found when the note's visitId does not match the expected visit", async () => {
     const medicalNoteRepository = {
       findById: vi.fn().mockResolvedValue(ok(note({ visitId: "visit1" }))),

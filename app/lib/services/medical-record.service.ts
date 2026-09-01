@@ -56,6 +56,10 @@ const NOTE_TYPE_LABELS: Record<string, string> = {
   soap_plan: "SOAP - תוכנית טיפול",
   follow_up: "מעקב",
   addendum: "נספח",
+  // soap_full is a Postgres enum value already (Task 3's migration), but is
+  // deliberately not yet in MedicalNoteType/medicalNoteTypeSchema — no app
+  // code can produce a note with this type yet, so this label is unreachable
+  // dead text until a future task wires it up end-to-end.
   soap_full: "SOAP מלא",
 };
 
@@ -348,6 +352,14 @@ export class MedicalRecordService {
    * dedicated archive/lock flow), which enforces the elevated-role gate and
    * stamps approved_by_user_id/approved_at. Accepting those values here would
    * let any clinic member flip a note to 'approved' without either.
+   *
+   * Likewise, noteType can never become 'addendum' via a plain edit: even
+   * though updateMedicalNoteSchema validates a { noteType: "addendum",
+   * parentNoteId } body, this repository's update() never writes
+   * parent_note_id, so that path would silently produce an addendum note
+   * with a stale/missing parent link — the exact invariant the validator's
+   * refine exists to enforce. addAddendum() is the only supported way to
+   * create an addendum.
    */
   async updateNote(
     actor: ServiceActor,
@@ -359,6 +371,14 @@ export class MedicalRecordService {
       return err(
         AppError.validation(
           "Cannot set medical note status to approved/archived via update; use the dedicated approve endpoint",
+        ),
+      );
+    }
+
+    if (input.noteType === "addendum") {
+      return err(
+        AppError.validation(
+          "Cannot set medical note type to addendum via update; use the dedicated addendum endpoint",
         ),
       );
     }

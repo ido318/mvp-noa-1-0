@@ -12,7 +12,7 @@ function buildClientForUpdate(error: unknown, data: unknown = null) {
 }
 
 describe("MedicalNoteRepository.update", () => {
-  it("maps the lock trigger's P0001 error to a 409 conflict, not a 502", async () => {
+  it("maps the lock trigger's P0001 error (with its matching message) to a 409 conflict, not a 502", async () => {
     const { client } = buildClientForUpdate({
       code: "P0001",
       message: "medical note is locked: approved more than 24 hours ago",
@@ -40,6 +40,22 @@ describe("MedicalNoteRepository.update", () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe("CONFLICT");
+    }
+  });
+
+  it("does NOT map a bare P0001 error with an unrelated message to a conflict (avoids mislabeling a future unrelated trigger)", async () => {
+    const { client } = buildClientForUpdate({
+      code: "P0001",
+      message: "some other trigger raised an unrelated exception",
+    });
+    const repository = new MedicalNoteRepository(client as never);
+
+    const result = await repository.update("note1", { content: "x" });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("EXTERNAL_PROVIDER_ERROR");
+      expect(result.error.status).toBe(502);
     }
   });
 
