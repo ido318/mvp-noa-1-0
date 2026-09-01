@@ -25,6 +25,27 @@ describe("getEnv", () => {
     expect(env.NEXT_PUBLIC_SUPABASE_URL).toBe("http://127.0.0.1:54321");
   });
 
+  it("derives APP_BASE_URL from VERCEL_URL when it is not set explicitly", () => {
+    Object.assign(process.env, baseEnv);
+    delete process.env.APP_BASE_URL;
+    process.env.VERCEL_URL = "my-app-git-some-branch.vercel.app";
+    resetEnvCache();
+
+    expect(getEnv().APP_BASE_URL).toBe("https://my-app-git-some-branch.vercel.app");
+
+    delete process.env.VERCEL_URL;
+  });
+
+  it("prefers an explicit APP_BASE_URL over VERCEL_URL", () => {
+    Object.assign(process.env, baseEnv);
+    process.env.VERCEL_URL = "my-app-git-some-branch.vercel.app";
+    resetEnvCache();
+
+    expect(getEnv().APP_BASE_URL).toBe("http://localhost:3000");
+
+    delete process.env.VERCEL_URL;
+  });
+
   it("throws when required variables are missing", () => {
     delete process.env.SUPABASE_SERVICE_ROLE_KEY;
     resetEnvCache();
