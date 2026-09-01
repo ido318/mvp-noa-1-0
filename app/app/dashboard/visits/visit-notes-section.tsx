@@ -196,6 +196,7 @@ function NoteListItem({ note, visitId, childrenByParent, depth }: NoteListItemPr
               onChange={(event) => setEditContent(event.target.value)}
               required
               rows={3}
+              placeholder="הערה רפואית שנכתבה על ידי הצוות"
               className={textareaClass}
             />
             <div className="grid gap-2 sm:grid-cols-2">
@@ -233,7 +234,7 @@ function NoteListItem({ note, visitId, childrenByParent, depth }: NoteListItemPr
               <Btn type="submit" size="sm" loading={editSaving}>
                 שמור שינויים
               </Btn>
-              <Btn type="button" variant="ghost" size="sm" onClick={cancelEdit}>
+              <Btn type="button" variant="ghost" size="sm" onClick={cancelEdit} disabled={editSaving}>
                 ביטול
               </Btn>
             </div>
@@ -285,7 +286,7 @@ function NoteListItem({ note, visitId, childrenByParent, depth }: NoteListItemPr
               <Btn type="submit" size="sm" loading={addendumSaving}>
                 שמור נספח
               </Btn>
-              <Btn type="button" variant="ghost" size="sm" onClick={cancelAddendum}>
+              <Btn type="button" variant="ghost" size="sm" onClick={cancelAddendum} disabled={addendumSaving}>
                 ביטול
               </Btn>
             </div>

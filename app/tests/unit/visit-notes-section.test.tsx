@@ -104,6 +104,35 @@ describe("VisitNotesSection", () => {
     );
   });
 
+  it("disables the addendum cancel button while the save is in flight", async () => {
+    const lockedNote = makeNote({
+      status: "approved",
+      createdAt: "2000-01-01T00:00:00.000Z",
+    });
+    let resolveFetch!: (value: Response) => void;
+    vi.mocked(fetch).mockReturnValueOnce(
+      new Promise<Response>((resolve) => {
+        resolveFetch = resolve;
+      }),
+    );
+
+    render(<VisitNotesSection visitId="visit-1" initialNotes={[lockedNote]} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "הוסף נספח" }));
+    fireEvent.change(screen.getByPlaceholderText("תוכן הנספח"), {
+      target: { value: "עדכון מצב" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "שמור נספח" }));
+
+    // While the request is still pending, cancel must not be clickable —
+    // otherwise a user who "cancels" here could still have the save silently
+    // land (and trigger router.refresh()) once the in-flight fetch resolves.
+    expect(screen.getByRole("button", { name: "ביטול" })).toBeDisabled();
+
+    resolveFetch(okJsonResponse());
+    await vi.waitFor(() => expect(mockRefresh).toHaveBeenCalledTimes(1));
+  });
+
   it("shows edit for an unlocked note (draft) and round-trips a save through PATCH", async () => {
     const note = makeNote({
       status: "draft",
@@ -142,6 +171,29 @@ describe("VisitNotesSection", () => {
 
     // Edit form is closed again after a successful save.
     expect(screen.queryByRole("button", { name: "שמור שינויים" })).not.toBeInTheDocument();
+  });
+
+  it("disables the edit cancel button while the save is in flight", async () => {
+    const note = makeNote({ status: "draft" });
+    let resolveFetch!: (value: Response) => void;
+    vi.mocked(fetch).mockReturnValueOnce(
+      new Promise<Response>((resolve) => {
+        resolveFetch = resolve;
+      }),
+    );
+
+    render(<VisitNotesSection visitId="visit-1" initialNotes={[note]} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "ערוך" }));
+    fireEvent.click(screen.getByRole("button", { name: "שמור שינויים" }));
+
+    // While the request is still pending, cancel must not be clickable —
+    // otherwise a user who "cancels" here could still have the save silently
+    // land (and trigger router.refresh()) once the in-flight fetch resolves.
+    expect(screen.getByRole("button", { name: "ביטול" })).toBeDisabled();
+
+    resolveFetch(okJsonResponse(note));
+    await vi.waitFor(() => expect(mockRefresh).toHaveBeenCalledTimes(1));
   });
 
   it("treats an approved note still within the 24h window as editable, not locked", () => {
