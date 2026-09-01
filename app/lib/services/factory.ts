@@ -109,7 +109,7 @@ export async function createServices() {
     health: new HealthService(admin),
     audit: auditService,
     aiEvent: new AIEventService(aiEventRepository),
-    aiArtifact: new AiArtifactService(aiSummaryRepository),
+    aiArtifact: new AiArtifactService(aiSummaryRepository, new AIEventService(aiEventRepository)),
     customer: new CustomerService(customerRepository, petRepository, auditService),
     pet: new PetService(petRepository, customerRepository, auditService, medicalRecordService),
     escalation: new EscalationService(supabase),

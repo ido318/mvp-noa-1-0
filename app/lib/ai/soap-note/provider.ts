@@ -137,3 +137,25 @@ export async function transcribeAndParseSoapNote(
 
   return resolved.transcribeAndParse(audio, mimeType);
 }
+
+/**
+ * Parses an already-transcribed dictation into a structured SOAP draft,
+ * resolving to the real OpenAI-backed provider or the deterministic stub
+ * the same way `transcribeAndParseSoapNote` does — an explicit `provider`
+ * wins, otherwise test envs get the stub and everything else gets the real
+ * provider. Callers (e.g. `AiArtifactService`) that only need the parse step
+ * (transcription already happened upstream) should use this instead of
+ * duplicating the env-based resolution logic themselves.
+ */
+export async function parseSoapNoteTranscript(
+  transcriptText: string,
+  provider?: Pick<SoapNoteProvider, "parseTranscript">,
+): Promise<SoapParseResult> {
+  const resolved =
+    provider ??
+    (process.env.VITEST === "true" || process.env.NODE_ENV === "test"
+      ? createStubSoapNoteProvider()
+      : createOpenAiSoapNoteProvider());
+
+  return resolved.parseTranscript(transcriptText);
+}
