@@ -74,7 +74,7 @@ export function VisitVaccinationsSection({
         ) : (
           visitLinked.map((v) => (
             <li key={v.id} className="rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--surface-2)] p-3 text-sm">
-              <p className="font-bold text-[var(--ink)]">{v.vaccineName}</p>
+              <p className="font-semibold text-[var(--ink)]">{v.vaccineName}</p>
               <p className="text-[var(--ink-2)]">
                 {formatIsraelDateTime(v.administeredAt)}
                 {v.batchNumber ? ` · אצווה ${v.batchNumber}` : ""}

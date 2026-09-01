@@ -7,12 +7,13 @@ interface DrawerProps {
   open: boolean;
   onClose: () => void;
   title?: React.ReactNode;
+  subtitle?: React.ReactNode;
   children: React.ReactNode;
   width?: number;
   footer?: React.ReactNode;
 }
 
-export function Drawer({ open, onClose, title, children, width = 460, footer }: DrawerProps) {
+export function Drawer({ open, onClose, title, subtitle, children, width, footer }: DrawerProps) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => { setMounted(true); }, []);
@@ -26,53 +27,92 @@ export function Drawer({ open, onClose, title, children, width = 460, footer }: 
 
   if (!open || !mounted) return null;
 
-  // Portalled to document.body: the dashboard layout's page-entrance animation
-  // (.page-enter in globals.css) ends on a non-none `transform`, which per the CSS
-  // spec makes that ancestor a containing block for `position: fixed` descendants -
-  // without the portal, this panel would be positioned relative to the scrollable
-  // page content instead of the viewport.
+  // Portalled to document.body: an ancestor with a non-none `transform` becomes
+  // the containing block for `position: fixed` descendants, which would position
+  // this panel against the scrollable page content instead of the viewport.
   return createPortal(
-    <div className="fixed inset-0 z-40 flex">
-      {/* Overlay */}
+    <div className="fixed inset-0 z-40">
+      {/* Scrim — a flat wash; the system uses no blur on overlays. */}
       <div
         className="absolute inset-0"
-        style={{ backgroundColor: "rgba(45,38,32,.4)", backdropFilter: "blur(2px)" }}
+        style={{ background: "var(--scrim)" }}
         onClick={onClose}
       />
-      {/* Panel — slides from the start (right in RTL) */}
-      <div
-        className="absolute inset-y-0 end-0 flex flex-col bg-[var(--surface)] shadow-[var(--sh-pop)] drawer-enter"
-        style={{ width }}
+      {/* Panel — anchored to the inline end, opposite the navigation rail. */}
+      <aside
+        className="absolute inset-y-0 end-0 flex flex-col drawer-enter"
+        style={{
+          width: width ?? "var(--drawer-w)",
+          maxWidth: "94vw",
+          background: "var(--surface-raised)",
+          boxShadow: "var(--shadow-drawer)",
+        }}
         role="dialog"
         aria-modal="true"
       >
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--line-2)] flex-shrink-0">
-          {title ? (
-            <div className="text-[15px] font-bold text-[var(--ink)]">{title}</div>
-          ) : (
-            <span />
-          )}
+        <header
+          className="flex items-center gap-3 flex-shrink-0 px-5"
+          style={{ height: "var(--drawer-head-h)", borderBottom: "var(--rule)" }}
+        >
+          <div className="min-w-0">
+            {title && (
+              <p
+                className="text-[14px] truncate"
+                style={{ color: "var(--text-primary)", fontWeight: "var(--w-semibold)" }}
+              >
+                {title}
+              </p>
+            )}
+            {subtitle && (
+              <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>{subtitle}</p>
+            )}
+          </div>
           <button
             onClick={onClose}
-            className="text-[var(--faint)] hover:text-[var(--ink-2)] transition-colors p-1.5 rounded-lg hover:bg-[var(--surface-2)]"
+            className="ms-auto grid place-items-center flex-shrink-0 w-[26px] h-[26px]"
+            style={{
+              borderRadius: "var(--radius-2)",
+              color: "var(--text-faint)",
+              transition: "var(--transition-color)",
+            }}
             aria-label="סגור"
           >
-            <XIcon size={18} />
+            <XIcon size={16} />
           </button>
-        </div>
+        </header>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto">{children}</div>
+        <div className="flex-1 min-h-0 overflow-y-auto">{children}</div>
 
-        {/* Footer */}
         {footer && (
-          <div className="border-t border-[var(--line-2)] px-6 py-4 flex-shrink-0 bg-[var(--surface)]">
+          <footer
+            className="flex items-center gap-2 flex-shrink-0 px-5 py-3"
+            style={{ borderTop: "var(--rule)", background: "var(--surface-raised)" }}
+          >
             {footer}
-          </div>
+          </footer>
         )}
-      </div>
+      </aside>
     </div>,
     document.body,
+  );
+}
+
+export function DrawerSection({
+  label,
+  children,
+  className = "",
+}: {
+  label?: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <section
+      className={["px-5 py-4", className].join(" ")}
+      style={{ borderBottom: "var(--rule-row)" }}
+    >
+      {label && <div className="gv-section-label mb-2">{label}</div>}
+      {children}
+    </section>
   );
 }

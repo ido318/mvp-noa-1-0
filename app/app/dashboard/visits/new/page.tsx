@@ -67,7 +67,7 @@ export default async function NewVisitPage({
         <Link href="/dashboard/visits" className="text-sm font-semibold text-[var(--brand-600)] hover:underline">
           ← חזרה לביקורים
         </Link>
-        <h2 className="mt-2 text-[22px] font-extrabold text-[var(--ink)]">ביקור חדש</h2>
+        <h2 className="mt-2 text-[22px] font-semibold text-[var(--ink)]">ביקור חדש</h2>
       </div>
 
       <div className="rounded-[var(--r-lg)] border border-[var(--line)] bg-[var(--surface)] p-6">

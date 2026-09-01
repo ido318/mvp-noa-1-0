@@ -67,8 +67,8 @@ export function VisitShareSection({ visitId, hasSummary, hasPrescriptions }: Pro
 
       {result ? (
         <div className="rounded-[var(--r-lg)] border border-[var(--brand-200)] bg-[var(--brand-50)] p-3 text-sm">
-          <p className="font-bold text-[var(--brand-700)]">
-            נשלח ל-{result.recipientPhone} ✓
+          <p className="font-semibold text-[var(--brand-700)]">
+            נשלח ל-{result.recipientPhone}
           </p>
           <div className="mt-2 flex items-center gap-2">
             <a

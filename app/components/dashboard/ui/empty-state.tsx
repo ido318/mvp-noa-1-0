@@ -1,27 +1,26 @@
 import React from "react";
 
 interface EmptyStateProps {
+  /** Retired: empty states are text-first, so this is accepted but not drawn. */
   icon?: React.ReactNode;
   title: string;
   subtitle?: string;
   action?: React.ReactNode;
+  compact?: boolean;
   className?: string;
 }
 
-export function EmptyState({ icon, title, subtitle, action, className = "" }: EmptyStateProps) {
+export function EmptyState({ title, subtitle, action, compact = false, className = "" }: EmptyStateProps) {
   return (
-    <div className={["flex flex-col items-center justify-center py-16 text-center", className].join(" ")}>
-      {icon && (
-        <span
-          className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-[var(--surface-2)] text-[var(--faint)]"
-          style={{ animation: "pawIn .5s var(--ease) both" }}
-        >
-          {icon}
-        </span>
+    <div
+      className={["flex flex-col gap-1", className].join(" ")}
+      style={{ padding: compact ? "var(--space-4) 0" : "var(--space-6) 0" }}
+    >
+      <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>{title}</p>
+      {subtitle && (
+        <p className="text-[12px]" style={{ color: "var(--text-faint)" }}>{subtitle}</p>
       )}
-      <p className="text-[15px] font-semibold text-[var(--ink)]">{title}</p>
-      {subtitle && <p className="mt-1 text-sm text-[var(--muted)]">{subtitle}</p>}
-      {action && <div className="mt-4">{action}</div>}
+      {action && <div style={{ marginTop: "var(--space-2)" }}>{action}</div>}
     </div>
   );
 }

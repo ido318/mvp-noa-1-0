@@ -14,7 +14,7 @@ const FILES = [
   "app/dashboard/visits/visit-vaccinations-section.tsx",
   "app/dashboard/pets/[petId]/page.tsx",
   "app/dashboard/voice/[callId]/page.tsx",
-  "app/dashboard/voice/page.tsx",
+  "app/dashboard/voice/[callId]/call-recording-player.tsx",
 ];
 
 const FORBIDDEN_COPY = [

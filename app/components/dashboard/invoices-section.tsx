@@ -176,7 +176,7 @@ export function InvoicesSection({
             className="w-full rounded-[var(--r-sm)] border border-[var(--line)] bg-[var(--surface)] px-2 py-1.5 text-xs outline-none focus:border-[var(--brand-400)]"
           />
           <div className="flex items-center justify-between pt-1">
-            <span className="text-sm font-extrabold text-[var(--ink)]">{fmtMoney(total)}</span>
+            <span className="text-sm font-semibold text-[var(--ink)]">{fmtMoney(total)}</span>
             <Btn type="submit" size="sm" loading={submitting}>הפק חשבונית</Btn>
           </div>
         </form>

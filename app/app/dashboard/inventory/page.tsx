@@ -47,7 +47,7 @@ export default function InventoryPage() {
 
   return (
     <div className="mx-auto w-full max-w-[1000px] space-y-5 p-6">
-      <h1 className="text-[28px] font-extrabold text-[var(--ink)]">מלאי</h1>
+      <h1 className="text-[28px] font-semibold text-[var(--ink)]">מלאי</h1>
       <Card>
         <div className="grid gap-2 sm:grid-cols-[1fr_140px_auto]">
           <input value={name} onChange={(event) => setName(event.target.value)} placeholder="שם פריט" className="h-10 rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--bg)] px-3 text-sm" />

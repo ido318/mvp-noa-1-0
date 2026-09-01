@@ -13,6 +13,9 @@ export function getTwilioVoiceConfig(): TwilioVoiceConfig | null {
   const accountSid = process.env.TWILIO_ACCOUNT_SID?.trim();
   const authToken = process.env.TWILIO_AUTH_TOKEN?.trim();
   const clinicPhoneNumber = process.env.TWILIO_CLINIC_PHONE_NUMBER?.trim();
+  // Deliberately the raw variable, not env.ts's VERCEL_URL fallback: these become
+  // webhook URLs Twilio calls back on, so they must point at a stable deployment.
+  // Absent it, voice config stays null and the integration is simply inactive.
   const baseUrl = process.env.APP_BASE_URL?.trim();
 
   if (!accountSid || !authToken || !clinicPhoneNumber || !baseUrl) {

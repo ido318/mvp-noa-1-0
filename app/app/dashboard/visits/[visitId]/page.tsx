@@ -85,17 +85,17 @@ export default async function VisitDetailPage({ params }: Params) {
 
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--r-lg)] border border-[var(--line)] bg-[var(--surface)] p-5">
         <div>
-          <h1 className="text-[22px] font-extrabold text-[var(--ink)]">מפגש טיפולי</h1>
+          <h1 className="text-[22px] font-semibold text-[var(--ink)]">מפגש טיפולי</h1>
           <p className="mt-1 text-sm text-[var(--muted)]">{formatIsraelDateTime(visit.startedAt)}</p>
         </div>
         <div className="flex items-center gap-4">
           <div className="text-end">
             <p className="text-[11px] text-[var(--muted)]">מטופל</p>
-            <p className="text-sm font-bold text-[var(--ink)]">{pet?.name ?? visit.petId}</p>
+            <p className="text-sm font-semibold text-[var(--ink)]">{pet?.name ?? visit.petId}</p>
           </div>
           <div className="text-end">
             <p className="text-[11px] text-[var(--muted)]">בעלים</p>
-            <p className="text-sm font-bold text-[var(--ink)]">{customer?.fullName ?? visit.customerId}</p>
+            <p className="text-sm font-semibold text-[var(--ink)]">{customer?.fullName ?? visit.customerId}</p>
           </div>
           <Badge color={visit.status === "completed" ? "green" : visit.status === "cancelled" ? "muted" : "brand"}>
             {VISIT_STATUS_LABELS[visit.status]}
@@ -104,7 +104,7 @@ export default async function VisitDetailPage({ params }: Params) {
       </div>
 
       <Card>
-        <h3 className="text-[15px] font-bold text-[var(--ink)]">Reason & Pre-Visit</h3>
+        <h3 className="text-[15px] font-semibold text-[var(--ink)]">Reason & Pre-Visit</h3>
         <div className="mt-3 grid gap-3 text-sm md:grid-cols-2">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">סיבת הביקור</p>
@@ -130,7 +130,7 @@ export default async function VisitDetailPage({ params }: Params) {
       <PreVisitBriefCard calls={customerCalls?.items ?? []} />
 
       <Card>
-        <h3 className="text-[15px] font-bold text-[var(--ink)]">סיכומי ביקור</h3>
+        <h3 className="text-[15px] font-semibold text-[var(--ink)]">סיכומי ביקור</h3>
         <div className="mt-3">
           <VisitAiSummarySection
             visitId={visit.id}
@@ -155,7 +155,7 @@ export default async function VisitDetailPage({ params }: Params) {
       />
 
       <Card>
-        <h3 className="text-[15px] font-bold text-[var(--ink)]">מרשמים</h3>
+        <h3 className="text-[15px] font-semibold text-[var(--ink)]">מרשמים</h3>
         <div className="mt-3">
           <VisitPrescriptionsSection
             visitId={visit.id}
@@ -165,7 +165,7 @@ export default async function VisitDetailPage({ params }: Params) {
       </Card>
 
       <Card>
-        <h3 className="text-[15px] font-bold text-[var(--ink)]">חיסונים</h3>
+        <h3 className="text-[15px] font-semibold text-[var(--ink)]">חיסונים</h3>
         <div className="mt-3">
           <VisitVaccinationsSection
             visitId={visit.id}
@@ -178,14 +178,14 @@ export default async function VisitDetailPage({ params }: Params) {
       </Card>
 
       <Card>
-        <h3 className="text-[15px] font-bold text-[var(--ink)]">חיובי ביקור</h3>
+        <h3 className="text-[15px] font-semibold text-[var(--ink)]">חיובי ביקור</h3>
         <div className="mt-3">
           <VisitChargesPanel visitId={visit.id} charges={chargesData?.items ?? []} />
         </div>
       </Card>
 
       <Card>
-        <h3 className="text-[15px] font-bold text-[var(--ink)]">שליחה ללקוח</h3>
+        <h3 className="text-[15px] font-semibold text-[var(--ink)]">שליחה ללקוח</h3>
         <div className="mt-3">
           <VisitShareSection
             visitId={visit.id}
@@ -198,7 +198,7 @@ export default async function VisitDetailPage({ params }: Params) {
       </Card>
 
       <Card>
-        <h3 className="text-[15px] font-bold text-[var(--ink)]">פעולות נוספות</h3>
+        <h3 className="text-[15px] font-semibold text-[var(--ink)]">פעולות נוספות</h3>
         <div className="mt-3">
           <VisitActions
             visitId={visit.id}

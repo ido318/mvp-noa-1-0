@@ -9,7 +9,7 @@ export function InventoryTable({ items }: { items: InventoryItem[] }) {
       <tbody className="divide-y divide-[var(--line-2)]">
         {items.map((item) => (
           <tr key={item.id}>
-            <td className="px-4 py-3 font-bold text-[var(--ink)]">{item.name}</td>
+            <td className="px-4 py-3 font-semibold text-[var(--ink)]">{item.name}</td>
             <td className="px-4 py-3 text-[var(--ink-2)]">
               {item.quantityOnHand} {item.unit}
             </td>

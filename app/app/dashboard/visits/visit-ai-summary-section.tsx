@@ -93,7 +93,7 @@ export function VisitAiSummarySection({
   return (
     <div className="space-y-4">
       <div>
-        <h4 className="text-sm font-bold text-[var(--ink)]">סיכום ביקור ידני</h4>
+        <h4 className="text-sm font-semibold text-[var(--ink)]">סיכום ביקור ידני</h4>
         {manualVisitSummary ? (
           <p className="mt-1 whitespace-pre-wrap text-sm text-[var(--ink-2)]">
             {manualVisitSummary}
@@ -105,7 +105,7 @@ export function VisitAiSummarySection({
 
       <div className="border-t border-[var(--line-2)] pt-4">
         <div className="flex items-center gap-2">
-          <h4 className="text-sm font-bold text-[var(--ink)]">סיכום ביקור AI</h4>
+          <h4 className="text-sm font-semibold text-[var(--ink)]">סיכום ביקור AI</h4>
           <Badge color="brand">AI</Badge>
         </div>
         <p className="mt-1 text-xs text-[var(--muted)]">

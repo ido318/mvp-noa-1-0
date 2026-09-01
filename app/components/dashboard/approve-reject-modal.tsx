@@ -56,7 +56,7 @@ export function ApproveRejectModal({
         className="w-full max-w-sm rounded-[var(--r-xl)] bg-[var(--surface)] p-6 shadow-[var(--sh-lg)] modal-enter"
         onClick={(event) => event.stopPropagation()}
       >
-        <h3 className="text-[15px] font-bold text-[var(--ink)]">
+        <h3 className="text-[15px] font-semibold text-[var(--ink)]">
           {mode === "approve" ? "אישור תור עיקור/סירוס" : "דחיית תור עיקור/סירוס"}
         </h3>
         <p className="mt-2 text-sm text-[var(--ink-2)]">

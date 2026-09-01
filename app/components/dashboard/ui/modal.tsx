@@ -12,7 +12,7 @@ interface ModalProps {
   maxWidth?: number;
 }
 
-export function Modal({ open, onClose, title, subtitle, children, maxWidth = 520 }: ModalProps) {
+export function Modal({ open, onClose, title, subtitle, children, maxWidth }: ModalProps) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => { setMounted(true); }, []);
@@ -26,38 +26,58 @@ export function Modal({ open, onClose, title, subtitle, children, maxWidth = 520
 
   if (!open || !mounted) return null;
 
-  // Portalled to document.body - see the matching comment in drawer.tsx for why
-  // (the dashboard layout's .page-enter animation ends on a non-none transform,
-  // which breaks `position: fixed` containment for descendants otherwise).
+  // Portalled to document.body — see the matching comment in drawer.tsx.
   return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ backgroundColor: "rgba(45,38,32,.6)", backdropFilter: "blur(4px)" }}
+      style={{ background: "var(--scrim-strong)" }}
       onClick={onClose}
     >
       <div
-        className="w-full bg-[var(--surface)] rounded-[var(--r-xl)] shadow-[var(--sh-pop)] modal-enter"
-        style={{ maxWidth }}
+        className="w-full modal-enter"
+        style={{
+          maxWidth: maxWidth ?? "var(--modal-w-lg)",
+          background: "var(--surface-raised)",
+          borderRadius: "var(--radius-3)",
+          boxShadow: "var(--shadow-modal)",
+        }}
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
       >
         {(title || subtitle) && (
-          <div className="flex items-start justify-between p-6 pb-4 border-b border-[var(--line-2)]">
+          <div
+            className="flex items-start justify-between px-5 py-4"
+            style={{ borderBottom: "var(--rule)" }}
+          >
             <div>
-              {title && <h2 className="text-[18px] font-bold text-[var(--ink)]">{title}</h2>}
-              {subtitle && <p className="mt-0.5 text-sm text-[var(--muted)]">{subtitle}</p>}
+              {title && (
+                <h2
+                  className="text-[15px]"
+                  style={{ color: "var(--text-primary)", fontWeight: "var(--w-semibold)" }}
+                >
+                  {title}
+                </h2>
+              )}
+              {subtitle && (
+                <p className="mt-0.5 text-[12px]" style={{ color: "var(--text-muted)" }}>{subtitle}</p>
+              )}
             </div>
             <button
               onClick={onClose}
-              className="text-[var(--faint)] hover:text-[var(--ink-2)] transition-colors p-1 rounded-lg hover:bg-[var(--surface-2)]"
+              className="grid place-items-center flex-shrink-0 w-[26px] h-[26px]"
+              style={{
+                borderRadius: "var(--radius-2)",
+                color: "var(--text-faint)",
+                transition: "var(--transition-color)",
+              }}
               aria-label="סגור"
             >
-              <XIcon size={20} />
+              <XIcon size={16} />
             </button>
           </div>
         )}
-        <div className="p-6">{children}</div>
+        <div className="px-5 py-4">{children}</div>
       </div>
     </div>,
     document.body,

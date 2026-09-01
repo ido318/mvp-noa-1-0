@@ -10,7 +10,7 @@ describe("dashboard calendar page live refresh", () => {
     expect(source).not.toContain("/api/appointments?from=");
     expect(source).toContain("petName");
     expect(source).toContain("customerName");
-    expect(source).toContain("appointmentAccent");
+    expect(source).toContain("typeMark");
     expect(source).toContain('minHeight: "72px"');
     expect(source).toContain("HOUR_HEIGHT_PX = 150");
     expect(source).toContain("TIMELINE_HEIGHT_PX");

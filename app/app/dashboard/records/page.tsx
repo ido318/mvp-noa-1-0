@@ -29,12 +29,12 @@ export default async function RecordsPage() {
     <div className="p-6 space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-extrabold text-[var(--ink)]">תיקים רפואיים</h1>
+          <h1 className="text-xl font-semibold text-[var(--ink)]">תיקים רפואיים</h1>
           <p className="mt-1 text-sm text-[var(--muted)]">ביקורים, סיכומי AI, הערות, תרופות וחיסונים.</p>
         </div>
         <Link
           href="/dashboard/visits/new"
-          className="rounded-[11px] bg-[var(--brand-600)] px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110"
+          className="rounded-[var(--radius-2)] bg-[var(--accent)] hover:bg-[var(--accent-hover)] px-4 py-2 text-[13px] font-medium text-[var(--text-on-accent)] transition"
         >
           ביקור חדש
         </Link>
@@ -43,15 +43,15 @@ export default async function RecordsPage() {
       <div className="grid gap-3 md:grid-cols-3">
         <Card>
           <p className="text-xs text-[var(--muted)]">ביקורים</p>
-          <p className="mt-1 text-2xl font-extrabold text-[var(--ink)]">{visits.length}</p>
+          <p className="mt-1 text-2xl font-semibold text-[var(--ink)]">{visits.length}</p>
         </Card>
         <Card>
           <p className="text-xs text-[var(--muted)]">הושלמו</p>
-          <p className="mt-1 text-2xl font-extrabold text-[var(--ink)]">{completed}</p>
+          <p className="mt-1 text-2xl font-semibold text-[var(--ink)]">{completed}</p>
         </Card>
         <Card>
           <p className="text-xs text-[var(--muted)]">עם סיכום AI</p>
-          <p className="mt-1 text-2xl font-extrabold text-[var(--ink)]">{withAi}</p>
+          <p className="mt-1 text-2xl font-semibold text-[var(--ink)]">{withAi}</p>
         </Card>
       </div>
 
@@ -70,7 +70,7 @@ export default async function RecordsPage() {
                   <div className="min-w-0">
                     <Link
                       href={`/dashboard/visits/${visit.id}`}
-                      className="font-bold text-[var(--ink)] hover:text-[var(--brand-700)]"
+                      className="font-semibold text-[var(--ink)] hover:text-[var(--brand-700)]"
                     >
                       {formatIsraelDateTime(visit.startedAt)}
                     </Link>

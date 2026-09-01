@@ -1,5 +1,11 @@
 import React from "react";
-import { HomeIcon } from "@/components/dashboard/icons";
+
+/**
+ * All 12 appointment-type keys and their Hebrew labels are preserved, including
+ * the `vaccine` / `followup` legacy aliases. The eight-colour palette they used
+ * to carry collapses onto the system's four status hues, drawn as a 6px square
+ * mark rather than a filled pill.
+ */
 
 export type VisitType =
   | "checkup"
@@ -15,55 +21,51 @@ export type VisitType =
   | "follow_up"
   | "other";
 
-const VISIT_LABELS: Record<VisitType, string> = {
-  checkup:            "בדיקה",
-  vaccine:            "חיסון",
-  vaccination:        "חיסון",
-  surgery:            "ניתוח",
-  neutering:          "עיקור/סירוס",
-  home_visit:         "ביקור בית",
-  phone_consultation: "ייעוץ טלפוני",
-  followup:           "מעקב",
-  follow_up:          "מעקב",
-  consultation:       "ייעוץ",
-  urgent:             "דחוף",
-  other:              "אחר",
-};
-
-const VISIT_COLORS: Record<VisitType, { fg: string; bg: string }> = {
-  checkup:            { fg: "#3E9C86", bg: "#E7F4F0" },
-  vaccine:            { fg: "#5B7CFA", bg: "#EEF1FE" },
-  vaccination:        { fg: "#5B7CFA", bg: "#EEF1FE" },
-  surgery:            { fg: "#E0696D", bg: "#FBEAEB" },
-  neutering:          { fg: "#E0696D", bg: "#FBEAEB" },
-  home_visit:         { fg: "#14877D", bg: "#EEF8F6" },
-  phone_consultation: { fg: "#5B7CFA", bg: "#EEF1FE" },
-  followup:           { fg: "#C2891E", bg: "#FBF2DD" },
-  follow_up:          { fg: "#C2891E", bg: "#FBF2DD" },
-  consultation:       { fg: "#0F766E", bg: "#EEF8F6" },
-  urgent:             { fg: "#B91C1C", bg: "#FEF2F2" },
-  other:              { fg: "#6B7785", bg: "#EEF2F5" },
+const VISIT_TYPES: Record<VisitType, { label: string; color: string }> = {
+  checkup:            { label: "בדיקה",       color: "var(--type-checkup)" },
+  consultation:       { label: "ייעוץ",       color: "var(--type-consultation)" },
+  vaccination:        { label: "חיסון",       color: "var(--type-vaccination)" },
+  vaccine:            { label: "חיסון",       color: "var(--type-vaccination)" },
+  surgery:            { label: "ניתוח",       color: "var(--type-surgery)" },
+  neutering:          { label: "עיקור/סירוס", color: "var(--type-neutering)" },
+  home_visit:         { label: "ביקור בית",   color: "var(--type-home-visit)" },
+  phone_consultation: { label: "ייעוץ טלפוני", color: "var(--type-phone-consultation)" },
+  follow_up:          { label: "מעקב",        color: "var(--type-follow-up)" },
+  followup:           { label: "מעקב",        color: "var(--type-follow-up)" },
+  urgent:             { label: "דחוף",        color: "var(--type-urgent)" },
+  other:              { label: "אחר",         color: "var(--type-other)" },
 };
 
 interface TypePillProps {
   type: string;
+  /** Retired: the mark's colour already classifies the type. */
   showHomeIcon?: boolean;
+  showLabel?: boolean;
   className?: string;
 }
 
-export function TypePill({ type, showHomeIcon, className = "" }: TypePillProps) {
-  const t = type as VisitType;
-  const { fg, bg } = VISIT_COLORS[t] ?? { fg: "#6B7785", bg: "#EEF2F5" };
-  const label = VISIT_LABELS[t] ?? type;
-  const isHome = type === "home_visit" || showHomeIcon;
+export function TypePill({ type, showLabel = true, className = "" }: TypePillProps) {
+  const t = VISIT_TYPES[type as VisitType] ?? VISIT_TYPES.other;
+  const label = VISIT_TYPES[type as VisitType]?.label ?? type;
 
   return (
     <span
-      className={["inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold", className].join(" ")}
-      style={{ color: fg, backgroundColor: bg }}
+      className={["inline-flex items-center gap-2 whitespace-nowrap text-[12px]", className].join(" ")}
+      style={{ color: "var(--text-secondary)" }}
     >
-      {isHome && <HomeIcon size={10} />}
-      {label}
+      <span
+        aria-hidden="true"
+        className="flex-shrink-0"
+        style={{
+          width: "var(--mark-size)",
+          height: "var(--mark-size)",
+          borderRadius: "1px",
+          background: t.color,
+        }}
+      />
+      {showLabel && label}
     </span>
   );
 }
+
+export { VISIT_TYPES };

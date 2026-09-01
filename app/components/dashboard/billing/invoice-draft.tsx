@@ -18,8 +18,8 @@ export function InvoiceDraft({ invoice }: { invoice: Invoice }) {
   return (
     <div className="rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--surface-2)] p-3">
       <div className="mb-2 flex items-center justify-between gap-3">
-        <p className="text-xs font-bold text-[var(--ink)]">טיוטת חשבונית</p>
-        <p className="text-xs font-extrabold tabular-nums text-[var(--ink)]">{fmtMoney(invoice.total)}</p>
+        <p className="text-xs font-semibold text-[var(--ink)]">טיוטת חשבונית</p>
+        <p className="text-xs font-semibold tabular-nums text-[var(--ink)]">{fmtMoney(invoice.total)}</p>
       </div>
       <ul className="mb-3 space-y-1">
         {invoice.items.map((item, index) => (

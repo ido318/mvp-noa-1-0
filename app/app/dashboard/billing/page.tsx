@@ -64,10 +64,10 @@ export default function BillingPage() {
   return (
     <div className="mx-auto w-full max-w-[1000px] space-y-5 p-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-[28px] font-extrabold text-[var(--ink)]">חיובים</h1>
+        <h1 className="text-[28px] font-semibold text-[var(--ink)]">חיובים</h1>
         <Card className="px-4 py-2.5">
           <p className="text-[11px] text-[var(--muted)]">חוב פתוח (נשלח, טרם שולם)</p>
-          <p className="text-[18px] font-extrabold tabular-nums text-[var(--amber-600)]">{fmtMoney(totalOutstanding)}</p>
+          <p className="text-[18px] font-semibold tabular-nums text-[var(--amber-600)]">{fmtMoney(totalOutstanding)}</p>
         </Card>
       </div>
 
@@ -99,7 +99,7 @@ export default function BillingPage() {
             {filtered.map((inv) => (
               <div key={inv.id} className="flex items-center justify-between gap-3 px-5 py-3.5">
                 <div className="min-w-0">
-                  <p className="text-[13.5px] font-bold text-[var(--ink)]">#{inv.invoiceNumber}</p>
+                  <p className="text-[13.5px] font-semibold text-[var(--ink)]">#{inv.invoiceNumber}</p>
                   <Link
                     href={`/dashboard/clients?customerId=${inv.customerId}`}
                     className="text-xs text-[var(--brand-600)] hover:underline"
@@ -110,7 +110,7 @@ export default function BillingPage() {
                 </div>
                 <div className="flex flex-shrink-0 items-center gap-3">
                   <p className="text-xs text-[var(--muted)]">{fmtDate(inv.issuedAt)}</p>
-                  <p className="text-sm font-extrabold tabular-nums text-[var(--ink)]">{fmtMoney(inv.total)}</p>
+                  <p className="text-sm font-semibold tabular-nums text-[var(--ink)]">{fmtMoney(inv.total)}</p>
                   <Badge color={STATUS_COLOR[inv.status]}>{STATUS_LABEL[inv.status]}</Badge>
                   {inv.status === "draft" ? <InvoiceDraft invoice={inv} /> : null}
                   {inv.status === "sent" ? <PaymentForm clinicId={inv.clinicId} invoiceId={inv.id} /> : null}

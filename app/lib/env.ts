@@ -13,6 +13,26 @@ const clientSchema = z.object({
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1),
 });
 
+/**
+ * Vercel injects VERCEL_URL (host only, no scheme) into every deployment, and it
+ * is the only value that names *this* deployment. APP_BASE_URL is a single fixed
+ * value, so a preview that inherits Production's copy would call back into the
+ * production API instead of its own; falling back to VERCEL_URL keeps each
+ * deployment self-referential without a per-branch variable.
+ *
+ * An explicit APP_BASE_URL still wins, so local development and the fixed
+ * production domain are unaffected.
+ */
+function resolveAppBaseUrl(): string | undefined {
+  const explicit = process.env.APP_BASE_URL?.trim();
+  if (explicit) return explicit;
+
+  const vercelUrl = process.env.VERCEL_URL?.trim();
+  if (vercelUrl) return `https://${vercelUrl}`;
+
+  return undefined;
+}
+
 function parseEnv() {
   const client = clientSchema.safeParse({
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -27,7 +47,7 @@ function parseEnv() {
 
   const server = serverSchema.safeParse({
     APP_ENV: process.env.APP_ENV,
-    APP_BASE_URL: process.env.APP_BASE_URL,
+    APP_BASE_URL: resolveAppBaseUrl(),
     SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
     HEALTH_CHECK_TOKEN: process.env.HEALTH_CHECK_TOKEN || undefined,
     HEALTH_CHECK_ALLOWED_IPS: process.env.HEALTH_CHECK_ALLOWED_IPS || undefined,

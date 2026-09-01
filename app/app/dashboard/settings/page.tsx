@@ -46,7 +46,7 @@ function SectionTitle({
   return (
     <div className="mb-3 flex items-start justify-between gap-3">
       <div>
-        <h2 className="text-sm font-bold uppercase tracking-wide text-[var(--muted)]">{children}</h2>
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--muted)]">{children}</h2>
         {hint ? <p className="mt-0.5 text-xs text-[var(--faint)]">{hint}</p> : null}
       </div>
       {action}
@@ -213,7 +213,7 @@ export default function SettingsPage() {
       <div className="mx-auto max-w-[880px] space-y-5">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h1 className="text-[28px] font-extrabold leading-tight text-[var(--ink)]">הגדרות</h1>
+            <h1 className="text-[28px] font-semibold leading-tight text-[var(--ink)]">הגדרות</h1>
             <p className="mt-1 text-sm font-semibold text-[var(--muted)]">
               סקירת התצורה של המרפאה והחשבון שלך
             </p>
