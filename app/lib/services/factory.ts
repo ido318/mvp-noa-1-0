@@ -8,7 +8,10 @@ import { CalendarBlockRepository } from "@/lib/repositories/calendar-block.repos
 import { ClinicRepository } from "@/lib/repositories/clinic.repository";
 import { CustomerRepository } from "@/lib/repositories/customer.repository";
 import { InvoiceRepository } from "@/lib/repositories/invoice.repository";
+import { InventoryRepository } from "@/lib/repositories/inventory.repository";
 import { FollowUpRepository } from "@/lib/repositories/follow-up.repository";
+import { PaymentRepository } from "@/lib/repositories/payment.repository";
+import { VisitChargeRepository } from "@/lib/repositories/visit-charge.repository";
 import { LabOrderRepository } from "@/lib/repositories/lab-order.repository";
 import { MedicalNoteRepository } from "@/lib/repositories/medical-note.repository";
 import { MedicalRecordRepository } from "@/lib/repositories/medical-record.repository";
@@ -33,7 +36,10 @@ import { ClinicSettingsService } from "@/lib/services/clinic-settings.service";
 import { CustomerService } from "@/lib/services/customer.service";
 import { HealthService } from "@/lib/services/health.service";
 import { InvoiceService } from "@/lib/services/invoice.service";
+import { InventoryService } from "@/lib/services/inventory.service";
 import { FollowUpService } from "@/lib/services/follow-up.service";
+import { PaymentService } from "@/lib/services/payment.service";
+import { VisitChargeService } from "@/lib/services/visit-charge.service";
 import { LabOrderService } from "@/lib/services/lab-order.service";
 import { MedicalRecordService } from "@/lib/services/medical-record.service";
 import { PetService } from "@/lib/services/pet.service";
@@ -66,7 +72,10 @@ export async function createServices() {
   const vaccinationRepository = new VaccinationRepository(supabase);
   const prescriptionRepository = new PrescriptionRepository(supabase);
   const invoiceRepository = new InvoiceRepository(supabase);
+  const inventoryRepository = new InventoryRepository(supabase);
   const followUpRepository = new FollowUpRepository(supabase);
+  const paymentRepository = new PaymentRepository(supabase);
+  const visitChargeRepository = new VisitChargeRepository(supabase);
   const taskRepository = new TaskRepository(supabase);
   const labOrderRepository = new LabOrderRepository(supabase);
   const vitalRepository = new VitalRepository(supabase);
@@ -79,6 +88,7 @@ export async function createServices() {
   const dashboardNotificationsService = new DashboardNotificationsService(supabase);
   const taskService = new TaskService(taskRepository);
   const followUpService = new FollowUpService(followUpRepository, taskService);
+  const invoiceService = new InvoiceService(invoiceRepository, auditService);
 
   const medicalRecordService = new MedicalRecordService(
     visitRepository,
@@ -116,7 +126,10 @@ export async function createServices() {
     calendar: new CalendarService(appointmentRepository, calendarBlockRepository),
     calendarBlock: new CalendarBlockService(calendarBlockRepository),
     waitlist: new WaitlistService(waitlistRepository),
-    invoice: new InvoiceService(invoiceRepository, auditService),
+    invoice: invoiceService,
+    inventory: new InventoryService(inventoryRepository),
+    payment: new PaymentService(paymentRepository),
+    visitCharge: new VisitChargeService(visitChargeRepository, visitRepository, invoiceService),
     task: taskService,
     followUp: followUpService,
     labOrder: new LabOrderService(labOrderRepository),

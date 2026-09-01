@@ -9,6 +9,7 @@ import { VisitShareSection } from "@/app/dashboard/visits/visit-share-section";
 import { VisitVaccinationsSection } from "@/app/dashboard/visits/visit-vaccinations-section";
 import { VisitWorkspace } from "@/app/dashboard/visits/visit-workspace";
 import { PreVisitBriefCard } from "@/app/dashboard/voice/pre-visit-brief-card";
+import { VisitChargesPanel } from "@/components/dashboard/billing/visit-charges-panel";
 import { formatIsraelDateTime } from "@/lib/israel-date";
 import type { Appointment } from "@/types/domain/appointment";
 import type { Customer } from "@/types/domain/customer";
@@ -19,6 +20,7 @@ import type { Vaccination } from "@/types/domain/vaccination";
 import type { ClinicRole } from "@/types/domain/clinic";
 import type { MeResponse } from "@/types/api/me";
 import type { Visit, VisitStatus } from "@/types/domain/visit";
+import type { VisitCharge } from "@/types/domain/visit-charge";
 import type { Vital } from "@/types/domain/vital";
 import type { VoiceCall } from "@/types/domain/voice-call";
 
@@ -47,13 +49,14 @@ export default async function VisitDetailPage({ params }: Params) {
     );
   }
 
-  const [notesData, prescriptionsData, vaccinationsData, vitalsData, customer, pet, appointment] = await Promise.all([
+  const [notesData, prescriptionsData, vaccinationsData, vitalsData, chargesData, customer, pet, appointment] = await Promise.all([
     dashboardApiFetch<{ items: MedicalNote[] }>(`/api/visits/${visitId}/notes`),
     dashboardApiFetch<{ items: Prescription[] }>(`/api/visits/${visitId}/prescriptions`),
     dashboardApiFetch<{ items: Vaccination[] }>(
       `/api/pets/${visit.petId}/vaccinations?clinicId=${encodeURIComponent(visit.clinicId)}`,
     ),
     dashboardApiFetch<{ items: Vital[] }>(`/api/visits/${visitId}/vitals`),
+    dashboardApiFetch<{ items: VisitCharge[] }>(`/api/visits/${visitId}/charges`),
     dashboardApiFetch<Customer>(`/api/customers/${visit.customerId}`),
     dashboardApiFetch<Pet>(`/api/pets/${visit.petId}`),
     visit.appointmentId
@@ -171,6 +174,13 @@ export default async function VisitDetailPage({ params }: Params) {
             petId={visit.petId}
             initialVaccinations={vaccinationsData?.items ?? []}
           />
+        </div>
+      </Card>
+
+      <Card>
+        <h3 className="text-[15px] font-bold text-[var(--ink)]">חיובי ביקור</h3>
+        <div className="mt-3">
+          <VisitChargesPanel visitId={visit.id} charges={chargesData?.items ?? []} />
         </div>
       </Card>
 

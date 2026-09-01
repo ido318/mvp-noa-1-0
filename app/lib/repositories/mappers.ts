@@ -16,6 +16,7 @@ import type {
   PreferredContactMethod,
 } from "@/types/domain/customer";
 import type { Invoice, InvoiceLineItem, InvoiceStatus } from "@/types/domain/invoice";
+import type { InventoryItem } from "@/types/domain/inventory";
 import type { LabOrder, LabOrderStatus } from "@/types/domain/lab-order";
 import type { MedicalNote, MedicalNoteType } from "@/types/domain/medical-note";
 import type { MedicalRecord } from "@/types/domain/medical-record";
@@ -24,8 +25,10 @@ import type { Prescription, PrescriptionStatus } from "@/types/domain/prescripti
 import type { Profile } from "@/types/domain/profile";
 import type { Task, TaskPriority, TaskStatus } from "@/types/domain/task";
 import type { FollowUp } from "@/types/domain/follow-up";
+import type { Payment } from "@/types/domain/payment";
 import type { Vaccination } from "@/types/domain/vaccination";
 import type { Visit, VisitStatus } from "@/types/domain/visit";
+import type { VisitCharge } from "@/types/domain/visit-charge";
 import type { Vital } from "@/types/domain/vital";
 import type {
   VoiceCall,
@@ -843,5 +846,65 @@ export function mapVitalRow(row: {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     deletedAt: row.deleted_at,
+  };
+}
+
+export function mapInventoryItemRow(row: Record<string, unknown>): InventoryItem {
+  return {
+    id: row["id"] as string,
+    clinicId: row["clinic_id"] as string,
+    name: row["name"] as string,
+    sku: (row["sku"] as string | null) ?? null,
+    category: row["category"] as string,
+    unit: row["unit"] as string,
+    quantityOnHand: Number(row["quantity_on_hand"] ?? 0),
+    reorderLevel: Number(row["reorder_level"] ?? 0),
+    unitCost: row["unit_cost"] == null ? null : Number(row["unit_cost"]),
+    unitPrice: row["unit_price"] == null ? null : Number(row["unit_price"]),
+    active: row["active"] as boolean,
+    createdByUserId: (row["created_by_user_id"] as string | null) ?? null,
+    version: row["version"] as number,
+    createdAt: row["created_at"] as string,
+    updatedAt: row["updated_at"] as string,
+    deletedAt: (row["deleted_at"] as string | null) ?? null,
+  };
+}
+
+export function mapVisitChargeRow(row: Record<string, unknown>): VisitCharge {
+  return {
+    id: row["id"] as string,
+    clinicId: row["clinic_id"] as string,
+    visitId: row["visit_id"] as string,
+    customerId: row["customer_id"] as string,
+    petId: row["pet_id"] as string,
+    description: row["description"] as string,
+    quantity: Number(row["quantity"]),
+    unitPrice: Number(row["unit_price"]),
+    status: row["status"] as VisitCharge["status"],
+    invoiceId: (row["invoice_id"] as string | null) ?? null,
+    sourceType: row["source_type"] as string,
+    sourceId: (row["source_id"] as string | null) ?? null,
+    createdByUserId: (row["created_by_user_id"] as string | null) ?? null,
+    reviewedByUserId: (row["reviewed_by_user_id"] as string | null) ?? null,
+    reviewedAt: (row["reviewed_at"] as string | null) ?? null,
+    version: row["version"] as number,
+    createdAt: row["created_at"] as string,
+    updatedAt: row["updated_at"] as string,
+    deletedAt: (row["deleted_at"] as string | null) ?? null,
+  };
+}
+
+export function mapPaymentRow(row: Record<string, unknown>): Payment {
+  return {
+    id: row["id"] as string,
+    clinicId: row["clinic_id"] as string,
+    invoiceId: row["invoice_id"] as string,
+    amount: Number(row["amount"]),
+    method: row["method"] as Payment["method"],
+    paidAt: row["paid_at"] as string,
+    reference: (row["reference"] as string | null) ?? null,
+    notes: (row["notes"] as string | null) ?? null,
+    recordedByUserId: (row["recorded_by_user_id"] as string | null) ?? null,
+    createdAt: row["created_at"] as string,
   };
 }
