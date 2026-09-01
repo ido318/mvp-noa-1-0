@@ -338,14 +338,29 @@ export class MedicalRecordService {
     return created;
   }
 
+  /**
+   * Plain edits never transition status away from 'draft': 'approved' and
+   * 'archived' are only reachable through approveNote() (and, later, its own
+   * dedicated archive/lock flow), which enforces the elevated-role gate and
+   * stamps approved_by_user_id/approved_at. Accepting those values here would
+   * let any clinic member flip a note to 'approved' without either.
+   */
   async updateNote(
     actor: ServiceActor,
     noteId: string,
     input: UpdateMedicalNoteInput,
+    expectedVisitId?: string,
   ): Promise<Result<MedicalNote>> {
-    const existing = await this.medicalNoteRepository.findById(noteId);
+    if (input.status === "approved" || input.status === "archived") {
+      return err(
+        AppError.validation(
+          "Cannot set medical note status to approved/archived via update; use the dedicated approve endpoint",
+        ),
+      );
+    }
+
+    const existing = await this.loadScopedNote(noteId, expectedVisitId);
     if (!existing.ok) return existing;
-    if (!existing.value) return err(AppError.notFound("Medical note not found"));
 
     const visit = await this.assertVisitAccessible(actor, existing.value.visitId);
     if (!visit.ok) return visit;
@@ -367,10 +382,13 @@ export class MedicalRecordService {
     return updated;
   }
 
-  async approveNote(actor: ServiceActor, noteId: string): Promise<Result<MedicalNote>> {
-    const existing = await this.medicalNoteRepository.findById(noteId);
+  async approveNote(
+    actor: ServiceActor,
+    noteId: string,
+    expectedVisitId?: string,
+  ): Promise<Result<MedicalNote>> {
+    const existing = await this.loadScopedNote(noteId, expectedVisitId);
     if (!existing.ok) return existing;
-    if (!existing.value) return err(AppError.notFound("Medical note not found"));
 
     const visit = await this.assertVisitAccessible(actor, existing.value.visitId);
     if (!visit.ok) return visit;
@@ -397,6 +415,25 @@ export class MedicalRecordService {
     });
 
     return approved;
+  }
+
+  /**
+   * Loads a note by id, optionally verifying it belongs to expectedVisitId
+   * (the visitId path segment on nested /visits/:visitId/notes/:noteId
+   * routes). A mismatch is reported as not-found rather than leaking that a
+   * note exists under a different visit.
+   */
+  private async loadScopedNote(
+    noteId: string,
+    expectedVisitId?: string,
+  ): Promise<Result<MedicalNote>> {
+    const existing = await this.medicalNoteRepository.findById(noteId);
+    if (!existing.ok) return existing;
+    if (!existing.value) return err(AppError.notFound("Medical note not found"));
+    if (expectedVisitId && existing.value.visitId !== expectedVisitId) {
+      return err(AppError.notFound("Medical note not found"));
+    }
+    return ok(existing.value);
   }
 
   async softDeleteNote(actor: ServiceActor, noteId: string): Promise<Result<void>> {

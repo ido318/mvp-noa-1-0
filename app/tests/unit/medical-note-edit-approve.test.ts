@@ -117,6 +117,85 @@ describe("MedicalRecordService.updateNote", () => {
     expect(result.ok).toBe(false);
     expect(medicalNoteRepository.update).not.toHaveBeenCalled();
   });
+
+  it("rejects setting status to approved via plain update", async () => {
+    const medicalNoteRepository = {
+      findById: vi.fn(),
+      update: vi.fn(),
+    };
+    const { service } = buildService(medicalNoteRepository);
+
+    const result = await service.updateNote(vetActor, "note1", { status: "approved" });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("VALIDATION_ERROR");
+    }
+    expect(medicalNoteRepository.findById).not.toHaveBeenCalled();
+    expect(medicalNoteRepository.update).not.toHaveBeenCalled();
+  });
+
+  it("rejects setting status to archived via plain update", async () => {
+    const medicalNoteRepository = {
+      findById: vi.fn(),
+      update: vi.fn(),
+    };
+    const { service } = buildService(medicalNoteRepository);
+
+    const result = await service.updateNote(vetActor, "note1", { status: "archived" });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("VALIDATION_ERROR");
+    }
+    expect(medicalNoteRepository.update).not.toHaveBeenCalled();
+  });
+
+  it("allows setting status back to draft via plain update", async () => {
+    const medicalNoteRepository = {
+      findById: vi.fn().mockResolvedValue(ok(note())),
+      update: vi.fn().mockResolvedValue(ok(note({ status: "draft" }))),
+    };
+    const { service } = buildService(medicalNoteRepository);
+
+    const result = await service.updateNote(vetActor, "note1", { status: "draft" });
+
+    expect(result.ok).toBe(true);
+    expect(medicalNoteRepository.update).toHaveBeenCalledWith("note1", { status: "draft" });
+  });
+
+  it("returns not found when the note's visitId does not match the expected visit", async () => {
+    const medicalNoteRepository = {
+      findById: vi.fn().mockResolvedValue(ok(note({ visitId: "visit1" }))),
+      update: vi.fn(),
+    };
+    const { service } = buildService(medicalNoteRepository);
+
+    const result = await service.updateNote(
+      vetActor,
+      "note1",
+      { content: "x" },
+      "some-other-visit",
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("NOT_FOUND");
+    }
+    expect(medicalNoteRepository.update).not.toHaveBeenCalled();
+  });
+
+  it("succeeds when the note's visitId matches the expected visit", async () => {
+    const medicalNoteRepository = {
+      findById: vi.fn().mockResolvedValue(ok(note({ visitId: "visit1" }))),
+      update: vi.fn().mockResolvedValue(ok(note({ content: "עודכן" }))),
+    };
+    const { service } = buildService(medicalNoteRepository);
+
+    const result = await service.updateNote(vetActor, "note1", { content: "עודכן" }, "visit1");
+
+    expect(result.ok).toBe(true);
+  });
 });
 
 describe("MedicalRecordService.approveNote", () => {
@@ -203,6 +282,35 @@ describe("MedicalRecordService.approveNote", () => {
       expect(result.error.code).toBe("NOT_FOUND");
     }
   });
+
+  it("returns not found when the note's visitId does not match the expected visit", async () => {
+    const medicalNoteRepository = {
+      findById: vi.fn().mockResolvedValue(ok(note({ visitId: "visit1" }))),
+      approve: vi.fn(),
+    };
+    const { service } = buildService(medicalNoteRepository);
+
+    const result = await service.approveNote(vetActor, "note1", "some-other-visit");
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("NOT_FOUND");
+    }
+    expect(medicalNoteRepository.approve).not.toHaveBeenCalled();
+  });
+
+  it("succeeds when the note's visitId matches the expected visit", async () => {
+    const medicalNoteRepository = {
+      findById: vi.fn().mockResolvedValue(ok(note({ visitId: "visit1" }))),
+      approve: vi.fn().mockResolvedValue(ok(note({ status: "approved" }))),
+    };
+    const { service } = buildService(medicalNoteRepository);
+
+    const result = await service.approveNote(vetActor, "note1", "visit1");
+
+    expect(result.ok).toBe(true);
+    expect(medicalNoteRepository.approve).toHaveBeenCalledWith("note1", "vet1");
+  });
 });
 
 describe("API routes for editing and approving medical notes", () => {
@@ -251,6 +359,7 @@ describe("API routes for editing and approving medical notes", () => {
       { userId: "u1", clinicIds: ["c1"], defaultClinicId: "c1" },
       "n1",
       { content: "עודכן" },
+      "v1",
     );
   });
 
@@ -271,6 +380,7 @@ describe("API routes for editing and approving medical notes", () => {
     expect(approveNote).toHaveBeenCalledWith(
       { userId: "u1", clinicIds: ["c1"], defaultClinicId: "c1" },
       "n1",
+      "v1",
     );
   });
 

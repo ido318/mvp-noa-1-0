@@ -9,8 +9,8 @@ export async function POST(_: Request, { params }: Params) {
 
   try {
     const { actor, medicalRecord } = await getActorAndServices();
-    const { noteId } = await params;
-    const result = await medicalRecord.approveNote(actor, noteId);
+    const { visitId, noteId } = await params;
+    const result = await medicalRecord.approveNote(actor, noteId, visitId);
     if (!result.ok) return handleRouteError(result.error, requestId);
     return jsonSuccess(result.value, 200, requestId);
   } catch (error) {
