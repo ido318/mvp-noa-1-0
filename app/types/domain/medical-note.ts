@@ -4,7 +4,8 @@ export type MedicalNoteType =
   | "soap_assessment"
   | "soap_plan"
   | "general"
-  | "follow_up";
+  | "follow_up"
+  | "addendum";
 
 export type MedicalNote = {
   id: string;
@@ -16,6 +17,7 @@ export type MedicalNote = {
   objective: string | null;
   assessment: string | null;
   plan: string | null;
+  parentNoteId: string | null;
   status: "draft" | "approved" | "archived";
   approvedByUserId: string | null;
   approvedAt: string | null;
@@ -34,6 +36,7 @@ export type CreateMedicalNoteInput = {
   assessment?: string | null;
   plan?: string | null;
   status?: "draft" | "approved" | "archived";
+  parentNoteId?: string | null;
 };
 
 export type UpdateMedicalNoteInput = {
@@ -44,4 +47,17 @@ export type UpdateMedicalNoteInput = {
   assessment?: string | null;
   plan?: string | null;
   status?: "draft" | "approved" | "archived";
+};
+
+/**
+ * Body shape for POST /visits/:visitId/notes/:noteId/addendum. noteType is
+ * fixed to "addendum" and parentNoteId is derived from the :noteId path
+ * segment, so neither is client-supplied here.
+ */
+export type AddMedicalNoteAddendumInput = {
+  content: string;
+  subjective?: string | null;
+  objective?: string | null;
+  assessment?: string | null;
+  plan?: string | null;
 };

@@ -400,6 +400,7 @@ export function mapMedicalNoteRow(row: {
   objective?: string | null;
   assessment?: string | null;
   plan?: string | null;
+  parent_note_id?: string | null;
   status?: "draft" | "approved" | "archived";
   approved_by_user_id?: string | null;
   approved_at?: string | null;
@@ -419,6 +420,7 @@ export function mapMedicalNoteRow(row: {
     objective: row.objective ?? null,
     assessment: row.assessment ?? null,
     plan: row.plan ?? null,
+    parentNoteId: row.parent_note_id ?? null,
     status: row.status ?? "draft",
     approvedByUserId: row.approved_by_user_id ?? null,
     approvedAt: row.approved_at ?? null,

@@ -22,6 +22,12 @@ const NOTE_TYPE_LABELS: Record<MedicalNoteType, string> = {
   soap_assessment: "SOAP - הערכה",
   soap_plan: "SOAP - תוכנית טיפול",
   follow_up: "מעקב",
+  // Minimal compile-fix only: MedicalNoteType gained "addendum" alongside the
+  // DB migration + addAddendum() app-layer support (see
+  // supabase/migrations/20260901172952_medical_notes_lock_and_addendum.sql).
+  // Full UI wiring (badges, "add addendum" textarea, nested display) is a
+  // separate later task; this entry only keeps this exhaustive map compiling.
+  addendum: "נספח",
 };
 
 type Props = {

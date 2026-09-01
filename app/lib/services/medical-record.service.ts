@@ -16,7 +16,9 @@ import {
 import type { AuditService } from "@/lib/services/audit.service";
 import type { DashboardNotificationsService } from "@/lib/services/dashboard-notifications.service";
 import type { ServiceActor } from "@/lib/services/service-context";
+import { isMedicalNoteLocked } from "@/lib/domain/medical-note-lock";
 import type {
+  AddMedicalNoteAddendumInput,
   CreateMedicalNoteInput,
   MedicalNote,
   UpdateMedicalNoteInput,
@@ -53,6 +55,8 @@ const NOTE_TYPE_LABELS: Record<string, string> = {
   soap_assessment: "SOAP - הערכה",
   soap_plan: "SOAP - תוכנית טיפול",
   follow_up: "מעקב",
+  addendum: "נספח",
+  soap_full: "SOAP מלא",
 };
 
 export class MedicalRecordService {
@@ -365,6 +369,20 @@ export class MedicalRecordService {
     const visit = await this.assertVisitAccessible(actor, existing.value.visitId);
     if (!visit.ok) return visit;
 
+    // Pre-emptive check above the DB trigger: give a clear Hebrew conflict
+    // message instead of letting the request reach
+    // medical_notes_enforce_lock and fail with a raw Postgres exception. The
+    // trigger (see supabase/migrations/20260901172952_medical_notes_lock_and_addendum.sql)
+    // remains the authoritative enforcement layer; this is defense-in-depth,
+    // not a replacement.
+    if (isMedicalNoteLocked(existing.value)) {
+      return err(
+        AppError.conflict(
+          "לא ניתן לערוך הערה מאושרת שעברו עליה יותר מ-24 שעות — הוסף נספח במקום",
+        ),
+      );
+    }
+
     const updated = await this.medicalNoteRepository.update(noteId, input);
     if (!updated.ok) return updated;
 
@@ -380,6 +398,57 @@ export class MedicalRecordService {
     });
 
     return updated;
+  }
+
+  /**
+   * Adds an addendum to an existing (possibly locked) note: a new
+   * medical_notes row with note_type 'addendum' and parent_note_id pointing
+   * back at the parent, created as a plain 'draft' like any other new note.
+   * This is never blocked by the parent's 24-hour lock, because the
+   * medical_notes_enforce_lock trigger only fires on UPDATE to the parent
+   * row itself — inserting a new row is unaffected regardless of the
+   * parent's age or approval status.
+   */
+  async addAddendum(
+    actor: ServiceActor,
+    parentNoteId: string,
+    input: AddMedicalNoteAddendumInput,
+    expectedVisitId?: string,
+  ): Promise<Result<MedicalNote>> {
+    const parent = await this.loadScopedNote(parentNoteId, expectedVisitId);
+    if (!parent.ok) return parent;
+
+    const visit = await this.assertVisitAccessible(actor, parent.value.visitId);
+    if (!visit.ok) return visit;
+
+    const created = await this.medicalNoteRepository.create(
+      parent.value.clinicId,
+      parent.value.visitId,
+      {
+        noteType: "addendum",
+        parentNoteId: parent.value.id,
+        content: input.content,
+        subjective: input.subjective ?? null,
+        objective: input.objective ?? null,
+        assessment: input.assessment ?? null,
+        plan: input.plan ?? null,
+      },
+      actor.userId,
+    );
+    if (!created.ok) return created;
+
+    await this.auditService.logAction({
+      clinicId: parent.value.clinicId,
+      actorType: "user",
+      actorId: actor.userId,
+      action: "medical_note.addendum_create",
+      entityType: "medical_note",
+      entityId: created.value.id,
+      afterPayload: created.value,
+      metadata: { parentNoteId: parent.value.id },
+    });
+
+    return created;
   }
 
   async approveNote(

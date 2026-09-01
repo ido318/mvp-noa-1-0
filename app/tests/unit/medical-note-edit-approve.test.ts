@@ -63,6 +63,7 @@ function note(overrides: Partial<MedicalNote> = {}): MedicalNote {
     objective: null,
     assessment: null,
     plan: null,
+    parentNoteId: null,
     status: "draft",
     approvedByUserId: null,
     approvedAt: null,
@@ -195,6 +196,138 @@ describe("MedicalRecordService.updateNote", () => {
     const result = await service.updateNote(vetActor, "note1", { content: "עודכן" }, "visit1");
 
     expect(result.ok).toBe(true);
+  });
+
+  it("rejects editing an approved note more than 24 hours old with a conflict, before ever calling the repository", async () => {
+    const lockedNote = note({
+      status: "approved",
+      createdAt: new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString(),
+    });
+    const medicalNoteRepository = {
+      findById: vi.fn().mockResolvedValue(ok(lockedNote)),
+      update: vi.fn(),
+    };
+    const { service } = buildService(medicalNoteRepository);
+
+    const result = await service.updateNote(vetActor, "note1", { content: "עודכן" });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("CONFLICT");
+    }
+    expect(medicalNoteRepository.update).not.toHaveBeenCalled();
+  });
+
+  it("allows editing an approved note less than 24 hours old (not yet locked)", async () => {
+    const freshlyApproved = note({
+      status: "approved",
+      createdAt: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
+    });
+    const medicalNoteRepository = {
+      findById: vi.fn().mockResolvedValue(ok(freshlyApproved)),
+      update: vi.fn().mockResolvedValue(ok(note({ content: "עודכן" }))),
+    };
+    const { service } = buildService(medicalNoteRepository);
+
+    const result = await service.updateNote(vetActor, "note1", { content: "עודכן" });
+
+    expect(result.ok).toBe(true);
+    expect(medicalNoteRepository.update).toHaveBeenCalledWith("note1", { content: "עודכן" });
+  });
+});
+
+describe("MedicalRecordService.addAddendum", () => {
+  it("creates a draft addendum note referencing the parent, even when the parent is locked", async () => {
+    const lockedParent = note({
+      id: "parent1",
+      status: "approved",
+      createdAt: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(),
+    });
+    const createdAddendum = note({
+      id: "addendum1",
+      noteType: "addendum",
+      parentNoteId: "parent1",
+      content: "תוספת למרות שההערה נעולה",
+      status: "draft",
+    });
+    const medicalNoteRepository = {
+      findById: vi.fn().mockResolvedValue(ok(lockedParent)),
+      create: vi.fn().mockResolvedValue(ok(createdAddendum)),
+    };
+    const { service, auditService } = buildService(medicalNoteRepository);
+
+    const result = await service.addAddendum(vetActor, "parent1", {
+      content: "תוספת למרות שההערה נעולה",
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.noteType).toBe("addendum");
+      expect(result.value.parentNoteId).toBe("parent1");
+      expect(result.value.status).toBe("draft");
+    }
+    expect(medicalNoteRepository.create).toHaveBeenCalledWith(
+      "clinic1",
+      "visit1",
+      expect.objectContaining({
+        noteType: "addendum",
+        parentNoteId: "parent1",
+        content: "תוספת למרות שההערה נעולה",
+      }),
+      "vet1",
+    );
+    expect(auditService.logAction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "medical_note.addendum_create",
+        entityId: "addendum1",
+        metadata: { parentNoteId: "parent1" },
+      }),
+    );
+  });
+
+  it("rejects addendum creation from an actor outside the parent note's clinic", async () => {
+    const medicalNoteRepository = {
+      findById: vi.fn().mockResolvedValue(ok(note({ id: "parent1" }))),
+      create: vi.fn(),
+    };
+    const { service } = buildService(medicalNoteRepository);
+
+    const result = await service.addAddendum(outsideActor, "parent1", { content: "x" });
+
+    expect(result.ok).toBe(false);
+    expect(medicalNoteRepository.create).not.toHaveBeenCalled();
+  });
+
+  it("returns not found when the parent note's visitId does not match the expected visit", async () => {
+    const medicalNoteRepository = {
+      findById: vi.fn().mockResolvedValue(ok(note({ id: "parent1", visitId: "visit1" }))),
+      create: vi.fn(),
+    };
+    const { service } = buildService(medicalNoteRepository);
+
+    const result = await service.addAddendum(vetActor, "parent1", { content: "x" }, "some-other-visit");
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("NOT_FOUND");
+    }
+    expect(medicalNoteRepository.create).not.toHaveBeenCalled();
+  });
+
+  it("returns not found when the parent note does not exist", async () => {
+    const medicalNoteRepository = {
+      findById: vi.fn().mockResolvedValue(ok(null)),
+      create: vi.fn(),
+    };
+    const { service } = buildService(medicalNoteRepository);
+
+    const result = await service.addAddendum(vetActor, "missing", { content: "x" });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("NOT_FOUND");
+    }
+    expect(medicalNoteRepository.create).not.toHaveBeenCalled();
   });
 });
 
@@ -399,5 +532,73 @@ describe("API routes for editing and approving medical notes", () => {
     );
 
     expect(response.status).toBe(409);
+  });
+
+  it("POST /api/visits/[visitId]/notes/[noteId]/addendum validates the body", async () => {
+    const { POST } = await import("@/app/api/visits/[visitId]/notes/[noteId]/addendum/route");
+    mockGetActorAndServices.mockResolvedValue({
+      actor: { userId: "u1", clinicIds: ["c1"], defaultClinicId: "c1" },
+      medicalRecord: { addAddendum: vi.fn() },
+    });
+
+    const response = await POST(
+      new Request("http://localhost/api/visits/v1/notes/n1/addendum", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      }),
+      { params: Promise.resolve({ visitId: "v1", noteId: "n1" }) },
+    );
+
+    expect(response.status).toBe(400);
+  });
+
+  it("POST /api/visits/[visitId]/notes/[noteId]/addendum calls addAddendum and returns 201", async () => {
+    const { POST } = await import("@/app/api/visits/[visitId]/notes/[noteId]/addendum/route");
+    const addAddendum = vi.fn().mockResolvedValue(
+      ok(note({ id: "addendum1", noteType: "addendum", parentNoteId: "n1" })),
+    );
+    mockGetActorAndServices.mockResolvedValue({
+      actor: { userId: "u1", clinicIds: ["c1"], defaultClinicId: "c1" },
+      medicalRecord: { addAddendum },
+    });
+
+    const response = await POST(
+      new Request("http://localhost/api/visits/v1/notes/n1/addendum", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: "תוספת" }),
+      }),
+      { params: Promise.resolve({ visitId: "v1", noteId: "n1" }) },
+    );
+
+    expect(response.status).toBe(201);
+    expect(addAddendum).toHaveBeenCalledWith(
+      { userId: "u1", clinicIds: ["c1"], defaultClinicId: "c1" },
+      "n1",
+      { content: "תוספת" },
+      "v1",
+    );
+  });
+
+  it("POST /api/visits/[visitId]/notes/[noteId]/addendum surfaces a not-found as 404", async () => {
+    const { AppError, err } = await import("@/lib/errors/app-error");
+    const { POST } = await import("@/app/api/visits/[visitId]/notes/[noteId]/addendum/route");
+    const addAddendum = vi.fn().mockResolvedValue(err(AppError.notFound("Medical note not found")));
+    mockGetActorAndServices.mockResolvedValue({
+      actor: { userId: "u1", clinicIds: ["c1"], defaultClinicId: "c1" },
+      medicalRecord: { addAddendum },
+    });
+
+    const response = await POST(
+      new Request("http://localhost/api/visits/v1/notes/n1/addendum", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: "תוספת" }),
+      }),
+      { params: Promise.resolve({ visitId: "v1", noteId: "n1" }) },
+    );
+
+    expect(response.status).toBe(404);
   });
 });
