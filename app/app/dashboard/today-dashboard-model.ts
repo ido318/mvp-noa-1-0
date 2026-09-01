@@ -2,6 +2,7 @@ import { formatIsraelTime, israelDateIso } from "@/lib/israel-date";
 import type { Appointment } from "@/types/domain/appointment";
 import type { Escalation } from "@/types/domain/escalation";
 import type { VoiceCall } from "@/types/domain/voice-call";
+import { formatEscalationReason } from "@/lib/triage-labels";
 
 export type MetricTone = "brand" | "amber" | "coral" | "red";
 
@@ -111,7 +112,7 @@ export function buildTodayDashboardModel({
       ...escalations.map((escalation): TodayAttentionItem => ({
         id: `escalation-${escalation.id}`,
         kind: "escalation",
-        title: escalation.reason,
+        title: formatEscalationReason(escalation.reason),
         subtitle: escalation.afterHours ? "נוצר אחרי שעות הפעילות" : formatIsraelTime(escalation.createdAt),
         tone: escalation.urgency >= 8 ? "red" : "amber",
         urgency: escalation.urgency,

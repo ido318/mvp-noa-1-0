@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/dashboard/ui/skeleton";
 import { useToast } from "@/components/dashboard/ui/toast";
 import { EscalationIcon, ClockIcon, PhoneIcon } from "@/components/dashboard/icons";
 import type { Escalation } from "@/types/domain/escalation";
+import { formatEscalationReason, parseEscalationReason } from "@/lib/triage-labels";
 
 function formatDate(iso: string) {
   return new Intl.DateTimeFormat("he-IL", {
@@ -58,7 +59,9 @@ function ResolveModal({
         onClick={(e) => e.stopPropagation()}
       >
         <h3 className="text-[15px] font-semibold text-[var(--ink)]">סגירת אסקלציה</h3>
-        <p className="mt-1 text-sm text-[var(--muted)] truncate">{escalation.reason}</p>
+        <p className="mt-1 text-sm text-[var(--muted)] truncate">
+          {formatEscalationReason(escalation.reason)}
+        </p>
 
         <div className="mt-4">
           <label className="block text-xs font-semibold text-[var(--ink-2)] mb-1">הערות (אופציונלי)</label>
@@ -104,7 +107,7 @@ function EscalationCard({
             {isResolved && <Badge color="green">טופלה</Badge>}
           </div>
 
-          <p className="text-[14px] font-semibold text-[var(--ink)] leading-snug">{escalation.reason}</p>
+          <EscalationReason reason={escalation.reason} />
 
           <div className="mt-2 flex flex-wrap gap-3 text-[11px] text-[var(--muted)]">
             <span className="flex items-center gap-1">
@@ -138,6 +141,40 @@ function EscalationCard({
 }
 
 type FilterStatus = "open" | "resolved" | "all";
+
+
+/**
+ * The agent stores the reason as one machine-readable string. Rendered as its
+ * parts, the decision leads, the matched red flags read as chips, and what the
+ * caller actually said sits underneath in their own words.
+ */
+function EscalationReason({ reason }: { reason: string }) {
+  const { decision, flags, quote, raw } = parseEscalationReason(reason);
+
+  if (!decision) {
+    return (
+      <p className="text-[14px] font-semibold text-[var(--text-primary)] leading-snug">{raw}</p>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-[14px] font-semibold text-[var(--text-primary)] leading-snug">
+          {decision}
+        </span>
+        {flags.map((flag) => (
+          <Badge key={flag} tone="critical">{flag}</Badge>
+        ))}
+      </div>
+      {quote && (
+        <p className="text-[13px] leading-snug" style={{ color: "var(--text-secondary)" }}>
+          ״{quote}״
+        </p>
+      )}
+    </div>
+  );
+}
 
 export default function EscalationsPage() {
   const [items, setItems] = useState<Escalation[]>([]);
