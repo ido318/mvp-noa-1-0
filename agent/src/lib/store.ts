@@ -629,6 +629,13 @@ export async function listCustomerPets(phone: string): Promise<ListCustomerPetsR
   const customerId = extractId(customerRow);
   const fullName = extractString(customerRow, "full_name") ?? "";
 
+  // customers.id is a NOT NULL primary key, so this should be unreachable in
+  // practice — but fail safely (no pets) rather than issuing a pets query
+  // filtered on a null customer_id.
+  if (!customerId) {
+    return { result: `לא נמצאו חיות רשומות עבור ${fullName}.`, pets: [] };
+  }
+
   // Queried separately (rather than via a `pets(...)` embed on the customers
   // query above) so deleted_at can actually be filtered on the pets side —
   // PostgREST embeds don't apply the parent query's filters to child rows.
