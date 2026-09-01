@@ -5,6 +5,7 @@ import type { PetRepository } from "@/lib/repositories/pet.repository";
 import type { VisitRepository } from "@/lib/repositories/visit.repository";
 import { assertMedicalDeleteAuthorized } from "@/lib/services/medical-authorization";
 import type { AuditService } from "@/lib/services/audit.service";
+import type { FollowUpService } from "@/lib/services/follow-up.service";
 import type { MedicalRecordService } from "@/lib/services/medical-record.service";
 import type { ServiceActor } from "@/lib/services/service-context";
 import type {
@@ -30,6 +31,7 @@ export class VisitService {
     private readonly appointmentRepository: AppointmentRepository,
     private readonly auditService: AuditService,
     private readonly medicalRecordService?: Pick<MedicalRecordService, "ensureRecordForPet" | "listNotes">,
+    private readonly followUpService?: Pick<FollowUpService, "createFromVisitClose">,
   ) {}
 
   async listVisits(
@@ -236,6 +238,7 @@ export class VisitService {
     actor: ServiceActor,
     visitId: string,
     version: number,
+    followUp?: { reason: string; dueAt: string },
   ): Promise<Result<Visit>> {
     const existing = await this.getVisitById(actor, visitId);
     if (!existing.ok) return existing;
@@ -253,7 +256,22 @@ export class VisitService {
       return err(AppError.validation("Cannot close visit without at least one clinical note"));
     }
 
-    return this.changeVisitStatus(actor, visitId, version, { status: "completed" });
+    const closed = await this.changeVisitStatus(actor, visitId, version, { status: "completed" });
+    if (!closed.ok) return closed;
+
+    if (followUp) {
+      if (!this.followUpService) {
+        return err(AppError.internal("Follow-up service is not configured"));
+      }
+      const createdFollowUp = await this.followUpService.createFromVisitClose(
+        actor,
+        closed.value,
+        followUp,
+      );
+      if (!createdFollowUp.ok) return err(createdFollowUp.error);
+    }
+
+    return closed;
   }
 
   async softDeleteVisit(

@@ -9,13 +9,15 @@ import { Skeleton } from "@/components/dashboard/ui/skeleton";
 import { Modal } from "@/components/dashboard/ui/modal";
 import { useToast } from "@/components/dashboard/ui/toast";
 import { ListCheckIcon, PlusIcon, CheckIcon } from "@/components/dashboard/icons";
-import type { Task, TaskPriority } from "@/types/domain/task";
+import { DueBadge } from "./due-badge";
+import type { Task, TaskPriority, TaskSourceType } from "@/types/domain/task";
 import type { Appointment } from "@/types/domain/appointment";
 import type { Invoice } from "@/types/domain/invoice";
 import type { MeResponse } from "@/types/api/me";
 
 const PRIORITY_LABEL: Record<TaskPriority, string> = { low: "נמוכה", medium: "בינונית", high: "גבוהה" };
 const PRIORITY_COLOR: Record<TaskPriority, "muted" | "amber" | "red"> = { low: "muted", medium: "amber", high: "red" };
+const SOURCE_LABEL: Record<TaskSourceType, string> = { manual: "ידני", visit: "מביקור", call: "משיחה", follow_up: "מעקב" };
 
 type InboxRow = {
   id: string;
@@ -23,6 +25,7 @@ type InboxRow = {
   subtitle: string;
   tone: "muted" | "amber" | "red";
   toneLabel: string;
+  dueAt?: string | null;
   href?: string;
   onComplete?: () => void;
   completing?: boolean;
@@ -111,12 +114,15 @@ export default function TasksPage() {
   const [loading, setLoading] = useState(true);
   const [clinicId, setClinicId] = useState<string | null>(null);
   const [showNew, setShowNew] = useState(false);
+  const [sourceFilter, setSourceFilter] = useState<"all" | "call">("all");
   const [completingId, setCompletingId] = useState<string | null>(null);
   const { toast } = useToast();
 
   const fetchAll = useCallback(async () => {
+    const taskParams = new URLSearchParams({ status: "open" });
+    if (sourceFilter === "call") taskParams.set("sourceType", "call");
     const [tasksRes, apptRes, invRes] = await Promise.all([
-      fetch("/api/tasks?status=open"),
+      fetch(`/api/tasks?${taskParams.toString()}`),
       fetch("/api/appointments?status=pending_approval"),
       fetch("/api/invoices?status=sent"),
     ]);
@@ -133,7 +139,7 @@ export default function TasksPage() {
       setUnpaidInvoices(d.data.items ?? []);
     }
     setLoading(false);
-  }, []);
+  }, [sourceFilter]);
 
   useEffect(() => {
     void (async () => {
@@ -167,9 +173,10 @@ export default function TasksPage() {
     ...tasks.map((t): InboxRow => ({
       id: `task-${t.id}`,
       title: t.title,
-      subtitle: [t.customerName, t.dueAt ? fmtDateTime(t.dueAt) : null].filter(Boolean).join(" · ") || "משימה כללית",
+      subtitle: [SOURCE_LABEL[t.sourceType], t.customerName, t.dueAt ? fmtDateTime(t.dueAt) : null].filter(Boolean).join(" · ") || "משימה כללית",
       tone: PRIORITY_COLOR[t.priority],
       toneLabel: PRIORITY_LABEL[t.priority],
+      dueAt: t.dueAt,
       onComplete: () => completeTask(t),
       completing: completingId === t.id,
     })),
@@ -179,6 +186,7 @@ export default function TasksPage() {
       subtitle: `${a.customerName ?? ""} · ${fmtDateTime(a.scheduledAt)}`,
       tone: "amber",
       toneLabel: "אישור תור",
+      dueAt: a.scheduledAt,
       href: "/dashboard/calendar",
     })),
     ...unpaidInvoices.map((inv): InboxRow => ({
@@ -201,6 +209,25 @@ export default function TasksPage() {
         </Btn>
       </div>
 
+      <div className="flex gap-2">
+        <Btn
+          type="button"
+          size="sm"
+          variant={sourceFilter === "all" ? "primary" : "soft"}
+          onClick={() => setSourceFilter("all")}
+        >
+          הכל
+        </Btn>
+        <Btn
+          type="button"
+          size="sm"
+          variant={sourceFilter === "call" ? "primary" : "soft"}
+          onClick={() => setSourceFilter("call")}
+        >
+          From Calls
+        </Btn>
+      </div>
+
       {loading ? (
         <Skeleton className="h-64" />
       ) : rows.length === 0 ? (
@@ -216,6 +243,7 @@ export default function TasksPage() {
                     <p className="text-xs text-[var(--muted)]">{row.subtitle}</p>
                   </div>
                   <div className="flex flex-shrink-0 items-center gap-2">
+                    <DueBadge dueAt={row.dueAt ?? null} />
                     <Badge color={row.tone}>{row.toneLabel}</Badge>
                     {row.onComplete && (
                       <Btn size="sm" variant="soft" loading={row.completing} onClick={row.onComplete}>

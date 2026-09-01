@@ -2,6 +2,7 @@ import { z } from "zod";
 
 export const taskPrioritySchema = z.enum(["low", "medium", "high"]);
 export const taskStatusSchema = z.enum(["open", "done"]);
+export const taskSourceTypeSchema = z.enum(["manual", "visit", "call", "follow_up"]);
 
 export const createTaskSchema = z.object({
   clinicId: z.string().uuid(),
@@ -12,6 +13,8 @@ export const createTaskSchema = z.object({
   assigneeUserId: z.string().uuid().optional().nullable(),
   customerId: z.string().uuid().optional().nullable(),
   petId: z.string().uuid().optional().nullable(),
+  sourceType: taskSourceTypeSchema.optional(),
+  sourceId: z.string().uuid().optional().nullable(),
 });
 
 export const updateTaskSchema = z.object({
@@ -22,8 +25,11 @@ export const updateTaskSchema = z.object({
   priority: taskPrioritySchema.optional(),
   dueAt: z.string().datetime({ offset: true }).optional().nullable(),
   assigneeUserId: z.string().uuid().optional().nullable(),
+  sourceType: taskSourceTypeSchema.optional(),
+  sourceId: z.string().uuid().optional().nullable(),
 });
 
 export const listTasksSchema = z.object({
   status: taskStatusSchema.optional(),
+  sourceType: taskSourceTypeSchema.optional(),
 });

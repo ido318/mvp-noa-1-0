@@ -50,6 +50,9 @@ function buildService(existing = visit(), notes: unknown[] = [{ id: "note1" }]) 
   const medicalRecordService = {
     listNotes: vi.fn().mockResolvedValue(ok(notes)),
   };
+  const followUpService = {
+    createFromVisitClose: vi.fn().mockResolvedValue(ok({ id: "follow1" })),
+  };
   const auditService = { logAction: vi.fn().mockResolvedValue(ok(undefined)) };
   const service = new VisitService(
     visitRepository as unknown as VisitRepository,
@@ -58,9 +61,10 @@ function buildService(existing = visit(), notes: unknown[] = [{ id: "note1" }]) 
     {} as AppointmentRepository,
     auditService as unknown as AuditService,
     medicalRecordService as unknown as Pick<MedicalRecordService, "ensureRecordForPet" | "listNotes">,
+    followUpService as never,
   );
 
-  return { service, visitRepository };
+  return { service, visitRepository, followUpService };
 }
 
 describe("VisitService.closeVisit", () => {
@@ -92,5 +96,21 @@ describe("VisitService.closeVisit", () => {
       expectedVersion: 2,
       data: expect.objectContaining({ status: "completed" }),
     });
+  });
+
+  it("creates a follow-up when requested during close", async () => {
+    const { service, followUpService } = buildService();
+
+    const result = await service.closeVisit(actor, "visit1", 2, {
+      reason: "בדיקת שיפור",
+      dueAt: "2026-09-01T09:00:00.000Z",
+    });
+
+    expect(result.ok).toBe(true);
+    expect(followUpService.createFromVisitClose).toHaveBeenCalledWith(
+      actor,
+      expect.objectContaining({ id: "visit1", status: "completed" }),
+      { reason: "בדיקת שיפור", dueAt: "2026-09-01T09:00:00.000Z" },
+    );
   });
 });

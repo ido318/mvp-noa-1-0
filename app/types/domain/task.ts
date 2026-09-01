@@ -1,5 +1,6 @@
 export type TaskPriority = "low" | "medium" | "high";
 export type TaskStatus = "open" | "done";
+export type TaskSourceType = "manual" | "visit" | "call" | "follow_up";
 
 export type Task = {
   id: string;
@@ -14,6 +15,9 @@ export type Task = {
   customerName?: string | null;
   petId: string | null;
   petName?: string | null;
+  sourceType: TaskSourceType;
+  sourceId: string | null;
+  completedAt: string | null;
   createdByUserId: string | null;
   version: number;
   createdAt: string;
@@ -30,6 +34,8 @@ export type CreateTaskInput = {
   assigneeUserId?: string | null;
   customerId?: string | null;
   petId?: string | null;
+  sourceType?: TaskSourceType;
+  sourceId?: string | null;
 };
 
 export type UpdateTaskInput = {
@@ -40,9 +46,12 @@ export type UpdateTaskInput = {
   priority?: TaskPriority;
   dueAt?: string | null;
   assigneeUserId?: string | null;
+  sourceType?: TaskSourceType;
+  sourceId?: string | null;
 };
 
 export type TaskListFilters = {
   clinicIds: string[];
   status?: TaskStatus;
+  sourceType?: TaskSourceType;
 };

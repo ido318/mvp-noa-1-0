@@ -26,6 +26,7 @@ export class TaskRepository {
       .order("created_at", { ascending: false });
 
     if (filters.status) query = query.eq("status", filters.status);
+    if (filters.sourceType) query = query.eq("source_type", filters.sourceType);
 
     const { data, error } = await query;
     if (error) return err(AppError.externalProvider("Failed to list tasks", error));
@@ -56,6 +57,8 @@ export class TaskRepository {
         assignee_user_id: input.assigneeUserId ?? null,
         customer_id: input.customerId ?? null,
         pet_id: input.petId ?? null,
+        source_type: input.sourceType ?? "manual",
+        source_id: input.sourceId ?? null,
         created_by_user_id: input.createdByUserId,
       })
       .select(SELECT_WITH_JOINS)

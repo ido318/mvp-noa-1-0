@@ -22,6 +22,7 @@ import type { Pet, PetStatus } from "@/types/domain/pet";
 import type { Prescription, PrescriptionStatus } from "@/types/domain/prescription";
 import type { Profile } from "@/types/domain/profile";
 import type { Task, TaskPriority, TaskStatus } from "@/types/domain/task";
+import type { FollowUp } from "@/types/domain/follow-up";
 import type { Vaccination } from "@/types/domain/vaccination";
 import type { Visit, VisitStatus } from "@/types/domain/visit";
 import type { Vital } from "@/types/domain/vital";
@@ -625,6 +626,9 @@ export function mapTaskRow(row: {
   customer?: { full_name: string | null } | { full_name: string | null }[] | null;
   pet_id: string | null;
   pet?: { name: string | null } | { name: string | null }[] | null;
+  source_type?: Task["sourceType"];
+  source_id?: string | null;
+  completed_at?: string | null;
   created_by_user_id: string | null;
   version: number;
   created_at: string;
@@ -647,6 +651,56 @@ export function mapTaskRow(row: {
     customerName: customer?.full_name ?? null,
     petId: row.pet_id,
     petName: pet?.name ?? null,
+    sourceType: row.source_type ?? "manual",
+    sourceId: row.source_id ?? null,
+    completedAt: row.completed_at ?? null,
+    createdByUserId: row.created_by_user_id,
+    version: row.version,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    deletedAt: row.deleted_at,
+  };
+}
+
+export function mapFollowUpRow(row: {
+  id: string;
+  clinic_id: string;
+  customer_id: string;
+  customer?: { full_name: string | null } | { full_name: string | null }[] | null;
+  pet_id: string | null;
+  pet?: { name: string | null } | { name: string | null }[] | null;
+  visit_id: string | null;
+  voice_call_id: string | null;
+  task_id: string | null;
+  reason: string;
+  due_at: string;
+  status: TaskStatus;
+  completed_at: string | null;
+  completed_by_user_id: string | null;
+  created_by_user_id: string | null;
+  version: number;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}): FollowUp {
+  const customer = Array.isArray(row.customer) ? row.customer[0] : row.customer;
+  const pet = Array.isArray(row.pet) ? row.pet[0] : row.pet;
+
+  return {
+    id: row.id,
+    clinicId: row.clinic_id,
+    customerId: row.customer_id,
+    customerName: customer?.full_name ?? null,
+    petId: row.pet_id,
+    petName: pet?.name ?? null,
+    visitId: row.visit_id,
+    voiceCallId: row.voice_call_id,
+    taskId: row.task_id,
+    reason: row.reason,
+    dueAt: row.due_at,
+    status: row.status,
+    completedAt: row.completed_at,
+    completedByUserId: row.completed_by_user_id,
     createdByUserId: row.created_by_user_id,
     version: row.version,
     createdAt: row.created_at,

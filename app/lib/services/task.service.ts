@@ -6,6 +6,7 @@ import type {
   Task,
   TaskListFilters,
   TaskPriority,
+  TaskSourceType,
   TaskStatus,
 } from "@/types/domain/task";
 
@@ -37,6 +38,8 @@ export class TaskService {
       priority?: TaskPriority;
       dueAt?: string | null;
       assigneeUserId?: string | null;
+      sourceType?: TaskSourceType;
+      sourceId?: string | null;
     },
   ): Promise<Result<Task>> {
     const existing = await this.repository.findById(taskId);
@@ -53,7 +56,17 @@ export class TaskService {
     if (patch.priority !== undefined) columnPatch.priority = patch.priority;
     if (patch.dueAt !== undefined) columnPatch.due_at = patch.dueAt;
     if (patch.assigneeUserId !== undefined) columnPatch.assignee_user_id = patch.assigneeUserId;
+    if (patch.sourceType !== undefined) columnPatch.source_type = patch.sourceType;
+    if (patch.sourceId !== undefined) columnPatch.source_id = patch.sourceId;
+    if (patch.status === "done") columnPatch.completed_at = new Date().toISOString();
 
     return this.repository.updateVersioned(taskId, expectedVersion, columnPatch);
+  }
+
+  async completeTask(actor: ServiceActor, taskId: string): Promise<Result<Task>> {
+    const existing = await this.repository.findById(taskId);
+    if (!existing.ok) return existing;
+    if (!existing.value) return err(AppError.notFound("Task not found"));
+    return this.updateTask(actor, taskId, existing.value.version, { status: "done" });
   }
 }
