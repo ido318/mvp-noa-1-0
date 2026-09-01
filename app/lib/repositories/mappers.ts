@@ -1,4 +1,5 @@
 import type { AIEvent } from "@/types/domain/ai-event";
+import type { AiSummary } from "@/types/domain/ai-summary";
 import type {
   Appointment,
   AppointmentSource,
@@ -150,6 +151,46 @@ export function mapAIEventRow(row: {
     modelName: row.model_name,
     metadata: row.metadata,
     createdAt: row.created_at,
+  };
+}
+
+export function mapAiSummaryRow(row: {
+  id: string;
+  clinic_id: string;
+  artifact_type: AiSummary["artifactType"];
+  source_type: AiSummary["sourceType"];
+  source_id: string | null;
+  status: AiSummary["status"];
+  draft_text: string;
+  structured_payload: Record<string, unknown>;
+  model_name: string | null;
+  prompt_version: string | null;
+  created_by_user_id: string | null;
+  reviewed_by_user_id: string | null;
+  reviewed_at: string | null;
+  rejection_reason: string | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}): AiSummary {
+  return {
+    id: row.id,
+    clinicId: row.clinic_id,
+    artifactType: row.artifact_type,
+    sourceType: row.source_type,
+    sourceId: row.source_id,
+    status: row.status,
+    draftText: row.draft_text,
+    structuredPayload: row.structured_payload ?? {},
+    modelName: row.model_name,
+    promptVersion: row.prompt_version,
+    createdByUserId: row.created_by_user_id,
+    reviewedByUserId: row.reviewed_by_user_id,
+    reviewedAt: row.reviewed_at,
+    rejectionReason: row.rejection_reason,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    deletedAt: row.deleted_at,
   };
 }
 

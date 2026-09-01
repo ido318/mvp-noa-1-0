@@ -1,6 +1,7 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { AIEventRepository } from "@/lib/repositories/ai-event.repository";
+import { AiSummaryRepository } from "@/lib/repositories/ai-summary.repository";
 import { AppointmentRepository } from "@/lib/repositories/appointment.repository";
 import { AuditLogRepository } from "@/lib/repositories/audit-log.repository";
 import { CalendarBlockRepository } from "@/lib/repositories/calendar-block.repository";
@@ -22,6 +23,7 @@ import { VisitShareRepository } from "@/lib/repositories/visit-share.repository"
 import { WaitlistRepository } from "@/lib/repositories/waitlist.repository";
 import { VitalRepository } from "@/lib/repositories/vital.repository";
 import { AIEventService } from "@/lib/services/ai-event.service";
+import { AiArtifactService } from "@/lib/services/ai-artifact.service";
 import { AppointmentService } from "@/lib/services/appointment.service";
 import { AuditService } from "@/lib/services/audit.service";
 import { AuthService } from "@/lib/services/auth.service";
@@ -72,6 +74,7 @@ export async function createServices() {
   const promptSuggestionRepository = new PromptSuggestionRepository(admin);
   const auditLogRepository = new AuditLogRepository(admin);
   const aiEventRepository = new AIEventRepository(admin);
+  const aiSummaryRepository = new AiSummaryRepository(supabase);
   const auditService = new AuditService(auditLogRepository);
   const dashboardNotificationsService = new DashboardNotificationsService(supabase);
   const taskService = new TaskService(taskRepository);
@@ -96,6 +99,7 @@ export async function createServices() {
     health: new HealthService(admin),
     audit: auditService,
     aiEvent: new AIEventService(aiEventRepository),
+    aiArtifact: new AiArtifactService(aiSummaryRepository),
     customer: new CustomerService(customerRepository, petRepository, auditService),
     pet: new PetService(petRepository, customerRepository, auditService, medicalRecordService),
     escalation: new EscalationService(supabase),
