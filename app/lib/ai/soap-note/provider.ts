@@ -6,6 +6,8 @@ import type {
   SoapNoteDraft,
   SoapNoteGenerationResult,
   SoapNoteProvider,
+  SoapParseResult,
+  SoapTranscriptionResult,
 } from "@/lib/ai/soap-note/types";
 
 const soapNoteDraftSchema = z.object({
@@ -28,52 +30,69 @@ export function getSoapParseModelName(): string {
 }
 
 export function createOpenAiSoapNoteProvider(): SoapNoteProvider {
-  return {
-    async transcribeAndParse(
-      audio: ArrayBuffer | Uint8Array,
-      mimeType: string,
-    ): Promise<SoapNoteGenerationResult> {
-      const apiKey = process.env.OPENAI_API_KEY?.trim();
-      if (!apiKey) {
-        throw new Error("OPENAI_API_KEY is not configured");
-      }
+  async function transcribeAudio(
+    audio: ArrayBuffer | Uint8Array,
+    mimeType: string,
+  ): Promise<SoapTranscriptionResult> {
+    const apiKey = process.env.OPENAI_API_KEY?.trim();
+    if (!apiKey) {
+      throw new Error("OPENAI_API_KEY is not configured");
+    }
 
-      const openai = createOpenAI({ apiKey });
+    const openai = createOpenAI({ apiKey });
+    const transcribeModelName = getSoapTranscribeModelName();
 
-      // Note: the installed `ai` SDK's `experimental_transcribe` has no
-      // parameter to force the audio media type — it auto-detects it from
-      // the byte signature (falling back to audio/wav) and does not accept
-      // an override. `mimeType` is accepted here for interface parity with
-      // callers (who know the recorded file's real content type) but is not
-      // forwarded to the SDK call.
-      void mimeType;
+    // Note: the installed `ai` SDK's `experimental_transcribe` has no
+    // parameter to force the audio media type — it auto-detects it from
+    // the byte signature (falling back to audio/wav) and does not accept
+    // an override. `mimeType` is accepted here for interface parity with
+    // callers (who know the recorded file's real content type) but is not
+    // forwarded to the SDK call. See the JSDoc on
+    // `SoapNoteProvider.transcribeAudio` in types.ts for the full rationale.
+    void mimeType;
 
-      const transcriptionResult = await transcribe({
-        model: openai.transcription(getSoapTranscribeModelName()),
-        audio,
-      });
+    const transcriptionResult = await transcribe({
+      model: openai.transcription(transcribeModelName),
+      audio,
+    });
 
-      const transcriptText = transcriptionResult.text.trim();
-      if (!transcriptText) {
-        throw new Error("Transcription returned empty text");
-      }
+    const transcriptText = transcriptionResult.text.trim();
+    if (!transcriptText) {
+      throw new Error("Transcription returned empty text");
+    }
 
-      const parseModelName = getSoapParseModelName();
+    return { transcriptText, modelName: transcribeModelName };
+  }
 
-      const { object } = await generateObject({
-        model: openai(parseModelName),
-        system: getSystemPrompt(),
-        prompt: transcriptText,
-        schema: soapNoteDraftSchema,
-      });
+  async function parseTranscript(transcriptText: string): Promise<SoapParseResult> {
+    const apiKey = process.env.OPENAI_API_KEY?.trim();
+    if (!apiKey) {
+      throw new Error("OPENAI_API_KEY is not configured");
+    }
 
-      return {
-        draft: object,
-        modelName: parseModelName,
-        transcriptText,
-      };
-    },
-  };
+    const openai = createOpenAI({ apiKey });
+    const parseModelName = getSoapParseModelName();
+
+    const { object } = await generateObject({
+      model: openai(parseModelName),
+      system: getSystemPrompt(),
+      prompt: transcriptText,
+      schema: soapNoteDraftSchema,
+    });
+
+    return { draft: object, modelName: parseModelName };
+  }
+
+  async function transcribeAndParse(
+    audio: ArrayBuffer | Uint8Array,
+    mimeType: string,
+  ): Promise<SoapNoteGenerationResult> {
+    const { transcriptText } = await transcribeAudio(audio, mimeType);
+    const { draft, modelName } = await parseTranscript(transcriptText);
+    return { draft, modelName, transcriptText };
+  }
+
+  return { transcribeAudio, parseTranscript, transcribeAndParse };
 }
 
 export function createStubSoapNoteProvider(
@@ -86,16 +105,23 @@ export function createStubSoapNoteProvider(
     P: "מנוחה ומעקב, חזרה לביקורת בעוד שבוע אם אין שיפור.",
     ...overrides,
   };
+  const stubTranscriptText = "תמלול לדוגמה לצורכי בדיקות.";
 
-  return {
-    async transcribeAndParse(): Promise<SoapNoteGenerationResult> {
-      return {
-        draft,
-        modelName: "stub",
-        transcriptText: "תמלול לדוגמה לצורכי בדיקות.",
-      };
-    },
-  };
+  async function transcribeAudio(): Promise<SoapTranscriptionResult> {
+    return { transcriptText: stubTranscriptText, modelName: "stub" };
+  }
+
+  async function parseTranscript(): Promise<SoapParseResult> {
+    return { draft, modelName: "stub" };
+  }
+
+  async function transcribeAndParse(): Promise<SoapNoteGenerationResult> {
+    const { transcriptText } = await transcribeAudio();
+    const { draft: parsedDraft, modelName } = await parseTranscript();
+    return { draft: parsedDraft, modelName, transcriptText };
+  }
+
+  return { transcribeAudio, parseTranscript, transcribeAndParse };
 }
 
 export async function transcribeAndParseSoapNote(

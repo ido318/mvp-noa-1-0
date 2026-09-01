@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { getSystemPrompt } from "@/lib/ai/soap-note/prompt";
 import {
   createStubSoapNoteProvider,
@@ -8,6 +8,8 @@ import {
   transcribeAndParseSoapNote,
 } from "@/lib/ai/soap-note/provider";
 
+// Verbatim clinic-specified spec text this task was given (see Task 7 /
+// Area 3 Step 2 description) — do not paraphrase, reformat, or "fix" it.
 const EXACT_SYSTEM_PROMPT = `You are an expert veterinary clinical scribe. Your task is to process a free-form audio transcription spoken by a veterinarian in Hebrew and accurately parse it into a structured JSON object representing a clinical SOAP note.
 
 CRITICAL INSTRUCTIONS:
@@ -111,6 +113,40 @@ describe("soap-note provider", () => {
       // Untouched fields keep their sensible defaults.
       expect(result.draft.O).toBeTruthy();
       expect(result.draft.P).toBeTruthy();
+    });
+
+    it("transcribeAudio resolves independently, without ever calling parseTranscript", async () => {
+      const provider = createStubSoapNoteProvider();
+      const result = await provider.transcribeAudio(new ArrayBuffer(0), "audio/wav");
+
+      expect(result.modelName).toBe("stub");
+      expect(result.transcriptText.length).toBeGreaterThan(0);
+      // transcribeAudio's result shape has no `draft` — it's transcription only.
+      expect(result).not.toHaveProperty("draft");
+    });
+
+    it("parseTranscript resolves independently from arbitrary transcript text, without touching audio", async () => {
+      const provider = createStubSoapNoteProvider({ P: "תוכנית מותאמת" });
+      const result = await provider.parseTranscript("כל טקסט תמלול שרירותי");
+
+      expect(result.modelName).toBe("stub");
+      expect(result.draft.P).toBe("תוכנית מותאמת");
+      expect(result.draft.S).toBeTruthy();
+      // parseTranscript's result shape has no `transcriptText`.
+      expect(result).not.toHaveProperty("transcriptText");
+    });
+
+    it("transcribeAndParse composes transcribeAudio and parseTranscript", async () => {
+      const provider = createStubSoapNoteProvider();
+      const [transcribed, parsed, combined] = await Promise.all([
+        provider.transcribeAudio(new ArrayBuffer(0), "audio/wav"),
+        provider.parseTranscript("טקסט כלשהו"),
+        provider.transcribeAndParse(new ArrayBuffer(0), "audio/wav"),
+      ]);
+
+      expect(combined.transcriptText).toBe(transcribed.transcriptText);
+      expect(combined.draft).toEqual(parsed.draft);
+      expect(combined.modelName).toBe(parsed.modelName);
     });
   });
 
