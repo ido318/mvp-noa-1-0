@@ -56,10 +56,10 @@ const NOTE_TYPE_LABELS: Record<string, string> = {
   soap_plan: "SOAP - תוכנית טיפול",
   follow_up: "מעקב",
   addendum: "נספח",
-  // soap_full is a Postgres enum value already (Task 3's migration), but is
-  // deliberately not yet in MedicalNoteType/medicalNoteTypeSchema — no app
-  // code can produce a note with this type yet, so this label is unreachable
-  // dead text until a future task wires it up end-to-end.
+  // soap_full notes are created by VoiceSoapRecorder's "הוסף כהערה" flow
+  // (voice-soap-recorder.tsx), after a voice-dictated SOAP draft has been
+  // reviewed/edited — they flow into this same timeline like any other
+  // note type.
   soap_full: "SOAP מלא",
 };
 

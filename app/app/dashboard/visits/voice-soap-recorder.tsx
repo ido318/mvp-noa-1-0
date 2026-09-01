@@ -153,6 +153,18 @@ export function VoiceSoapRecorder({ visitId }: { visitId: string }) {
   useEffect(() => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
+
+      // Neutralize the stop handler BEFORE releasing the stream below:
+      // ending the tracks causes a still-recording MediaRecorder to
+      // auto-stop and fire `onstop` on its own — merely calling .stop()
+      // here would trigger that exact same cascade, not avoid it. Left
+      // wired, a vet who navigates away mid-dictation would silently
+      // upload the partial recording, call /soap-draft, and create a
+      // real AI artifact (burning an actual transcription/LLM call) for
+      // a visit already left — permanently orphaned, never reviewable.
+      if (mediaRecorderRef.current) {
+        mediaRecorderRef.current.onstop = null;
+      }
       streamRef.current?.getTracks().forEach((track) => track.stop());
     };
   }, []);
@@ -225,11 +237,20 @@ export function VoiceSoapRecorder({ visitId }: { visitId: string }) {
   }
 
   function stopRecording() {
+    // Per the MediaStream Recording spec, calling .stop() on a recorder
+    // that's already "inactive" throws InvalidStateError synchronously —
+    // and `state` flips to "inactive" synchronously on the first .stop()
+    // call, before the queued dataavailable/stop events (and the React
+    // re-render that removes this button) actually fire. That leaves a
+    // window where the button is still clickable but a second click would
+    // throw uncaught. Guard the same way the start side is guarded.
+    if (mediaRecorderRef.current?.state !== "recording") return;
+
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
-    mediaRecorderRef.current?.stop();
+    mediaRecorderRef.current.stop();
     streamRef.current?.getTracks().forEach((track) => track.stop());
   }
 

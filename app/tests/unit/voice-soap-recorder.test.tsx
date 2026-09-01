@@ -9,18 +9,33 @@ vi.mock("next/navigation", () => ({
 }));
 
 // A minimal fake standing in for the browser's MediaRecorder, which
-// doesn't exist in jsdom. `stop()` synchronously fires `ondataavailable`
-// then `onstop`, exactly like the shape the component relies on.
+// doesn't exist in jsdom. Mirrors the real spec's actual timing, which
+// matters for the tests below: `.state` flips to "inactive" synchronously
+// inside `.stop()`, but the `dataavailable`/`stop` events are dispatched
+// on a later microtask, not synchronously — and calling `.stop()` while
+// already "inactive" throws, exactly like a real MediaRecorder.
 class FakeMediaRecorder {
   static instances: FakeMediaRecorder[] = [];
   static isTypeSupported = vi.fn().mockReturnValue(true);
 
+  state: "inactive" | "recording" = "inactive";
   ondataavailable: ((event: { data: Blob }) => void) | null = null;
   onstop: (() => void) | null = null;
-  start = vi.fn();
+  start = vi.fn(() => {
+    this.state = "recording";
+  });
   stop = vi.fn(() => {
-    this.ondataavailable?.({ data: new Blob(["fake-audio-bytes"], { type: "audio/webm" }) });
-    this.onstop?.();
+    if (this.state !== "recording") {
+      throw new DOMException(
+        "Failed to execute 'stop' on 'MediaRecorder': The MediaRecorder's state is 'inactive'.",
+        "InvalidStateError",
+      );
+    }
+    this.state = "inactive";
+    queueMicrotask(() => {
+      this.ondataavailable?.({ data: new Blob(["fake-audio-bytes"], { type: "audio/webm" }) });
+      this.onstop?.();
+    });
   });
 
   constructor(
@@ -28,6 +43,16 @@ class FakeMediaRecorder {
     public options?: { mimeType?: string },
   ) {
     FakeMediaRecorder.instances.push(this);
+  }
+}
+
+// A recorder whose construction always throws — used to regression-test
+// the mic-stream-release/error-message path when starting the recorder
+// fails outright.
+class ThrowingMediaRecorder {
+  static isTypeSupported = vi.fn().mockReturnValue(true);
+  constructor() {
+    throw new Error("boom: recorder could not be started");
   }
 }
 
@@ -51,6 +76,7 @@ async function recordAndStop() {
 describe("VoiceSoapRecorder", () => {
   beforeEach(() => {
     mockRefresh.mockClear();
+    fakeTrack.stop.mockClear();
     FakeMediaRecorder.instances = [];
     vi.stubGlobal("fetch", vi.fn());
     vi.stubGlobal("MediaRecorder", FakeMediaRecorder);
@@ -207,5 +233,74 @@ describe("VoiceSoapRecorder", () => {
 
     expect(await screen.findByText(/מקליט/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "עצור הקלטה" })).toBeInTheDocument();
+  });
+
+  it("releases the mic and shows a Hebrew error if starting the recorder throws", async () => {
+    vi.stubGlobal("MediaRecorder", ThrowingMediaRecorder);
+
+    render(<VoiceSoapRecorder visitId="visit-1" />);
+    fireEvent.click(screen.getByRole("button", { name: "הקלטה" }));
+
+    expect(await screen.findByText("לא ניתן להתחיל הקלטה. נסה שוב.")).toBeInTheDocument();
+    expect(fakeTrack.stop).toHaveBeenCalled();
+    // Stays/returns to the idle "הקלטה" button state, not stuck.
+    expect(screen.getByRole("button", { name: "הקלטה" })).toBeInTheDocument();
+  });
+
+  it("does not crash when the stop button is clicked twice in a row", async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(okJsonResponse({ storagePath: "clinic-1/visit-1/rec.webm" }))
+      .mockResolvedValueOnce(
+        okJsonResponse({
+          id: "artifact-1",
+          structuredPayload: { subjective: "s", objective: "o", assessment: "a", plan: "p" },
+        }),
+      );
+
+    render(<VoiceSoapRecorder visitId="visit-1" />);
+    fireEvent.click(screen.getByRole("button", { name: "הקלטה" }));
+    const stopButton = await screen.findByRole("button", { name: "עצור הקלטה" });
+    const recorder = FakeMediaRecorder.instances[0];
+    expect(recorder).toBeDefined();
+
+    // Both clicks land while the button is still visible: the recorder's
+    // `.state` flips to "inactive" synchronously inside the first
+    // .stop() call, but the queued dataavailable/stop events (and the
+    // re-render that would remove this button) haven't fired yet. Pre-fix,
+    // the second click calls the recorder's real .stop() again, which
+    // throws InvalidStateError — that exception escapes React's own
+    // event-dispatch machinery asynchronously, so it isn't reliably
+    // observable via a synchronous try/catch here; asserting the call
+    // count on the underlying .stop() mock catches the regression
+    // directly and deterministically instead.
+    fireEvent.click(stopButton);
+    fireEvent.click(stopButton);
+
+    expect(recorder!.stop).toHaveBeenCalledTimes(1);
+    expect(await screen.findByLabelText("סובייקטיבי")).toHaveValue("s");
+    // Only one upload/draft round-trip happened — the guard absorbed the
+    // extra click instead of triggering a second real stop.
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not upload if the component unmounts mid-recording", async () => {
+    const { unmount } = render(<VoiceSoapRecorder visitId="visit-1" />);
+    fireEvent.click(screen.getByRole("button", { name: "הקלטה" }));
+    await screen.findByRole("button", { name: "עצור הקלטה" });
+
+    const recorder = FakeMediaRecorder.instances[0];
+    expect(recorder).toBeDefined();
+    unmount();
+
+    // Simulate the browser's own auto-stop cascade that ending the
+    // stream's tracks (in the cleanup effect) would trigger on a
+    // still-recording MediaRecorder — this must not silently upload a
+    // partial recording and burn a real transcription/LLM call for a
+    // visit the vet already left.
+    recorder!.ondataavailable?.({ data: new Blob(["fake-audio-bytes"], { type: "audio/webm" }) });
+    recorder!.onstop?.();
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(fetch).not.toHaveBeenCalled();
   });
 });
