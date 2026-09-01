@@ -97,7 +97,9 @@ flyctl deploy --app voxly-agent
 [voice_calls table — visible in dashboard]
 
 [app/ — Next.js dashboard]
-      └── /dashboard/voice   ← shows voice_calls + escalations
+      └── /dashboard/calls   ← shows voice_calls + escalations
+                                 (/dashboard/voice/[callId] is the single-call view,
+                                  opened from the pre-visit brief)
 ```
 
 ---
