@@ -90,6 +90,23 @@ export class MedicalNoteRepository {
     return ok(mapMedicalNoteRow(data));
   }
 
+  async approve(noteId: string, approvedByUserId: string): Promise<Result<MedicalNote>> {
+    const { data, error } = await this.client
+      .from("medical_notes")
+      .update({
+        status: "approved",
+        approved_by_user_id: approvedByUserId,
+        approved_at: new Date().toISOString(),
+      })
+      .eq("id", noteId)
+      .eq("status", "draft")
+      .is("deleted_at", null)
+      .select("*")
+      .single();
+    if (error) return err(AppError.externalProvider("Failed to approve medical note", error));
+    return ok(mapMedicalNoteRow(data));
+  }
+
   async softDelete(noteId: string): Promise<Result<MedicalNote>> {
     const { data, error } = await this.client
       .from("medical_notes")

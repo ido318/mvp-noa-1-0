@@ -10,6 +10,7 @@ import type { VisitRepository } from "@/lib/repositories/visit.repository";
 import type { VitalRepository } from "@/lib/repositories/vital.repository";
 import {
   assertMedicalDeleteAuthorized,
+  assertMedicalNoteApproveAuthorized,
   assertPrescriptionApproveAuthorized,
 } from "@/lib/services/medical-authorization";
 import type { AuditService } from "@/lib/services/audit.service";
@@ -364,6 +365,38 @@ export class MedicalRecordService {
     });
 
     return updated;
+  }
+
+  async approveNote(actor: ServiceActor, noteId: string): Promise<Result<MedicalNote>> {
+    const existing = await this.medicalNoteRepository.findById(noteId);
+    if (!existing.ok) return existing;
+    if (!existing.value) return err(AppError.notFound("Medical note not found"));
+
+    const visit = await this.assertVisitAccessible(actor, existing.value.visitId);
+    if (!visit.ok) return visit;
+
+    const approveAuth = assertMedicalNoteApproveAuthorized(actor, existing.value.clinicId);
+    if (!approveAuth.ok) return approveAuth;
+
+    if (existing.value.status !== "draft") {
+      return err(AppError.conflict(`Medical note already ${existing.value.status}`));
+    }
+
+    const approved = await this.medicalNoteRepository.approve(noteId, actor.userId);
+    if (!approved.ok) return approved;
+
+    await this.auditService.logAction({
+      clinicId: existing.value.clinicId,
+      actorType: "user",
+      actorId: actor.userId,
+      action: "medical_note.approve",
+      entityType: "medical_note",
+      entityId: approved.value.id,
+      beforePayload: existing.value,
+      afterPayload: approved.value,
+    });
+
+    return approved;
   }
 
   async softDeleteNote(actor: ServiceActor, noteId: string): Promise<Result<void>> {
