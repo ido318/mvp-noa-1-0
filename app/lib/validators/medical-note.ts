@@ -41,6 +41,20 @@ function refineParentNoteId(
   }
 }
 
+/**
+ * status is deliberately NOT accepted here: every note is created as
+ * 'draft' (see medical-note.repository.ts create()), and 'approved' is only
+ * reachable via the dedicated approve endpoint
+ * (assertMedicalNoteApproveAuthorized), which stamps approved_by_user_id/
+ * approved_at together with the status flip. Accepting a client-supplied
+ * status on creation would let any clinic member mint an already-"approved"
+ * note that never passed through that authorization gate — e.g. one the
+ * agent's get_last_visit_plan tool could then read aloud to a phone caller
+ * as if a vet had reviewed it. If a status field is present in the request
+ * body it is silently stripped (this schema's object mode is the default
+ * "strip", matching every other schema in this file — none use .strict()),
+ * not rejected with a validation error.
+ */
 export const createMedicalNoteSchema = z
   .object({
     noteType: medicalNoteTypeSchema,
@@ -49,7 +63,6 @@ export const createMedicalNoteSchema = z
     objective: z.string().trim().max(16000).optional().nullable(),
     assessment: z.string().trim().max(16000).optional().nullable(),
     plan: z.string().trim().max(16000).optional().nullable(),
-    status: medicalNoteStatusSchema.optional(),
     parentNoteId: z.string().uuid().optional().nullable(),
   })
   .superRefine(refineParentNoteId);

@@ -29,6 +29,13 @@ export type MedicalNote = {
   deletedAt: string | null;
 };
 
+/**
+ * status is intentionally absent: every note is created as 'draft'
+ * (medical-note.repository.ts create() writes it unconditionally).
+ * 'approved' is reachable only through approveNote()/the dedicated approve
+ * endpoint, which enforces assertMedicalNoteApproveAuthorized and stamps
+ * approved_by_user_id/approved_at together with the status flip.
+ */
 export type CreateMedicalNoteInput = {
   noteType: MedicalNoteType;
   content: string;
@@ -36,7 +43,6 @@ export type CreateMedicalNoteInput = {
   objective?: string | null;
   assessment?: string | null;
   plan?: string | null;
-  status?: "draft" | "approved" | "archived";
   parentNoteId?: string | null;
 };
 

@@ -151,4 +151,45 @@ describe("MedicalNoteRepository.create", () => {
       expect(result.value.parentNoteId).toBe("note1");
     }
   });
+
+  it("always writes status 'draft' to the insert payload, even if a status is smuggled into the input (CreateMedicalNoteInput has no status field, so this cast simulates a caller bypassing that type)", async () => {
+    const row = {
+      id: "note3",
+      clinic_id: "clinic1",
+      visit_id: "visit1",
+      note_type: "general",
+      content: "x",
+      subjective: null,
+      objective: null,
+      assessment: null,
+      plan: null,
+      parent_note_id: null,
+      status: "draft",
+      approved_by_user_id: null,
+      approved_at: null,
+      version: 1,
+      author_user_id: "vet1",
+      created_at: "2026-09-02T09:00:00.000Z",
+      updated_at: "2026-09-02T09:00:00.000Z",
+      deleted_at: null,
+    };
+    const single = vi.fn().mockResolvedValue({ data: row, error: null });
+    const select = vi.fn().mockReturnValue({ single });
+    const insert = vi.fn().mockReturnValue({ select });
+    const client = { from: vi.fn().mockReturnValue({ insert }) };
+    const repository = new MedicalNoteRepository(client as never);
+
+    const result = await repository.create(
+      "clinic1",
+      "visit1",
+      { noteType: "general", content: "x", status: "approved" } as never,
+      "vet1",
+    );
+
+    expect(result.ok).toBe(true);
+    expect(insert).toHaveBeenCalledWith(expect.objectContaining({ status: "draft" }));
+    if (result.ok) {
+      expect(result.value.status).toBe("draft");
+    }
+  });
 });

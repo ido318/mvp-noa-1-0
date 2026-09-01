@@ -83,7 +83,11 @@ export class MedicalNoteRepository {
         assessment: input.assessment ?? null,
         plan: input.plan ?? null,
         parent_note_id: input.parentNoteId ?? null,
-        status: input.status ?? "draft",
+        // Every note is created as 'draft', unconditionally: CreateMedicalNoteInput
+        // has no status field (see types/domain/medical-note.ts), so there is no
+        // input value to thread through here. approve() is the sole path to
+        // 'approved'/'archived'.
+        status: "draft",
         author_user_id: authorUserId,
       })
       .select("*")

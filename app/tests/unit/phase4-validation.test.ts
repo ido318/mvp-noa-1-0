@@ -67,6 +67,30 @@ describe("phase4 validators", () => {
     expect(result.success).toBe(false);
   });
 
+  it("silently strips a client-supplied status:'approved' on note creation instead of honoring it (status is not a field of this schema; approval is only reachable via the dedicated approve endpoint)", () => {
+    const result = createMedicalNoteSchema.safeParse({
+      noteType: "general",
+      content: "הערה רגילה",
+      status: "approved",
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data).not.toHaveProperty("status");
+    }
+  });
+
+  it("silently strips a client-supplied status:'archived' on note creation the same way", () => {
+    const result = createMedicalNoteSchema.safeParse({
+      noteType: "general",
+      content: "הערה רגילה",
+      status: "archived",
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data).not.toHaveProperty("status");
+    }
+  });
+
   it("rejects switching a note's type to addendum via update without a parentNoteId", () => {
     const result = updateMedicalNoteSchema.safeParse({ noteType: "addendum" });
     expect(result.success).toBe(false);
