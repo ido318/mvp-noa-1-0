@@ -608,35 +608,50 @@ export async function listCustomerPets(phone: string): Promise<ListCustomerPetsR
   const normalised = normalisePhone(phone);
   const env = getEnv();
 
-  const { data, error } = await getSupabase()
+  const { data: customerRow, error: customerErr } = await getSupabase()
     .from("customers")
-    .select("full_name, pets(id, name, species)")
+    .select("id, full_name")
     .eq("clinic_id", env.AGENT_CLINIC_ID)
     .eq("phone", normalised)
     .is("deleted_at", null)
     .eq("status", "active")
     .maybeSingle();
 
-  if (error) throw new Error(`listCustomerPets failed: ${error.message}`);
+  if (customerErr) throw new Error(`listCustomerPets customer query failed: ${customerErr.message}`);
 
-  if (!data) {
+  if (!customerRow) {
     return {
       result: "לקוח לא מוכר במערכת. לא נמצאו חיות רשומות למספר הטלפון הזה.",
       pets: [],
     };
   }
 
-  const row = data as { full_name: string; pets: PetSummary[] | null };
-  const pets = row.pets ?? [];
+  const customerId = extractId(customerRow);
+  const fullName = extractString(customerRow, "full_name") ?? "";
+
+  // Queried separately (rather than via a `pets(...)` embed on the customers
+  // query above) so deleted_at can actually be filtered on the pets side —
+  // PostgREST embeds don't apply the parent query's filters to child rows.
+  const { data: petsData, error: petsErr } = await getSupabase()
+    .from("pets")
+    .select("id, name, species")
+    .eq("clinic_id", env.AGENT_CLINIC_ID)
+    .eq("customer_id", customerId)
+    .is("deleted_at", null)
+    .order("created_at", { ascending: true });
+
+  if (petsErr) throw new Error(`listCustomerPets pets query failed: ${petsErr.message}`);
+
+  const pets = (petsData ?? []) as PetSummary[];
 
   if (pets.length === 0) {
-    return { result: `לא נמצאו חיות רשומות עבור ${row.full_name}.`, pets: [] };
+    return { result: `לא נמצאו חיות רשומות עבור ${fullName}.`, pets: [] };
   }
 
   if (pets.length === 1) {
     const p = pets[0]!;
     return {
-      result: `החיה הרשומה עבור ${row.full_name} היא ${p.name} (${p.species}), מזהה pet_id: ${p.id}.`,
+      result: `החיה הרשומה עבור ${fullName} היא ${p.name} (${p.species}), מזהה pet_id: ${p.id}.`,
       pets,
     };
   }
@@ -644,7 +659,7 @@ export async function listCustomerPets(phone: string): Promise<ListCustomerPetsR
   const listHe = pets.map((p) => `${p.name} (${p.species}, pet_id: ${p.id})`).join(", ");
   return {
     result:
-      `ל${row.full_name} יש כמה חיות רשומות: ${listHe}. ` +
+      `ל${fullName} יש כמה חיות רשומות: ${listHe}. ` +
       "יש לשאול לאיזו חיה מתייחסת הפנייה, ולהשתמש ב-pet_id המתאים בקריאות הבאות.",
     pets,
   };

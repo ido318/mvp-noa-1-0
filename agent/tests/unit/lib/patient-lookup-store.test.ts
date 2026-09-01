@@ -9,8 +9,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // different responses.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const { queues, setQueue, popResponse } = vi.hoisted(() => {
+const { queues, setQueue, popResponse, eqCalls, eqCallsFor, isCalls, isCallsFor } = vi.hoisted(() => {
   const queues: Record<string, Array<{ data: unknown; error: unknown }>> = {};
+  const eqCalls: Record<string, Array<[string, unknown]>> = {};
+  const isCalls: Record<string, Array<[string, unknown]>> = {};
 
   function setQueue(table: string, responses: Array<{ data: unknown; error: unknown }>) {
     queues[table] = [...responses];
@@ -26,16 +28,30 @@ const { queues, setQueue, popResponse } = vi.hoisted(() => {
     return Promise.resolve(queue.shift()!);
   }
 
-  return { queues, setQueue, popResponse };
+  function eqCallsFor(table: string): Array<[string, unknown]> {
+    return eqCalls[table] ?? [];
+  }
+
+  function isCallsFor(table: string): Array<[string, unknown]> {
+    return isCalls[table] ?? [];
+  }
+
+  return { queues, setQueue, popResponse, eqCalls, eqCallsFor, isCalls, isCallsFor };
 });
 
 vi.mock("../../../src/lib/supabase.js", () => {
   function chainFor(table: string): Record<string, unknown> {
     const chain: Record<string, unknown> = {
       select: vi.fn(() => chain),
-      eq: vi.fn(() => chain),
+      eq: vi.fn((col: string, val: unknown) => {
+        (eqCalls[table] ??= []).push([col, val]);
+        return chain;
+      }),
       in: vi.fn(() => chain),
-      is: vi.fn(() => chain),
+      is: vi.fn((col: string, val: unknown) => {
+        (isCalls[table] ??= []).push([col, val]);
+        return chain;
+      }),
       not: vi.fn(() => chain),
       order: vi.fn(() => chain),
       limit: vi.fn(() => chain),
@@ -83,6 +99,8 @@ function ownershipQueues(matches = true) {
 
 beforeEach(() => {
   for (const key of Object.keys(queues)) delete queues[key];
+  for (const key of Object.keys(eqCalls)) delete eqCalls[key];
+  for (const key of Object.keys(isCalls)) delete isCalls[key];
   vi.clearAllMocks();
   vi.useFakeTimers();
   // Israel is UTC+3 (DST) in June — 09:00 UTC is 12:00 local, date unaffected.
@@ -104,7 +122,8 @@ describe("listCustomerPets", () => {
   });
 
   it("reports zero pets for a known customer with none registered", async () => {
-    setQueue("customers", [{ data: { full_name: "דנה כהן", pets: [] }, error: null }]);
+    setQueue("customers", [{ data: { id: CUSTOMER_ID, full_name: "דנה כהן" }, error: null }]);
+    setQueue("pets", [{ data: [], error: null }]);
 
     const { result, pets } = await listCustomerPets(PHONE);
 
@@ -114,12 +133,8 @@ describe("listCustomerPets", () => {
   });
 
   it("names the single pet and includes its id for later tool calls", async () => {
-    setQueue("customers", [
-      {
-        data: { full_name: "דנה כהן", pets: [{ id: VALID_PET_ID, name: PET_NAME, species: PET_SPECIES }] },
-        error: null,
-      },
-    ]);
+    setQueue("customers", [{ data: { id: CUSTOMER_ID, full_name: "דנה כהן" }, error: null }]);
+    setQueue("pets", [{ data: [{ id: VALID_PET_ID, name: PET_NAME, species: PET_SPECIES }], error: null }]);
 
     const { result, pets } = await listCustomerPets(PHONE);
 
@@ -130,14 +145,9 @@ describe("listCustomerPets", () => {
 
   it("lists every pet with disambiguating detail when the customer has more than one", async () => {
     const petTwo = { id: "22222222-2222-4222-8222-222222222222", name: "לונה", species: "חתול" };
-    setQueue("customers", [
-      {
-        data: {
-          full_name: "דנה כהן",
-          pets: [{ id: VALID_PET_ID, name: PET_NAME, species: PET_SPECIES }, petTwo],
-        },
-        error: null,
-      },
+    setQueue("customers", [{ data: { id: CUSTOMER_ID, full_name: "דנה כהן" }, error: null }]);
+    setQueue("pets", [
+      { data: [{ id: VALID_PET_ID, name: PET_NAME, species: PET_SPECIES }, petTwo], error: null },
     ]);
 
     const { result, pets } = await listCustomerPets(PHONE);
@@ -148,6 +158,16 @@ describe("listCustomerPets", () => {
     expect(result).toContain(petTwo.id);
     expect(result).toContain("לאיזו חיה");
     expect(pets).toHaveLength(2);
+  });
+
+  it("scopes the pets query to this customer and excludes soft-deleted pets", async () => {
+    setQueue("customers", [{ data: { id: CUSTOMER_ID, full_name: "דנה כהן" }, error: null }]);
+    setQueue("pets", [{ data: [], error: null }]);
+
+    await listCustomerPets(PHONE);
+
+    expect(eqCallsFor("pets")).toContainEqual(["customer_id", CUSTOMER_ID]);
+    expect(isCallsFor("pets")).toContainEqual(["deleted_at", null]);
   });
 });
 
@@ -283,6 +303,12 @@ describe("getLastVisitPlan", () => {
 
     expect(result).toContain("יש להמשיך תרופה X למשך שבוע");
     expect(result).toContain(formatDateHe("2026-06-10"));
+
+    // Prove the "strictly approved soap_full" contract at the query level,
+    // not just via the mocked data — a regression that dropped either eq()
+    // filter would still pass this test on data alone.
+    expect(eqCallsFor("medical_notes")).toContainEqual(["note_type", "soap_full"]);
+    expect(eqCallsFor("medical_notes")).toContainEqual(["status", "approved"]);
   });
 
   it("ignores a draft soap_full note's plan and falls back to the visit summary instead", async () => {
