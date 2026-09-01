@@ -20,6 +20,9 @@ export type VoiceCall = {
   id: string;
   clinicId: string;
   customerId: string | null;
+  petId: string | null;
+  appointmentId: string | null;
+  visitId: string | null;
   direction: VoiceCallDirection;
   status: VoiceCallStatus;
   fromNumber: string;
@@ -44,6 +47,9 @@ export type VoiceCall = {
 export type VoiceCallListFilters = {
   clinicIds: string[];
   customerId?: string;
+  petId?: string;
+  appointmentId?: string;
+  visitId?: string;
   status?: VoiceCallStatus;
   from?: string;
   to?: string;
@@ -54,12 +60,22 @@ export type VoiceCallListFilters = {
 export type UpsertInboundVoiceCallInput = {
   clinicId: string;
   customerId?: string | null;
+  petId?: string | null;
+  appointmentId?: string | null;
+  visitId?: string | null;
   fromNumber: string;
   toNumber: string;
   twilioCallSid: string;
   twilioParentCallSid?: string | null;
   status?: VoiceCallStatus;
   metadata?: Record<string, unknown>;
+};
+
+export type LinkVoiceCallInput = {
+  customerId?: string | null;
+  petId?: string | null;
+  appointmentId?: string | null;
+  visitId?: string | null;
 };
 
 export type UpdateVoiceCallStatusInput = {

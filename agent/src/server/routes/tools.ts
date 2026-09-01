@@ -336,6 +336,8 @@ const bookSchema = z.object({
   scheduled_at:  z.string().regex(ISO_DATETIME_RE, "Expected ISO8601 datetime"),
   visit_type:    z.enum(VISIT_TYPE_VALUES),
   reason:        z.string().optional(),
+  twilio_call_sid: z.string().min(1).optional(),
+  elevenlabs_conversation_id: z.string().min(1).optional(),
 });
 
 toolsRoutes.post("/tools/book-appointment", async (c) => {

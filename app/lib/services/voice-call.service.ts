@@ -1,7 +1,11 @@
 import { AppError, err, ok, type Result } from "@/lib/errors/app-error";
 import type { VoiceCallRepository } from "@/lib/repositories/voice-call.repository";
 import type { ServiceActor } from "@/lib/services/service-context";
-import type { VoiceCall, VoiceCallListFilters } from "@/types/domain/voice-call";
+import type {
+  LinkVoiceCallInput,
+  VoiceCall,
+  VoiceCallListFilters,
+} from "@/types/domain/voice-call";
 
 export class VoiceCallService {
   constructor(private readonly voiceCallRepository: VoiceCallRepository) {}
@@ -25,5 +29,15 @@ export class VoiceCallService {
       return err(AppError.forbidden("Voice call outside actor clinics"));
     }
     return ok(existing.value);
+  }
+
+  async linkCall(
+    actor: ServiceActor,
+    callId: string,
+    input: LinkVoiceCallInput,
+  ): Promise<Result<VoiceCall>> {
+    const existing = await this.getCallById(actor, callId);
+    if (!existing.ok) return existing;
+    return this.voiceCallRepository.link(callId, input);
   }
 }

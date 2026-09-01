@@ -108,6 +108,30 @@ export default async function VoiceCallDetailPage({
           </p>
         ) : null}
       </div>
+
+      {call.aiSummary ? (
+        <div className="rounded-2xl border border-zinc-200 bg-white p-6">
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">סיכום AI</h3>
+          <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-zinc-800">{call.aiSummary}</p>
+        </div>
+      ) : null}
+
+      {call.transcript?.length ? (
+        <div className="rounded-2xl border border-zinc-200 bg-white p-6">
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">תמלול</h3>
+          <div className="mt-3 space-y-3">
+            {call.transcript.map((item, index) => (
+              <div key={index} className="rounded-xl bg-zinc-50 p-3 text-sm">
+                <p className="text-xs font-semibold text-zinc-500">
+                  {item.role === "agent" ? "תומר" : "לקוח"}
+                  {item.time_in_call_secs != null ? ` · ${item.time_in_call_secs}s` : ""}
+                </p>
+                <p className="mt-1 whitespace-pre-wrap text-zinc-800">{item.message}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }

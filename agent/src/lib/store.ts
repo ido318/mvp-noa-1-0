@@ -280,6 +280,8 @@ export type BookAppointmentParams = {
   scheduled_at: string;
   visit_type: VisitType;
   reason?: string;
+  twilio_call_sid?: string;
+  elevenlabs_conversation_id?: string;
 };
 
 export async function bookAppointment(params: BookAppointmentParams): Promise<string> {
@@ -344,6 +346,16 @@ export async function bookAppointment(params: BookAppointmentParams): Promise<st
   const scheduledAt   = typeof data.scheduled_at === "string" ? data.scheduled_at : params.scheduled_at;
   const slotLabel     = formatSlotSpokenHe(scheduledAt);
   const dateLabel     = toIsraelDateIso(new Date(scheduledAt));
+
+  if (appointmentId) {
+    await linkVoiceCall({
+      twilioCallSid: params.twilio_call_sid,
+      conversationId: params.elevenlabs_conversation_id,
+      customerId,
+      petId,
+      appointmentId,
+    });
+  }
 
   // Fire-and-forget SMS notifications — only for confirmed bookings.
   // pending_approval (neutering) must NOT create notifications here;
@@ -621,6 +633,9 @@ export async function saveVoiceCall(
     typeof payload["caller_number"] === "string"
       ? payload["caller_number"]
       : "unknown";
+  const customerId = callerNumber !== "unknown"
+    ? await safeFindCustomerIdByPhone(normalisePhone(callerNumber))
+    : null;
 
   const payloadStatus =
     typeof payload["status"] === "string" ? payload["status"].toLowerCase() : null;
@@ -648,6 +663,7 @@ export async function saveVoiceCall(
     metadata:                     payload,
   };
 
+  if (customerId) row["customer_id"] = customerId;
   if (status === "completed" || status === "failed") row["ended_at"] = new Date().toISOString();
   if (enrichment.transcript !== undefined)            row["transcript"]              = enrichment.transcript;
   if (enrichment.aiSummary !== undefined)             row["ai_summary"]              = enrichment.aiSummary;
@@ -718,6 +734,51 @@ async function findActiveAppointmentNear(
 
   if (!id || !scheduled_at) return null;
   return { id, customer_id, scheduled_at, appointment_type, duration_minutes, customer_name, pet_name };
+}
+
+async function safeFindCustomerIdByPhone(phone: string): Promise<string | null> {
+  try {
+    return await findCustomerIdByPhone(phone);
+  } catch (err) {
+    logger.warn({ err }, "voice_call: customer lookup failed");
+    return null;
+  }
+}
+
+async function linkVoiceCall(params: {
+  twilioCallSid?: string;
+  conversationId?: string;
+  customerId: string;
+  petId?: string | null;
+  appointmentId?: string | null;
+  visitId?: string | null;
+}): Promise<void> {
+  if (!params.twilioCallSid && !params.conversationId) return;
+
+  const patch = {
+    customer_id: params.customerId,
+    pet_id: params.petId ?? null,
+    appointment_id: params.appointmentId ?? null,
+    visit_id: params.visitId ?? null,
+  };
+
+  if (params.twilioCallSid) {
+    const { data, error } = await getSupabase()
+      .from("voice_calls")
+      .update(patch)
+      .eq("twilio_call_sid", params.twilioCallSid)
+      .select("id");
+    if (error) throw new Error(`linkVoiceCall by twilio sid failed: ${error.message}`);
+    if (data && data.length > 0) return;
+  }
+
+  if (params.conversationId) {
+    const { error } = await getSupabase()
+      .from("voice_calls")
+      .update(patch)
+      .eq("elevenlabs_conversation_id", params.conversationId);
+    if (error) throw new Error(`linkVoiceCall by conversation id failed: ${error.message}`);
+  }
 }
 
 async function createOrFindCustomer(

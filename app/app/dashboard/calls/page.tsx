@@ -6,6 +6,7 @@ import { EmptyState } from "@/components/dashboard/ui/empty-state";
 import { Skeleton } from "@/components/dashboard/ui/skeleton";
 import { CallStatusBadge } from "@/components/dashboard/ui/call-status";
 import { PhoneIcon, ClockIcon, SparkleIcon, PlayIcon, XIcon } from "@/components/dashboard/icons";
+import { Btn } from "@/components/dashboard/ui/btn";
 import { formatIsraelDateTime } from "@/lib/israel-date";
 import type { VoiceCall, TranscriptItem } from "@/types/domain/voice-call";
 
@@ -116,6 +117,9 @@ function CallDrawer({
   onClose: () => void;
 }) {
   const [tab, setTab] = useState<"summary" | "transcript" | "recording">("summary");
+  const [taskDueAt, setTaskDueAt] = useState("");
+  const [taskLoading, setTaskLoading] = useState(false);
+  const [taskMessage, setTaskMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -178,17 +182,58 @@ function CallDrawer({
           </div>
 
           {tab === "summary" && (
-            call.aiSummary ? (
-              <div className="rounded-[var(--r-md)] bg-[var(--brand-50)] p-3">
-                <div className="flex items-center gap-1.5 mb-1.5">
-                  <SparkleIcon size={13} className="text-[var(--brand-600)]" />
-                  <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--brand-700)]">סיכום AI</p>
+            <>
+              {call.aiSummary ? (
+                <div className="rounded-[var(--r-md)] bg-[var(--brand-50)] p-3">
+                  <div className="flex items-center gap-1.5 mb-1.5">
+                    <SparkleIcon size={13} className="text-[var(--brand-600)]" />
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--brand-700)]">סיכום AI</p>
+                  </div>
+                  <p className="text-[13px] text-[var(--ink)] leading-relaxed">{call.aiSummary}</p>
                 </div>
-                <p className="text-[13px] text-[var(--ink)] leading-relaxed">{call.aiSummary}</p>
-              </div>
-            ) : (
-              <p className="text-sm text-[var(--muted)]">אין סיכום AI לשיחה הזו.</p>
-            )
+              ) : (
+                <p className="text-sm text-[var(--muted)]">אין סיכום AI לשיחה הזו.</p>
+              )}
+              {call.customerId ? (
+                <div className="space-y-2 rounded-[var(--r-md)] border border-[var(--line)] p-3">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--muted)]">משימת המשך מהשיחה</p>
+                  <input
+                    type="datetime-local"
+                    value={taskDueAt}
+                    onChange={(event) => setTaskDueAt(event.target.value)}
+                    className="h-9 w-full rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--bg)] px-3 text-sm text-[var(--ink)] outline-none focus:border-[var(--brand-400)]"
+                  />
+                  <Btn
+                    type="button"
+                    size="sm"
+                    variant="soft"
+                    loading={taskLoading}
+                    disabled={!taskDueAt}
+                    onClick={() => {
+                      setTaskLoading(true);
+                      setTaskMessage(null);
+                      void fetch("/api/follow-ups", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          clinicId: call.clinicId,
+                          customerId: call.customerId,
+                          petId: call.petId,
+                          voiceCallId: call.id,
+                          reason: call.aiSummary ?? `מעקב אחרי שיחה מ-${call.fromNumber}`,
+                          dueAt: new Date(taskDueAt).toISOString(),
+                        }),
+                      }).then((res) => {
+                        setTaskMessage(res.ok ? "משימת המשך נוצרה" : "יצירת המשימה נכשלה");
+                      }).finally(() => setTaskLoading(false));
+                    }}
+                  >
+                    צור משימה מהשיחה
+                  </Btn>
+                  {taskMessage ? <p className="text-xs font-semibold text-[var(--muted)]">{taskMessage}</p> : null}
+                </div>
+              ) : null}
+            </>
           )}
 
           {tab === "recording" && (

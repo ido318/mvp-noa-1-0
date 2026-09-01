@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { dashboardApiFetch } from "@/app/dashboard/api-client";
 import { AppointmentActions } from "@/app/dashboard/appointments/appointment-actions";
+import { PreVisitBriefCard } from "@/app/dashboard/voice/pre-visit-brief-card";
 import { formatIsraelDateTime } from "@/lib/israel-date";
 import type { Appointment } from "@/types/domain/appointment";
+import type { VoiceCall } from "@/types/domain/voice-call";
 
 type Params = { params: Promise<{ appointmentId: string }> };
 
@@ -17,6 +19,15 @@ export default async function AppointmentDetailPage({ params }: Params) {
       </section>
     );
   }
+
+  const linkedCalls = await dashboardApiFetch<{ items: VoiceCall[] }>(
+    `/api/voice/calls?appointmentId=${encodeURIComponent(appointment.id)}&limit=3`,
+  );
+  const customerCalls = linkedCalls?.items.length
+    ? linkedCalls
+    : await dashboardApiFetch<{ items: VoiceCall[] }>(
+        `/api/voice/calls?customerId=${encodeURIComponent(appointment.customerId)}&limit=3`,
+      );
 
   return (
     <section className="space-y-6">
@@ -68,6 +79,8 @@ export default async function AppointmentDetailPage({ params }: Params) {
           </div>
         </dl>
       </div>
+
+      <PreVisitBriefCard calls={customerCalls?.items ?? []} />
 
       <div className="rounded-2xl border border-zinc-200 bg-white p-6">
         <h3 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">Actions</h3>

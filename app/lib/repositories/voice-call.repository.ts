@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { AppError, err, ok, type Result } from "@/lib/errors/app-error";
 import { mapVoiceCallRow } from "@/lib/repositories/mappers";
 import type {
+  LinkVoiceCallInput,
   UpdateVoiceCallStatusInput,
   UpsertInboundVoiceCallInput,
   VoiceCall,
@@ -23,6 +24,9 @@ export class VoiceCallRepository {
       .range(offset, offset + limit - 1);
 
     if (filters.customerId) query = query.eq("customer_id", filters.customerId);
+    if (filters.petId) query = query.eq("pet_id", filters.petId);
+    if (filters.appointmentId) query = query.eq("appointment_id", filters.appointmentId);
+    if (filters.visitId) query = query.eq("visit_id", filters.visitId);
     if (filters.status) query = query.eq("status", filters.status);
     if (filters.from) query = query.gte("started_at", filters.from);
     if (filters.to) query = query.lt("started_at", filters.to);
@@ -63,6 +67,9 @@ export class VoiceCallRepository {
         {
           clinic_id: input.clinicId,
           customer_id: input.customerId ?? null,
+          pet_id: input.petId ?? null,
+          appointment_id: input.appointmentId ?? null,
+          visit_id: input.visitId ?? null,
           direction: "inbound",
           status: input.status ?? "ringing",
           from_number: input.fromNumber,
@@ -105,6 +112,24 @@ export class VoiceCallRepository {
       }
       return err(AppError.externalProvider("Failed to update voice call status", error));
     }
+    return ok(mapVoiceCallRow(data));
+  }
+
+  async link(callId: string, input: LinkVoiceCallInput): Promise<Result<VoiceCall>> {
+    const patch: Record<string, unknown> = {};
+    if (input.customerId !== undefined) patch.customer_id = input.customerId;
+    if (input.petId !== undefined) patch.pet_id = input.petId;
+    if (input.appointmentId !== undefined) patch.appointment_id = input.appointmentId;
+    if (input.visitId !== undefined) patch.visit_id = input.visitId;
+
+    const { data, error } = await this.client
+      .from("voice_calls")
+      .update(patch)
+      .eq("id", callId)
+      .select("*")
+      .single();
+
+    if (error) return err(AppError.externalProvider("Failed to link voice call", error));
     return ok(mapVoiceCallRow(data));
   }
 }

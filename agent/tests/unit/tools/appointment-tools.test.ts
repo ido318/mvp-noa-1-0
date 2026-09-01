@@ -102,6 +102,8 @@ describe("appointment tools", () => {
       scheduled_at: "2026-06-14T09:10:00+03:00",
       visit_type: "home_visit",
       reason: "בדיקה",
+      twilio_call_sid: "CA123",
+      elevenlabs_conversation_id: "conv123",
     };
     const res = await makeApp().request("/tools/book-appointment", {
       method: "POST",

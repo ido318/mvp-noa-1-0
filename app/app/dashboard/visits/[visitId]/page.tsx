@@ -8,6 +8,7 @@ import { VisitPrescriptionsSection } from "@/app/dashboard/visits/visit-prescrip
 import { VisitShareSection } from "@/app/dashboard/visits/visit-share-section";
 import { VisitVaccinationsSection } from "@/app/dashboard/visits/visit-vaccinations-section";
 import { VisitWorkspace } from "@/app/dashboard/visits/visit-workspace";
+import { PreVisitBriefCard } from "@/app/dashboard/voice/pre-visit-brief-card";
 import { formatIsraelDateTime } from "@/lib/israel-date";
 import type { Appointment } from "@/types/domain/appointment";
 import type { Customer } from "@/types/domain/customer";
@@ -19,6 +20,7 @@ import type { ClinicRole } from "@/types/domain/clinic";
 import type { MeResponse } from "@/types/api/me";
 import type { Visit, VisitStatus } from "@/types/domain/visit";
 import type { Vital } from "@/types/domain/vital";
+import type { VoiceCall } from "@/types/domain/voice-call";
 
 const AI_SUMMARY_ROLES: ClinicRole[] = ["owner", "admin", "veterinarian"];
 
@@ -58,6 +60,19 @@ export default async function VisitDetailPage({ params }: Params) {
       ? dashboardApiFetch<Appointment>(`/api/appointments/${visit.appointmentId}`)
       : Promise.resolve(null),
   ]);
+  const visitCalls = await dashboardApiFetch<{ items: VoiceCall[] }>(
+    `/api/voice/calls?visitId=${encodeURIComponent(visit.id)}&limit=3`,
+  );
+  const appointmentCalls = visitCalls?.items.length || !visit.appointmentId
+    ? visitCalls
+    : await dashboardApiFetch<{ items: VoiceCall[] }>(
+        `/api/voice/calls?appointmentId=${encodeURIComponent(visit.appointmentId)}&limit=3`,
+      );
+  const customerCalls = appointmentCalls?.items.length
+    ? appointmentCalls
+    : await dashboardApiFetch<{ items: VoiceCall[] }>(
+        `/api/voice/calls?customerId=${encodeURIComponent(visit.customerId)}&limit=3`,
+      );
 
   return (
     <div className="mx-auto w-full max-w-[900px] space-y-5 p-6">
@@ -108,6 +123,8 @@ export default async function VisitDetailPage({ params }: Params) {
           </div>
         )}
       </Card>
+
+      <PreVisitBriefCard calls={customerCalls?.items ?? []} />
 
       <Card>
         <h3 className="text-[15px] font-bold text-[var(--ink)]">סיכומי ביקור</h3>
