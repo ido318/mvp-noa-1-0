@@ -131,7 +131,7 @@ describe("VoiceSoapRecorder", () => {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        noteType: "general",
+        noteType: "soap_full",
         content:
           "סובייקטיבי:\nעדכון ידני של הרופא\n\nאובייקטיבי:\nטקסט מקורי\n\nהערכה:\nטקסט מקורי\n\nתוכנית טיפול:\nטקסט מקורי",
         subjective: "עדכון ידני של הרופא",

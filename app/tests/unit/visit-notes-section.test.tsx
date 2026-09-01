@@ -270,4 +270,12 @@ describe("VisitNotesSection", () => {
     render(<VisitNotesSection visitId="visit-1" initialNotes={[]} />);
     expect(screen.getByText("אין עדיין הערות.")).toBeInTheDocument();
   });
+
+  it("renders a 'soap_full' note (as produced by VoiceSoapRecorder) with the 'SOAP מלא' badge", () => {
+    const note = makeNote({ noteType: "soap_full", content: "הערת SOAP מלאה מהקלטה קולית" });
+    render(<VisitNotesSection visitId="visit-1" initialNotes={[note]} />);
+
+    expect(screen.getByText("SOAP מלא")).toBeInTheDocument();
+    expect(screen.getByText("הערת SOAP מלאה מהקלטה קולית")).toBeInTheDocument();
+  });
 });

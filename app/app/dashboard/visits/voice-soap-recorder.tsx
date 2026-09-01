@@ -194,17 +194,28 @@ export function VoiceSoapRecorder({ visitId }: { visitId: string }) {
     mimeTypeRef.current = mimeType;
     chunksRef.current = [];
 
-    const recorder = new MediaRecorder(stream, { mimeType });
-    recorder.ondataavailable = (event: BlobEvent) => {
-      if (event.data && event.data.size > 0) chunksRef.current.push(event.data);
-    };
-    recorder.onstop = () => {
-      void handleRecordingStopped();
-    };
+    // Constructing/starting the recorder can throw (e.g. an unsupported
+    // mimeType the browser didn't actually honor via isTypeSupported, or
+    // some other MediaRecorder quirk). If it does, the mic stream acquired
+    // just above must still be released — otherwise the user is left with
+    // an active, unstoppable-from-the-UI microphone and no explanation.
+    try {
+      const recorder = new MediaRecorder(stream, { mimeType });
+      recorder.ondataavailable = (event: BlobEvent) => {
+        if (event.data && event.data.size > 0) chunksRef.current.push(event.data);
+      };
+      recorder.onstop = () => {
+        void handleRecordingStopped();
+      };
 
-    streamRef.current = stream;
-    mediaRecorderRef.current = recorder;
-    recorder.start();
+      streamRef.current = stream;
+      mediaRecorderRef.current = recorder;
+      recorder.start();
+    } catch {
+      stream.getTracks().forEach((track) => track.stop());
+      setError("לא ניתן להתחיל הקלטה. נסה שוב.");
+      return;
+    }
 
     setElapsedSeconds(0);
     setStage("recording");
@@ -299,12 +310,7 @@ export function VoiceSoapRecorder({ visitId }: { visitId: string }) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        // "soap_full" (as an earlier plan draft assumed) is not a valid
-        // MedicalNoteType — see lib/validators/medical-note.ts. "general"
-        // is the closest existing type for a single note that carries all
-        // four SOAP sections at once; it's also the default noteType the
-        // manual create-note form in VisitNotesSection starts from.
-        noteType: "general",
+        noteType: "soap_full",
         content: composeNoteContent(fields),
         subjective: fields.subjective.trim() || null,
         objective: fields.objective.trim() || null,

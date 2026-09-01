@@ -22,6 +22,11 @@ const NOTE_TYPE_LABELS: Record<MedicalNoteType, string> = {
   soap_objective: "SOAP - ממצאים",
   soap_assessment: "SOAP - הערכה",
   soap_plan: "SOAP - תוכנית טיפול",
+  // "soap_full" notes, like "addendum" below, are never picked from this
+  // form's NOTE_TYPES select — they're created exclusively via
+  // VoiceSoapRecorder's "הוסף כהערה" flow (POST .../notes with a full,
+  // possibly hand-edited S/O/A/P draft), which sets noteType client-side.
+  soap_full: "SOAP מלא",
   follow_up: "מעקב",
   // "addendum" notes are never picked from this form's NOTE_TYPES select —
   // they're created exclusively via the "הוסף נספח" flow in NoteListItem

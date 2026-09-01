@@ -3,6 +3,7 @@ export type MedicalNoteType =
   | "soap_objective"
   | "soap_assessment"
   | "soap_plan"
+  | "soap_full"
   | "general"
   | "follow_up"
   | "addendum";
