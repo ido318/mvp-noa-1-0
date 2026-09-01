@@ -15,6 +15,14 @@ const SEVERITY_BADGE_COLOR: Record<ProblemListSeverity, "green" | "amber" | "red
   severe: "red",
 };
 
+// The DB CHECK constraint on active_problem_list only enforces "is a jsonb
+// array" — it does not guarantee onsetDate is a parseable date. formatIsraelDate
+// throws on an invalid value, so guard it rather than let one bad legacy/manual
+// row crash this whole tab.
+function formatOnsetDate(value: string): string {
+  return Number.isNaN(new Date(value).getTime()) ? value : formatIsraelDate(value);
+}
+
 export function ActiveProblems({ problems }: { problems: ProblemListEntry[] }) {
   return (
     <div className="rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--surface)] p-3">
@@ -38,7 +46,7 @@ export function ActiveProblems({ problems }: { problems: ProblemListEntry[] }) {
               </div>
               {(problem.onsetDate || problem.notes) && (
                 <div className="mt-1 space-y-0.5 text-[11px] text-[var(--muted)]">
-                  {problem.onsetDate && <p>תאריך תחילה: {formatIsraelDate(problem.onsetDate)}</p>}
+                  {problem.onsetDate && <p>תאריך תחילה: {formatOnsetDate(problem.onsetDate)}</p>}
                   {problem.notes && <p>הערות: {problem.notes}</p>}
                 </div>
               )}

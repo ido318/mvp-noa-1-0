@@ -45,6 +45,11 @@ describe("problemListEntrySchema", () => {
     expect(result.success).toBe(true);
   });
 
+  it("rejects a non-ISO onsetDate", () => {
+    const result = problemListEntrySchema.safeParse({ condition: "סכרת", onsetDate: "not-a-date" });
+    expect(result.success).toBe(false);
+  });
+
   it("rejects an entry missing condition", () => {
     const result = problemListEntrySchema.safeParse({ severity: "mild" });
     expect(result.success).toBe(false);
