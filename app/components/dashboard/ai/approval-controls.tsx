@@ -1,9 +1,11 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Btn } from "@/components/dashboard/ui/btn";
 
 export function ApprovalControls({ artifactId }: { artifactId: string }) {
+  const router = useRouter();
   const [reason, setReason] = useState("");
   const [loading, setLoading] = useState<"approve" | "reject" | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -18,6 +20,9 @@ export function ApprovalControls({ artifactId }: { artifactId: string }) {
     });
     setLoading(null);
     setMessage(response.ok ? "עודכן" : "העדכון נכשל");
+    if (response.ok) {
+      router.refresh();
+    }
   }
 
   return (
