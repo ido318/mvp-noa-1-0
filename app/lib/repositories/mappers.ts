@@ -19,7 +19,7 @@ import type { Invoice, InvoiceLineItem, InvoiceStatus } from "@/types/domain/inv
 import type { InventoryItem } from "@/types/domain/inventory";
 import type { LabOrder, LabOrderStatus } from "@/types/domain/lab-order";
 import type { MedicalNote, MedicalNoteType } from "@/types/domain/medical-note";
-import type { MedicalRecord } from "@/types/domain/medical-record";
+import type { MedicalRecord, ProblemListEntry } from "@/types/domain/medical-record";
 import type { Pet, PetStatus } from "@/types/domain/pet";
 import type { Prescription, PrescriptionStatus } from "@/types/domain/prescription";
 import type { Profile } from "@/types/domain/profile";
@@ -446,7 +446,9 @@ export function mapMedicalRecordRow(row: {
     clinicId: row.clinic_id,
     petId: row.pet_id,
     summary: row.summary,
-    activeProblemList: row.active_problem_list ?? [],
+    // The DB CHECK constraint only enforces "is a jsonb array" — actual entry
+    // shape is validated on write via problemListEntrySchema, not by Postgres.
+    activeProblemList: (row.active_problem_list ?? []) as ProblemListEntry[],
     alerts: row.alerts ?? [],
     createdAt: row.created_at,
     updatedAt: row.updated_at,
