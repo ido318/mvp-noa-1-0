@@ -10,6 +10,14 @@ import type { PromptSuggestion } from "@/types/domain/prompt-suggestion";
 type ApproveResponse = { data: { suggestion: PromptSuggestion; published: boolean; message: string } };
 type RejectResponse = { data: PromptSuggestion };
 
+const CATEGORY_LABEL: Record<string, string> = {
+  prompt: "פרומפט",
+  knowledge_base: "מאגר ידע",
+  tool: "כלי",
+  backend_logic: "לוגיקת שרת",
+  conversation_flow: "זרימת שיחה",
+};
+
 export default function ProviderAdminImprovementsPage() {
   const [items, setItems] = useState<PromptSuggestion[]>([]);
   const [loading, setLoading] = useState(true);
@@ -79,7 +87,7 @@ export default function ProviderAdminImprovementsPage() {
         <div className="space-y-3">
           {items.map((s) => (
             <Card key={s.id}>
-              <SectionHeading title={s.patternSummary} action={<Badge tone="info">{s.category}</Badge>} />
+              <SectionHeading title={s.patternSummary} action={<Badge tone="info">{CATEGORY_LABEL[s.category] ?? s.category}</Badge>} />
               {s.proposedChange && (
                 <p className="text-[13.5px] mt-2" style={{ color: "var(--text-secondary)" }}>{s.proposedChange}</p>
               )}
