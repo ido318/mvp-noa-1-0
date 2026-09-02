@@ -111,6 +111,18 @@ function buildCancellationUpdateBody(customerName: string, petName: string, oldD
   );
 }
 
+// Mirrors agent/src/services/sms.templates.ts's vaccination_reminder exactly.
+// Deliberately does not mention a specific due date (unlike this file's other
+// build*Body helpers) — the frozen template only says "בקרוב" (soon).
+function buildVaccinationReminderBody(customerName: string, petName: string, vaccineName: string): string {
+  return (
+    `שלום ${customerName}, כאן תומר מ-Get A Vet 💉\n` +
+    `הגיע הזמן לחיסון הבא של ${petName} (${vaccineName}) — מומלץ לתאם בקרוב לשמירה על הבריאות.\n` +
+    `לתיאום תור נוח — חייגו אלינו בכל עת.\n` +
+    `בריאות ל${petName} 🐾 תומר, Get A Vet`
+  );
+}
+
 export interface ApproveNotificationParams {
   appointmentId: string;
   scheduledAt: string;
@@ -217,20 +229,19 @@ export class DashboardNotificationsService {
   }
 
   async enqueueVaccinationReminder(p: VaccinationReminderParams): Promise<Result<void>> {
-    const { date } = israelDT(`${p.nextDueAt}T08:00:00+02:00`);
-    const { error } = await this.client.from("notifications_log").insert({
-      clinic_id: p.clinicId,
-      customer_id: p.customerId,
-      vaccination_id: p.vaccinationId,
-      phone: p.phone,
-      status: "pending",
-      type: "vaccination_reminder",
-      body:
-        `שלום ${p.customerName}, תזכורת מ-Get A Vet:\n` +
-        `הגיע הזמן לתאם את חיסון ${p.vaccineName} ל${p.petName}, סביב ${date}.\n` +
-        `לתיאום מועד, חייגו אלינו ונמצא זמן מתאים.`,
-      scheduled_for: `${p.nextDueAt}T06:00:00.000Z`,
-    });
+    const { error } = await this.client.from("notifications_log").upsert(
+      {
+        clinic_id: p.clinicId,
+        customer_id: p.customerId,
+        vaccination_id: p.vaccinationId,
+        phone: p.phone,
+        status: "pending",
+        type: "vaccination_reminder",
+        body: buildVaccinationReminderBody(p.customerName, p.petName, p.vaccineName),
+        scheduled_for: `${p.nextDueAt}T06:00:00.000Z`,
+      },
+      { onConflict: "vaccination_id,type", ignoreDuplicates: true },
+    );
 
     if (error) return err(AppError.externalProvider("Failed to enqueue vaccination reminder", error));
     return ok(undefined);

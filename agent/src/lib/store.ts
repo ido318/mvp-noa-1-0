@@ -68,7 +68,7 @@ export async function findCustomerByPhone(
 
   const { data, error } = await getSupabase()
     .from("customers")
-    .select("phone, full_name, notes, pets(name, species, breed)")
+    .select("id, phone, full_name, notes")
     .eq("clinic_id", env.AGENT_CLINIC_ID)
     .eq("phone", normalised)
     .is("deleted_at", null)
@@ -79,17 +79,31 @@ export async function findCustomerByPhone(
   if (!data) return null;
 
   const row = data as {
+    id: string;
     phone: string;
     full_name: string;
     notes: string | null;
-    pets: Array<{ name: string; species: string; breed: string | null }> | null;
   };
+
+  // Queried separately (rather than via a `pets(...)` embed on the customers
+  // query above) so deleted_at can actually be filtered on the pets side —
+  // PostgREST embeds don't apply the parent query's filters to child rows.
+  // Same fix as listCustomerPets below; this function predates that one and
+  // was missed when the bug was first found and fixed there.
+  const { data: petsData, error: petsErr } = await getSupabase()
+    .from("pets")
+    .select("name, species, breed")
+    .eq("clinic_id", env.AGENT_CLINIC_ID)
+    .eq("customer_id", row.id)
+    .is("deleted_at", null);
+
+  if (petsErr) throw new Error(`supabase lookup failed: ${petsErr.message}`);
 
   return {
     phone: row.phone,
     full_name: row.full_name,
     notes: row.notes,
-    pets: row.pets ?? [],
+    pets: (petsData ?? []) as Pet[],
   };
 }
 
