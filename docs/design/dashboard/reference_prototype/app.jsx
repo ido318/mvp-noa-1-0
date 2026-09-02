@@ -57,7 +57,7 @@ const Sidebar = ({route, setRoute})=>{
   );
 };
 
-const Header = ({onBell})=>{
+const Header = ({onBell, onNewAppt})=>{
   const [q,setQ]=useState("");
   const open=ESCALATIONS.filter(e=>e.status==="open").length;
   return (
@@ -72,16 +72,17 @@ const Header = ({onBell})=>{
         onBlur={e=>{e.target.style.borderColor="var(--line)";e.target.style.background="var(--surface-2)";}}/>
       </div>
       <div style={{display:"flex",alignItems:"center",gap:14}}>
-        <div style={{textAlign:"start",whiteSpace:"nowrap"}}>
-          <div style={{fontSize:13.5,fontWeight:700,color:"var(--ink-2)"}}>מרפאת Get A Vet</div>
-          <div style={{fontSize:11.5,color:"var(--faint)"}}>מגדלי גינדי TLV · תל אביב</div>
-        </div>
-        <div style={{width:1,height:30,background:"var(--line)"}}/>
+        <Btn icon="plus" size="sm" onClick={onNewAppt}>תור חדש</Btn>
         <button onClick={onBell} style={{position:"relative",width:42,height:42,borderRadius:12,display:"grid",placeItems:"center",color:"var(--ink-2)",background:"var(--surface-2)",transition:"background .15s"}}
           onMouseEnter={e=>e.currentTarget.style.background="var(--line-2)"} onMouseLeave={e=>e.currentTarget.style.background="var(--surface-2)"}>
           <Icon name="bell" size={21}/>
           {open>0 && <span style={{position:"absolute",top:7,insetInlineEnd:8,minWidth:17,height:17,padding:"0 4px",borderRadius:99,background:"var(--red-500)",color:"#fff",fontSize:10.5,fontWeight:700,display:"grid",placeItems:"center",border:"2px solid var(--surface)"}}>{open}</span>}
         </button>
+        <div style={{width:1,height:30,background:"var(--line)"}}/>
+        <div style={{textAlign:"start",whiteSpace:"nowrap"}}>
+          <div style={{fontSize:13.5,fontWeight:700,color:"var(--ink-2)"}}>מרפאת Get A Vet</div>
+          <div style={{fontSize:11.5,color:"var(--faint)"}}>מגדלי גינדי TLV · תל אביב</div>
+        </div>
       </div>
     </header>
   );
@@ -128,21 +129,25 @@ const App = ()=>{
   const [selClient,setSelClient]=useState(null);
   const [openCall,setOpenCall]=useState(null);
   const [drawer,setDrawer]=useState(false);
+  const [openVisit,setOpenVisit]=useState(null);
+  const [visitDrawer,setVisitDrawer]=useState(false);
+  const [newApptSignal,setNewApptSignal]=useState(0);
   const [loading,setLoading]=useState(true);
 
   useEffect(()=>{ const t=setTimeout(()=>setLoading(false),780); return ()=>clearTimeout(t); },[]);
 
   const goClient=(c)=>{ setSelClient(c); setRoute("clientProfile"); window.scrollTo&&window.scrollTo(0,0); };
   const showCall=(c)=>{ setOpenCall(c); setDrawer(true); };
+  const showVisit=(v)=>{ setOpenVisit(v); setVisitDrawer(true); };
   const nav=(r)=>{ setRoute(r); };
 
   // wrap setRoute to reset client when leaving
-  const navTo=(r)=>{ if(r!=="clientProfile") setSelClient(null); setDrawer(false); setRoute(r); };
+  const navTo=(r)=>{ if(r!=="clientProfile") setSelClient(null); setDrawer(false); setVisitDrawer(false); setRoute(r); };
 
   let content;
   switch(route){
-    case "today": content=<TodayScreen nav={nav} onOpenClient={goClient} onOpenCall={showCall} loading={loading}/>; break;
-    case "calendar": content=<CalendarScreen onOpenClient={goClient}/>; break;
+    case "today": content=<TodayScreen nav={nav} onOpenClient={goClient} onOpenCall={showCall} onOpenVisit={showVisit} loading={loading}/>; break;
+    case "calendar": content=<CalendarScreen onOpenClient={goClient} onOpenVisit={showVisit} openSignal={newApptSignal}/>; break;
     case "calls": content=<CallsScreen openCall={openCall} onOpenCall={showCall}/>; break;
     case "escalations": content=<EscalationsScreen onOpenClient={goClient} onOpenCall={showCall}/>; break;
     case "clients": content=<ClientsScreen onOpenClient={goClient}/>; break;
@@ -157,7 +162,7 @@ const App = ()=>{
     <ToastProvider>
       <div className="app">
         <div style={{flex:1,display:"flex",flexDirection:"column",minWidth:0,height:"100%"}}>
-          <Header onBell={()=>navTo("escalations")}/>
+          <Header onBell={()=>navTo("escalations")} onNewAppt={()=>{navTo("calendar");setNewApptSignal(n=>n+1);}}/>
           <main style={{flex:1,overflowY:"auto",padding:"28px 32px 40px"}}>
             <div style={{maxWidth:1240,margin:"0 auto"}}>{content}</div>
           </main>
@@ -165,6 +170,7 @@ const App = ()=>{
         <Sidebar route={route} setRoute={navTo}/>
       </div>
       <CallDrawer call={openCall} open={drawer} onClose={()=>setDrawer(false)} onOpenClient={goClient}/>
+      <VisitDrawer visit={openVisit} open={visitDrawer} onClose={()=>setVisitDrawer(false)} onOpenClient={goClient}/>
     </ToastProvider>
   );
 };
