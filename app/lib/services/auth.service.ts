@@ -4,6 +4,7 @@ import type { ClinicRepository } from "@/lib/repositories/clinic.repository";
 import type { ProfileRepository } from "@/lib/repositories/profile.repository";
 import type { ServiceActor } from "@/lib/services/service-context";
 import type { MeResponse } from "@/types/api/me";
+import type { Profile } from "@/types/domain/profile";
 
 export class AuthService {
   constructor(
@@ -20,6 +21,10 @@ export class AuthService {
     }
 
     return ok(data.user ?? null);
+  }
+
+  async getProfile(userId: string): Promise<Result<Profile | null>> {
+    return this.profileRepository.findByUserId(userId);
   }
 
   async getCurrentContext(): Promise<Result<MeResponse>> {
