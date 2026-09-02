@@ -1,4 +1,5 @@
-import { getActorAndServices } from "@/lib/api/actor";
+import { createServices } from "@/lib/services/factory";
+import { requireProviderAdmin } from "@/lib/api/provider-admin";
 import { createRequestId } from "@/lib/api/request-id";
 import { handleRouteError, jsonSuccess } from "@/lib/api/response";
 import type { PromptSuggestion } from "@/types/domain/prompt-suggestion";
@@ -25,9 +26,10 @@ export async function POST(
   const requestId = createRequestId();
 
   try {
-    const { actor, promptSuggestion } = await getActorAndServices();
+    const services = await createServices();
+    const { user } = await requireProviderAdmin(services.auth);
     const { id } = await params;
-    const result = await promptSuggestion.approve(actor, id);
+    const result = await services.promptSuggestion.approve(user.id, id);
     if (!result.ok) return handleRouteError(result.error, requestId);
 
     return jsonSuccess(

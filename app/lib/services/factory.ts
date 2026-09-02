@@ -18,6 +18,7 @@ import { MedicalRecordRepository } from "@/lib/repositories/medical-record.repos
 import { PetRepository } from "@/lib/repositories/pet.repository";
 import { PrescriptionRepository } from "@/lib/repositories/prescription.repository";
 import { PromptSuggestionRepository } from "@/lib/repositories/prompt-suggestion.repository";
+import { CallReviewRepository } from "@/lib/repositories/call-review.repository";
 import { ProfileRepository } from "@/lib/repositories/profile.repository";
 import { TaskRepository } from "@/lib/repositories/task.repository";
 import { VaccinationRepository } from "@/lib/repositories/vaccination.repository";
@@ -46,6 +47,7 @@ import { PetService } from "@/lib/services/pet.service";
 import { VisitService } from "@/lib/services/visit.service";
 import { VisitSummaryAssistantService } from "@/lib/services/visit-summary-assistant.service";
 import { PromptSuggestionService } from "@/lib/services/prompt-suggestion.service";
+import { CallReviewService } from "@/lib/services/call-review.service";
 import { TaskService } from "@/lib/services/task.service";
 import { VisitShareService } from "@/lib/services/visit-share.service";
 import { VoiceCallService } from "@/lib/services/voice-call.service";
@@ -81,6 +83,7 @@ export async function createServices() {
   const vitalRepository = new VitalRepository(supabase);
   const visitShareRepository = new VisitShareRepository(admin);
   const promptSuggestionRepository = new PromptSuggestionRepository(admin);
+  const callReviewRepository = new CallReviewRepository(admin);
   const auditLogRepository = new AuditLogRepository(admin);
   const aiEventRepository = new AIEventRepository(admin);
   const aiSummaryRepository = new AiSummaryRepository(supabase);
@@ -162,6 +165,7 @@ export async function createServices() {
     ),
     voiceCall: new VoiceCallService(voiceCallRepository),
     promptSuggestion: new PromptSuggestionService(promptSuggestionRepository),
+    callReview: new CallReviewService(callReviewRepository, promptSuggestionRepository),
   };
 }
 

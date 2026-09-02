@@ -4,116 +4,119 @@ import { GET } from "@/app/api/prompt-suggestions/route";
 import { POST as rejectRoute } from "@/app/api/prompt-suggestions/[id]/reject/route";
 import { POST as approveRoute } from "@/app/api/prompt-suggestions/[id]/approve/route";
 
-const mockGetActorAndServices = vi.fn();
-
-vi.mock("@/lib/api/actor", () => ({
-  getActorAndServices: () => mockGetActorAndServices(),
+const { mockRequireProviderAdmin, mockCreateServices } = vi.hoisted(() => ({
+  mockRequireProviderAdmin: vi.fn(),
+  mockCreateServices: vi.fn(),
 }));
 
-const ownerActor = {
-  userId: "u1",
-  clinicIds: ["c1"],
-  defaultClinicId: "c1",
-  memberships: [{ clinicId: "c1", role: "owner" }],
-};
+vi.mock("@/lib/api/provider-admin", () => ({
+  requireProviderAdmin: mockRequireProviderAdmin,
+}));
+
+vi.mock("@/lib/services/factory", () => ({
+  createServices: mockCreateServices,
+}));
+
+const adminUser = { id: "admin-1" };
+
+function mockServices(promptSuggestion: Record<string, unknown>) {
+  mockCreateServices.mockResolvedValue({ auth: {}, promptSuggestion });
+}
 
 describe("prompt-suggestions API routes", () => {
   beforeEach(() => {
-    mockGetActorAndServices.mockReset();
+    mockRequireProviderAdmin.mockReset();
+    mockCreateServices.mockReset();
+    mockCreateServices.mockResolvedValue({ auth: {} });
   });
 
   it("GET /prompt-suggestions returns 401 when unauthenticated", async () => {
-    mockGetActorAndServices.mockRejectedValue(AppError.unauthorized());
-
+    mockRequireProviderAdmin.mockRejectedValue(AppError.unauthorized());
     const response = await GET();
-
     expect(response.status).toBe(401);
   });
 
-  it("GET /prompt-suggestions lists pending suggestions for the actor", async () => {
-    const listPending = vi.fn().mockResolvedValue(ok([{ id: "sugg-1", status: "pending" }]));
-    mockGetActorAndServices.mockResolvedValue({ actor: ownerActor, promptSuggestion: { listPending } });
-
+  it("GET /prompt-suggestions returns 403 for a non-provider-admin", async () => {
+    mockRequireProviderAdmin.mockRejectedValue(AppError.forbidden());
     const response = await GET();
+    expect(response.status).toBe(403);
+  });
 
+  it("GET /prompt-suggestions lists pending suggestions with no actor argument", async () => {
+    mockRequireProviderAdmin.mockResolvedValue({ user: adminUser });
+    const listPending = vi.fn().mockResolvedValue(ok([{ id: "sugg-1", status: "pending" }]));
+    mockServices({ listPending });
+    const response = await GET();
     expect(response.status).toBe(200);
-    expect(listPending).toHaveBeenCalledWith(ownerActor);
+    expect(listPending).toHaveBeenCalledWith();
   });
 
   it("POST reject returns 401 when unauthenticated", async () => {
-    mockGetActorAndServices.mockRejectedValue(AppError.unauthorized());
-
+    mockRequireProviderAdmin.mockRejectedValue(AppError.unauthorized());
     const response = await rejectRoute(
       new Request("http://localhost/api/prompt-suggestions/sugg-1/reject", { method: "POST" }),
       { params: Promise.resolve({ id: "sugg-1" }) },
     );
-
     expect(response.status).toBe(401);
   });
 
-  it("POST reject delegates to the service with the actor and id", async () => {
+  it("POST reject delegates to the service with the user id and suggestion id", async () => {
+    mockRequireProviderAdmin.mockResolvedValue({ user: adminUser });
     const reject = vi.fn().mockResolvedValue(ok({ id: "sugg-1", status: "rejected" }));
-    mockGetActorAndServices.mockResolvedValue({ actor: ownerActor, promptSuggestion: { reject } });
-
+    mockServices({ reject });
     const response = await rejectRoute(
       new Request("http://localhost/api/prompt-suggestions/sugg-1/reject", { method: "POST" }),
       { params: Promise.resolve({ id: "sugg-1" }) },
     );
-
     expect(response.status).toBe(200);
-    expect(reject).toHaveBeenCalledWith(ownerActor, "sugg-1");
+    expect(reject).toHaveBeenCalledWith(adminUser.id, "sugg-1");
   });
 
   it("POST approve returns 401 when unauthenticated", async () => {
-    mockGetActorAndServices.mockRejectedValue(AppError.unauthorized());
-
+    mockRequireProviderAdmin.mockRejectedValue(AppError.unauthorized());
     const response = await approveRoute(
       new Request("http://localhost/api/prompt-suggestions/sugg-1/approve", { method: "POST" }),
       { params: Promise.resolve({ id: "sugg-1" }) },
     );
-
     expect(response.status).toBe(401);
   });
 
   it("POST approve reports published:false when regression could not be confirmed", async () => {
+    mockRequireProviderAdmin.mockResolvedValue({ user: adminUser });
     const approve = vi.fn().mockResolvedValue(ok({ id: "sugg-1", status: "pending" }));
-    mockGetActorAndServices.mockResolvedValue({ actor: ownerActor, promptSuggestion: { approve } });
-
+    mockServices({ approve });
     const response = await approveRoute(
       new Request("http://localhost/api/prompt-suggestions/sugg-1/approve", { method: "POST" }),
       { params: Promise.resolve({ id: "sugg-1" }) },
     );
     const body = (await response.json()) as { data: { published: boolean } };
-
     expect(response.status).toBe(200);
     expect(body.data.published).toBe(false);
-    expect(approve).toHaveBeenCalledWith(ownerActor, "sugg-1");
+    expect(approve).toHaveBeenCalledWith(adminUser.id, "sugg-1");
   });
 
   it("POST approve reports published:true on a successful publish", async () => {
+    mockRequireProviderAdmin.mockResolvedValue({ user: adminUser });
     const approve = vi.fn().mockResolvedValue(ok({ id: "sugg-1", status: "published" }));
-    mockGetActorAndServices.mockResolvedValue({ actor: ownerActor, promptSuggestion: { approve } });
-
+    mockServices({ approve });
     const response = await approveRoute(
       new Request("http://localhost/api/prompt-suggestions/sugg-1/approve", { method: "POST" }),
       { params: Promise.resolve({ id: "sugg-1" }) },
     );
     const body = (await response.json()) as { data: { published: boolean } };
-
     expect(response.status).toBe(200);
     expect(body.data.published).toBe(true);
   });
 
   it("POST approve reports a non-empty message for the 'approved' status (non-prompt category, no regression run)", async () => {
+    mockRequireProviderAdmin.mockResolvedValue({ user: adminUser });
     const approve = vi.fn().mockResolvedValue(ok({ id: "sugg-1", status: "approved" }));
-    mockGetActorAndServices.mockResolvedValue({ actor: ownerActor, promptSuggestion: { approve } });
-
+    mockServices({ approve });
     const response = await approveRoute(
       new Request("http://localhost/api/prompt-suggestions/sugg-1/approve", { method: "POST" }),
       { params: Promise.resolve({ id: "sugg-1" }) },
     );
     const body = (await response.json()) as { data: { published: boolean; message: string } };
-
     expect(response.status).toBe(200);
     expect(body.data.published).toBe(false);
     expect(body.data.message).not.toBe("");

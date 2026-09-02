@@ -55,11 +55,10 @@ function mapPromptSuggestionRow(row: Record<string, unknown>): PromptSuggestion 
 export class PromptSuggestionRepository {
   constructor(private readonly client: SupabaseClient) {}
 
-  async listByStatus(clinicIds: string[], status: PromptSuggestionStatus): Promise<Result<PromptSuggestion[]>> {
+  async listByStatus(status: PromptSuggestionStatus): Promise<Result<PromptSuggestion[]>> {
     const { data, error } = await this.client
       .from("tomer_prompt_suggestions")
       .select("*")
-      .in("clinic_id", clinicIds)
       .eq("status", status)
       .order("created_at", { ascending: false });
     if (error) return err(AppError.externalProvider("Failed to list prompt suggestions", error));
