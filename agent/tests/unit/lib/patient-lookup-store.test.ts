@@ -74,6 +74,7 @@ vi.mock("../../../src/lib/supabase.js", () => {
 
 import { formatDateHe } from "../../../src/lib/appointments.js";
 import {
+  findCustomerByPhone,
   getLastVisitPlan,
   getPatientChronicConditions,
   getPatientReminders,
@@ -168,6 +169,42 @@ describe("listCustomerPets", () => {
 
     expect(eqCallsFor("pets")).toContainEqual(["customer_id", CUSTOMER_ID]);
     expect(isCallsFor("pets")).toContainEqual(["deleted_at", null]);
+  });
+});
+
+describe("findCustomerByPhone", () => {
+  it("returns null for an unrecognised phone", async () => {
+    setQueue("customers", [{ data: null, error: null }]);
+
+    const customer = await findCustomerByPhone(PHONE);
+
+    expect(customer).toBeNull();
+  });
+
+  it("scopes the pets query to this customer and excludes soft-deleted pets", async () => {
+    setQueue("customers", [{ data: { id: CUSTOMER_ID, phone: PHONE, full_name: "דנה כהן", notes: null }, error: null }]);
+    // Only the non-deleted pet is queued back — the deleted one must never
+    // reach findCustomerByPhone's caller (a PostgREST `pets(...)` embed on
+    // the customers query, the bug this test guards against, can't be
+    // expressed through this table-scoped mock at all — the meaningful
+    // assertions are the eq/is calls below, proving the query itself filters
+    // server-side rather than relying on an embed).
+    setQueue("pets", [{ data: [{ name: PET_NAME, species: PET_SPECIES, breed: null }], error: null }]);
+
+    const customer = await findCustomerByPhone(PHONE);
+
+    expect(eqCallsFor("pets")).toContainEqual(["customer_id", CUSTOMER_ID]);
+    expect(isCallsFor("pets")).toContainEqual(["deleted_at", null]);
+    expect(customer?.pets).toEqual([{ name: PET_NAME, species: PET_SPECIES, breed: null }]);
+  });
+
+  it("reports zero pets for a known customer with none registered (or all soft-deleted)", async () => {
+    setQueue("customers", [{ data: { id: CUSTOMER_ID, phone: PHONE, full_name: "דנה כהן", notes: null }, error: null }]);
+    setQueue("pets", [{ data: [], error: null }]);
+
+    const customer = await findCustomerByPhone(PHONE);
+
+    expect(customer?.pets).toEqual([]);
   });
 });
 
