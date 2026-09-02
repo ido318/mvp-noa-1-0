@@ -48,4 +48,28 @@ export class AIEventRepository {
     }
     return ok(count ?? 0);
   }
+
+  /**
+   * Generalized version of `countVisitSummaryGenerationsSince`, scoped by
+   * `(sourceId, eventType)` instead of being hardcoded to visit summaries —
+   * usable by any artifact-generation flow that needs a per-source,
+   * per-generation-type rate limit (e.g. `soap_note_generated`).
+   */
+  async countArtifactGenerationsSince(
+    sourceId: string,
+    eventType: string,
+    sinceIso: string,
+  ): Promise<Result<number>> {
+    const { count, error } = await this.client
+      .from("ai_events")
+      .select("id", { count: "exact", head: true })
+      .eq("source_id", sourceId)
+      .eq("event_type", eventType)
+      .gte("created_at", sinceIso);
+
+    if (error) {
+      return err(AppError.externalProvider("Failed to count AI events", error));
+    }
+    return ok(count ?? 0);
+  }
 }

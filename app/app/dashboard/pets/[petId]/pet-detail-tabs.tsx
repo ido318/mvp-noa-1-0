@@ -6,6 +6,7 @@ import { Badge } from "@/components/dashboard/ui/badge";
 import { Btn } from "@/components/dashboard/ui/btn";
 import { EmptyState } from "@/components/dashboard/ui/empty-state";
 import { ActiveProblems } from "@/components/dashboard/medical-record/active-problems";
+import { ProblemListEditor } from "@/components/dashboard/medical-record/problem-list-editor";
 import { AlertBanner } from "@/components/dashboard/medical-record/alert-banner";
 import { MedicalTimeline } from "@/components/dashboard/medical-record/medical-timeline";
 import { VitalsTrend } from "@/components/dashboard/medical-record/vitals-trend";
@@ -119,6 +120,8 @@ export function PetDetailTabs({
               />
 
               <ActiveProblems problems={medicalRecord?.activeProblemList ?? []} />
+
+              <ProblemListEditor petId={pet.id} activeProblemList={medicalRecord?.activeProblemList ?? []} />
 
               <VitalsTrend items={timelineItems} />
 

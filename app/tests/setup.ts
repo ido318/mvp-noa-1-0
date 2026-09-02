@@ -1,5 +1,8 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
+// Extends `expect` with DOM matchers (toBeInTheDocument, etc.) for React
+// Testing Library component tests. A no-op for plain (non-DOM) unit tests.
+import "@testing-library/jest-dom/vitest";
 
 function loadEnvFile(filename: string) {
   const path = resolve(process.cwd(), filename);

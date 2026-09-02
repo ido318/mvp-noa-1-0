@@ -4,6 +4,7 @@ import Link from "next/link";
 import { AnimalAvatar, PersonAvatar } from "@/components/dashboard/ui/avatar";
 import { Badge } from "@/components/dashboard/ui/badge";
 import { Drawer } from "@/components/dashboard/ui/drawer";
+import { ProblemListEntryRow } from "@/components/dashboard/medical-record/active-problems";
 import { formatIsraelDateTime } from "@/lib/israel-date";
 import type { Customer } from "@/types/domain/customer";
 import type { MedicalRecord } from "@/types/domain/medical-record";
@@ -99,9 +100,7 @@ export function PatientContextDrawer({
               <p className="text-sm text-[var(--faint)]">אין בעיות פעילות רשומות.</p>
             ) : (
               medicalRecord!.activeProblemList.map((problem, index) => (
-                <p key={index} className="rounded-[var(--r-sm)] bg-[var(--surface-2)] px-2 py-1 text-xs font-semibold text-[var(--ink)]">
-                  {String(problem)}
-                </p>
+                <ProblemListEntryRow key={index} problem={problem} />
               ))
             )}
           </div>

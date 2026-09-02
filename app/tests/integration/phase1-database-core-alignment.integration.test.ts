@@ -158,7 +158,6 @@ describe.runIf(runIntegration)("phase1 database core alignment", () => {
       objective: "No fever.",
       assessment: "Mild respiratory concern.",
       plan: "Monitor and recheck if worse.",
-      status: "draft",
     });
     expect(note.ok).toBe(true);
     if (!note.ok) return;

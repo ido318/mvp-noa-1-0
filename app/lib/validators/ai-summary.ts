@@ -17,3 +17,13 @@ export const extractTasksSchema = generateAiArtifactSchema;
 export const rejectAiArtifactSchema = z.object({
   reason: z.string().trim().min(1).max(2000),
 });
+
+/**
+ * Body for POST /visits/:visitId/soap-draft — the client only supplies the
+ * storagePath of an already-uploaded dictation recording (see
+ * soap-recording/route.ts); clinicId/sourceType/sourceId are derived
+ * server-side from the visit itself, never trusted from the request.
+ */
+export const soapDraftFromRecordingSchema = z.object({
+  storagePath: z.string().trim().min(1),
+});

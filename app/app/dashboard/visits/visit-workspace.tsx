@@ -5,6 +5,7 @@ import { AnamnesisForm } from "@/app/dashboard/visits/anamnesis-form";
 import { VitalsForm } from "@/app/dashboard/visits/vitals-form";
 import { ExamForm } from "@/app/dashboard/visits/exam-form";
 import { SoapEditor } from "@/app/dashboard/visits/soap-editor";
+import { VoiceSoapRecorder } from "@/app/dashboard/visits/voice-soap-recorder";
 import { CloseVisitModal } from "@/app/dashboard/visits/close-visit-modal";
 import type { MedicalNote } from "@/types/domain/medical-note";
 import type { Visit } from "@/types/domain/visit";
@@ -43,8 +44,9 @@ export function VisitWorkspace({
         </div>
       </Card>
       <Card>
-        <h3 className="text-[15px] font-semibold text-[var(--ink)]">SOAP</h3>
-        <div className="mt-3">
+        <h3 className="text-[15px] font-bold text-[var(--ink)]">SOAP</h3>
+        <div className="mt-3 space-y-4">
+          <VoiceSoapRecorder visitId={visit.id} />
           <SoapEditor visitId={visit.id} initialNotes={notes} />
         </div>
       </Card>
