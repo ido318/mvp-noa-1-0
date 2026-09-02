@@ -1,12 +1,12 @@
-# שלב 3: דשבורד Provider Admin — Design Spec (פונקציונלי)
+# שלב 3: דשבורד Provider Admin — Design Spec
 
 > חלק מ-`docs/superpowers/plans/2026-08-30-tomer-qa-kb-provider-admin-roadmap.md` (שלב 3). נכתב ב-brainstorming, אושר.
 >
-> **הערה על עיצוב ויזואלי:** המשתמש בונה מערכת עיצוב חדשה לדשבורד באופן עצמאי. ה-spec הזה עוסק **רק במבנה הפונקציונלי** (routes, הרשאות, backend, זרימת נתונים) — לא בעיצוב סופי (צבעים, טיפוגרפיה, spacing). ה-UI שייבנה בשלב המימוש ישתמש בסגנון מינימלי/פונקציונלי (מבוסס על רכיבי ה-UI הקיימים ב-`app/components/dashboard/ui/`, ללא polish ויזואלי מיוחד) ויוחלף כשמערכת העיצוב החדשה תוטמע.
+> **עדכון:** בזמן שה-spec הזה נכתב, מערכת העיצוב החדשה עדיין לא הייתה קיימת — הסעיף המקורי דחה כל החלטה ויזואלית. מאז אומת ש-**"Graphite Pro, lightened"** (commit `8790563`) כבר ב-`main`: מערכת tokens סמנטית מלאה + רכיבים מותאמים (`Badge` עם `tone`, `Card`, `Sidebar` rail). סעיף "מימוש UI" למטה משתמש בה ישירות — אין יותר placeholder ויזואלי.
 
 ## רקע
 
-`docs/design/dashboard/README.md` חושף שה-`app/app/globals.css` הקיים בפרודקשן משתמש בערכי צבע שגויים (teal במקום הכתום הקנוני של המותג) — **לא בסקופ של שלב 3**, מטופל בנפרד ע"י המשתמש.
+`docs/design/dashboard/README.md` (מסמך העיצוב הישן, מבוסס reference_prototype) **הוחלף במלואו** ע"י מערכת Graphite Pro. אין יותר רלוונטיות לצבעי הכתום/קורל המתועדים שם.
 
 ## הרשאות
 
@@ -106,14 +106,15 @@ export default async function ProviderAdminLayout({ children }: { children: Reac
   }
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      {/* Minimal nav shell — Calls | Improvements. Will be restyled once the
-          new design system lands; no visual polish investment now. */}
-      {children}
+    <div className="flex h-screen overflow-hidden" style={{ background: "var(--surface-canvas)" }}>
+      <ProviderAdminSidebar />
+      <main className="flex-1 overflow-y-auto">{children}</main>
     </div>
   );
 }
 ```
+
+(`ProviderAdminSidebar` — see "Shell" under "מימוש UI" below.)
 
 ### `proxy.ts`
 
@@ -286,7 +287,36 @@ async approve(reviewedByUserId: string, id: string): Promise<Result<PromptSugges
 | `/provider-admin/calls/[id]` | פרטים מלאים: תמלול, 6 ציונים, `problems[]`, `reviewer_summary`, הצעת-תיקון מקושרת אם קיימת |
 | `/provider-admin/improvements` | תיבת `tomer_prompt_suggestions` בסטטוס `pending`, אישור/דחייה |
 
-`layout.tsx` + ניווט מינימלי (Calls / Improvements) — לא סיידבר של המרפאה, לא polish ויזואלי בשלב הזה.
+`layout.tsx` + `Sidebar` נפרד ב-Graphite Pro (Calls / Improvements) — ראו "מימוש UI" למעלה. לא סיידבר של המרפאה.
+
+## מימוש UI — Graphite Pro
+
+רכיבים קיימים ל-import ישיר (`app/components/dashboard/ui/`): `Card`/`SectionHeading` (`card.tsx`), `Badge` עם `tone` (`badge.tsx`), `Btn` (`btn.tsx`), `EmptyState`, `Skeleton`. **קוד חדש כותב עם שמות הטוקן הסמנטיים החדשים** (`--text-primary`, `--surface-raised`, `--radius-2/3`, `--status-*-text/wash`) — לא השמות הישנים (`--ink`, `--r-md`, `--brand-600`) שעדיין עובדים דרך ה-compat bridge אבל הם legacy.
+
+### מיפוי חומרת QA ל-`Badge tone`
+
+| `exception_severity` | `tone` |
+|---|---|
+| `critical` / `high` | `critical` (אדום) |
+| `medium` | `pending` (ענבר — "ממתין לבן אדם", מתאים סמנטית) |
+| `low` | `info` (סטיל) |
+| `none` | `done` (ירוק) |
+
+### `/provider-admin/calls`
+
+`Card noPad` עוטף `<table>` (בדיוק כמו `app/app/dashboard/calls/page.tsx` הקיים — `border-b border-[var(--border-hairline)]`, שורות עם `hover:bg-[var(--surface-hover)]`, `cursor-pointer`). עמודות: מתקשר, ציון כללי (`--type-metric` typography token, tabular-nums), חומרה (`Badge tone`), סיכום מקוצר. פילטר חומרה — segmented control (כמו הפילטר הקיים ב-`calls/page.tsx`: `flex rounded-[var(--radius-2)] border border-[var(--border-field)]`, active = `bg-[var(--accent)] text-white`). `EmptyState` כשאין תוצאות, `Skeleton` בזמן טעינה.
+
+### `/provider-admin/calls/[id]`
+
+`Card` אחד לכל בלוק: מטא (תאריך/משך/`call_successful`), 6 הציונים כרשת קטנה (`--type-metric` לכל מספר + תווית `--size-section`), `problems[]` כרשימה (כל item: `moment`/`problem`/`root_cause`/`proposed_change`), `reviewer_summary` כפסקה, ותיבת "הצעת תיקון מקושרת" (אם `linkedSuggestion` לא null) עם קישור ל-`/provider-admin/improvements#<id>`. תמלול — משתמש חוזר ב-`TranscriptBubble` הקיים מ-`calls/page.tsx` אם מעשי לחלץ, אחרת גרסה מינימלית דומה.
+
+### `/provider-admin/improvements`
+
+רשימת `Card` אחד לכל הצעה: `pattern_summary`, `Badge tone="info"` ל-`category`, `proposed_change`, ול-`category==='prompt'` — `suggested_prompt` בתוך `<pre>`/textarea קריאה בלבד. שני `Btn`: `variant="primary"` (אשר) ו-`variant="dangerSoft"` (דחה). מצב אחרי אישור/דחייה — הכרטיס עובר ל-toast (יש `ToastProvider` קיים ב-`dashboard/layout.tsx`, `provider-admin/layout.tsx` צריך את שלו).
+
+### Shell
+
+`app/app/provider-admin/layout.tsx` בונה `Sidebar`-מבודד (rail כהה, לא זהה לסיידבר של המרפאה — 2 פריטים: שיחות QA, הצעות תיקון) בהשראת `app/components/dashboard/sidebar.tsx` הקיים אבל **קומפוננטה נפרדת** (`app/components/provider-admin/sidebar.tsx`) — לא לשתף state/נתוני-מרפאה עם ה-sidebar הרגיל.
 
 ## מפורש מחוץ לסקופ
 
