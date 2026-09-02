@@ -2,7 +2,6 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { ok } from "@/lib/errors/app-error";
 import { PromptSuggestionService } from "@/lib/services/prompt-suggestion.service";
 import type { PromptSuggestionRepository } from "@/lib/repositories/prompt-suggestion.repository";
-import type { ServiceActor } from "@/lib/services/service-context";
 import type { PromptSuggestion } from "@/types/domain/prompt-suggestion";
 
 const { mockRunRegressionTests, mockGetLiveAgentConfig, mockPublishPrompt } = vi.hoisted(() => ({
@@ -17,26 +16,12 @@ vi.mock("@/lib/learning/elevenlabsTesting", () => ({
   publishPrompt: mockPublishPrompt,
 }));
 
-const TARGET_CLINIC = "clinic-target";
-
-const staffActor: ServiceActor = {
-  userId: "user-1",
-  clinicIds: [TARGET_CLINIC],
-  defaultClinicId: TARGET_CLINIC,
-  memberships: [{ clinicId: TARGET_CLINIC, role: "staff" }],
-};
-
-const adminActor: ServiceActor = {
-  userId: "user-2",
-  clinicIds: [TARGET_CLINIC],
-  defaultClinicId: TARGET_CLINIC,
-  memberships: [{ clinicId: TARGET_CLINIC, role: "admin" }],
-};
+const REVIEWER_ID = "user-2";
 
 function suggestion(overrides: Partial<PromptSuggestion> = {}): PromptSuggestion {
   return {
     id: "sugg-1",
-    clinicId: TARGET_CLINIC,
+    clinicId: "clinic-target",
     status: "pending",
     category: "prompt",
     targetFile: null,
@@ -93,53 +78,59 @@ beforeEach(() => {
 });
 
 describe("PromptSuggestionService.reject", () => {
-  it("forbids rejecting without owner/admin role in the suggestion's clinic", async () => {
+  it("rejects a pending suggestion", async () => {
     const { service, repo } = buildService();
-    const result = await service.reject(staffActor, "sugg-1");
-    expect(result.ok).toBe(false);
-    if (result.ok) return;
-    expect(result.error.status).toBe(403);
-    expect(repo.markRejected).not.toHaveBeenCalled();
+    const result = await service.reject(REVIEWER_ID, "sugg-1");
+    expect(result.ok).toBe(true);
+    expect(repo.markRejected).toHaveBeenCalledWith("sugg-1", REVIEWER_ID);
   });
 
-  it("allows rejecting with owner/admin role", async () => {
-    const { service, repo } = buildService();
-    const result = await service.reject(adminActor, "sugg-1");
-    expect(result.ok).toBe(true);
-    expect(repo.markRejected).toHaveBeenCalledWith("sugg-1", adminActor.userId);
+  it("returns notFound when the suggestion does not exist", async () => {
+    const { service } = buildService({ findById: vi.fn().mockResolvedValue(ok(null)) });
+    const result = await service.reject(REVIEWER_ID, "missing");
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.status).toBe(404);
   });
 });
 
 describe("PromptSuggestionService.approve", () => {
-  it("forbids approving without owner/admin role", async () => {
-    const { service } = buildService();
-    const result = await service.approve(staffActor, "sugg-1");
-    expect(result.ok).toBe(false);
-    if (result.ok) return;
-    expect(result.error.status).toBe(403);
-    expect(mockRunRegressionTests).not.toHaveBeenCalled();
-  });
-
-  it("forbids approving without owner/admin role even for a non-prompt category", async () => {
+  it("marks non-prompt categories approved without running regression or publish", async () => {
     const { service, repo } = buildService({
       findById: vi.fn().mockResolvedValue(ok(suggestion({ category: "knowledge_base", suggestedPrompt: null }))),
     });
 
-    const result = await service.approve(staffActor, "sugg-1");
+    const result = await service.approve(REVIEWER_ID, "sugg-1");
 
-    expect(result.ok).toBe(false);
-    if (result.ok) return;
-    expect(result.error.status).toBe(403);
-    expect(repo.markApproved).not.toHaveBeenCalled();
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.status).toBe("approved");
+    expect(repo.markApproved).toHaveBeenCalledWith("sugg-1", REVIEWER_ID);
     expect(mockRunRegressionTests).not.toHaveBeenCalled();
+    expect(mockPublishPrompt).not.toHaveBeenCalled();
   });
+
+  it.each(["tool", "backend_logic", "conversation_flow"] as const)(
+    "marks category '%s' approved without publish, same as knowledge_base",
+    async (category) => {
+      const { service, repo } = buildService({
+        findById: vi.fn().mockResolvedValue(ok(suggestion({ category, suggestedPrompt: null }))),
+      });
+
+      const result = await service.approve(REVIEWER_ID, "sugg-1");
+
+      expect(result.ok).toBe(true);
+      expect(repo.markApproved).toHaveBeenCalledOnce();
+      expect(mockRunRegressionTests).not.toHaveBeenCalled();
+    },
+  );
 
   it("returns an internal error if a 'prompt' category suggestion is somehow missing suggested_prompt", async () => {
     const { service, repo } = buildService({
       findById: vi.fn().mockResolvedValue(ok(suggestion({ category: "prompt", suggestedPrompt: null }))),
     });
 
-    const result = await service.approve(adminActor, "sugg-1");
+    const result = await service.approve(REVIEWER_ID, "sugg-1");
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
@@ -152,7 +143,7 @@ describe("PromptSuggestionService.approve", () => {
     const { service } = buildService({
       findById: vi.fn().mockResolvedValue(ok(suggestion({ status: "published" }))),
     });
-    const result = await service.approve(adminActor, "sugg-1");
+    const result = await service.approve(REVIEWER_ID, "sugg-1");
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.error.status).toBe(409);
@@ -165,7 +156,7 @@ describe("PromptSuggestionService.approve", () => {
     mockPublishPrompt.mockResolvedValue({ agent_id: "agent_1" });
 
     const { service, repo } = buildService();
-    const result = await service.approve(adminActor, "sugg-1");
+    const result = await service.approve(REVIEWER_ID, "sugg-1");
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -180,7 +171,7 @@ describe("PromptSuggestionService.approve", () => {
     mockRunRegressionTests.mockResolvedValue({ allPassed: false, raw: { test_results: [{ result: "failure" }] } });
 
     const { service, repo } = buildService();
-    const result = await service.approve(adminActor, "sugg-1");
+    const result = await service.approve(REVIEWER_ID, "sugg-1");
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -196,7 +187,7 @@ describe("PromptSuggestionService.approve", () => {
     mockRunRegressionTests.mockResolvedValue({ allPassed: null, raw: { unexpected: "shape" } });
 
     const { service, repo } = buildService();
-    const result = await service.approve(adminActor, "sugg-1");
+    const result = await service.approve(REVIEWER_ID, "sugg-1");
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -214,41 +205,11 @@ describe("PromptSuggestionService.approve", () => {
     mockPublishPrompt.mockRejectedValue(new Error("ElevenLabs 500"));
 
     const { service, repo } = buildService();
-    const result = await service.approve(adminActor, "sugg-1");
+    const result = await service.approve(REVIEWER_ID, "sugg-1");
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.error.status).toBe(502);
     expect(repo.markPublished).not.toHaveBeenCalled();
   });
-
-  it("marks non-prompt categories approved without running regression or publish", async () => {
-    const { service, repo } = buildService({
-      findById: vi.fn().mockResolvedValue(ok(suggestion({ category: "knowledge_base", suggestedPrompt: null }))),
-    });
-
-    const result = await service.approve(adminActor, "sugg-1");
-
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    expect(result.value.status).toBe("approved");
-    expect(repo.markApproved).toHaveBeenCalledWith("sugg-1", adminActor.userId);
-    expect(mockRunRegressionTests).not.toHaveBeenCalled();
-    expect(mockPublishPrompt).not.toHaveBeenCalled();
-  });
-
-  it.each(["tool", "backend_logic", "conversation_flow"] as const)(
-    "marks category '%s' approved without publish, same as knowledge_base",
-    async (category) => {
-      const { service, repo } = buildService({
-        findById: vi.fn().mockResolvedValue(ok(suggestion({ category, suggestedPrompt: null }))),
-      });
-
-      const result = await service.approve(adminActor, "sugg-1");
-
-      expect(result.ok).toBe(true);
-      expect(repo.markApproved).toHaveBeenCalledOnce();
-      expect(mockRunRegressionTests).not.toHaveBeenCalled();
-    },
-  );
 });

@@ -44,6 +44,7 @@ export function mapProfileRow(row: {
   full_name: string | null;
   phone: string | null;
   default_clinic_id: string | null;
+  role: string;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
@@ -53,6 +54,7 @@ export function mapProfileRow(row: {
     fullName: row.full_name,
     phone: row.phone,
     defaultClinicId: row.default_clinic_id,
+    role: row.role === "provider_admin" ? "provider_admin" : "clinic_user",
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     deletedAt: row.deleted_at,

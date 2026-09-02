@@ -55,11 +55,10 @@ function mapPromptSuggestionRow(row: Record<string, unknown>): PromptSuggestion 
 export class PromptSuggestionRepository {
   constructor(private readonly client: SupabaseClient) {}
 
-  async listByStatus(clinicIds: string[], status: PromptSuggestionStatus): Promise<Result<PromptSuggestion[]>> {
+  async listByStatus(status: PromptSuggestionStatus): Promise<Result<PromptSuggestion[]>> {
     const { data, error } = await this.client
       .from("tomer_prompt_suggestions")
       .select("*")
-      .in("clinic_id", clinicIds)
       .eq("status", status)
       .order("created_at", { ascending: false });
     if (error) return err(AppError.externalProvider("Failed to list prompt suggestions", error));
@@ -73,6 +72,23 @@ export class PromptSuggestionRepository {
       .eq("id", id)
       .maybeSingle();
     if (error) return err(AppError.externalProvider("Failed to load prompt suggestion", error));
+    return ok(data ? mapPromptSuggestionRow(data as Record<string, unknown>) : null);
+  }
+
+  /**
+   * Most recent suggestion whose supporting_call_review_ids includes this call review, if any.
+   * A call review could in theory back more than one suggestion over time — this deliberately
+   * returns only the newest rather than asserting uniqueness.
+   */
+  async findBySupportingCallReviewId(callReviewId: string): Promise<Result<PromptSuggestion | null>> {
+    const { data, error } = await this.client
+      .from("tomer_prompt_suggestions")
+      .select("*")
+      .contains("supporting_call_review_ids", [callReviewId])
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) return err(AppError.externalProvider("Failed to look up linked prompt suggestion", error));
     return ok(data ? mapPromptSuggestionRow(data as Record<string, unknown>) : null);
   }
 

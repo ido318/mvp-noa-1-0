@@ -172,4 +172,40 @@ describe("PromptSuggestionRepository write guards", () => {
     if (result.ok) return;
     expect(result.error.status).toBe(409);
   });
+
+  it("findBySupportingCallReviewId queries with .contains and returns the most recent match", async () => {
+    const query = {
+      select: vi.fn().mockReturnThis(),
+      contains: vi.fn().mockReturnThis(),
+      order: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockReturnThis(),
+      maybeSingle: vi.fn().mockResolvedValue({ data: suggestionRow, error: null }),
+    };
+    const client = { from: vi.fn().mockReturnValue(query) };
+    const repo = new PromptSuggestionRepository(client as never);
+
+    const result = await repo.findBySupportingCallReviewId("cr-1");
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value?.id).toBe("sugg-1");
+    expect(query.contains).toHaveBeenCalledWith("supporting_call_review_ids", ["cr-1"]);
+    expect(query.order).toHaveBeenCalledWith("created_at", { ascending: false });
+  });
+
+  it("findBySupportingCallReviewId returns null when nothing matches", async () => {
+    const query = {
+      select: vi.fn().mockReturnThis(),
+      contains: vi.fn().mockReturnThis(),
+      order: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockReturnThis(),
+      maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+    };
+    const client = { from: vi.fn().mockReturnValue(query) };
+    const repo = new PromptSuggestionRepository(client as never);
+
+    const result = await repo.findBySupportingCallReviewId("cr-none");
+
+    expect(result).toEqual({ ok: true, value: null });
+  });
 });

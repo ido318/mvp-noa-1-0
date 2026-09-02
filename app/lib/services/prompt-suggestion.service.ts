@@ -1,36 +1,28 @@
 import { AppError, err, type Result } from "@/lib/errors/app-error";
 import { getLiveAgentConfig, publishPrompt, runRegressionTests } from "@/lib/learning/elevenlabsTesting";
 import type { PromptSuggestionRepository } from "@/lib/repositories/prompt-suggestion.repository";
-import type { ServiceActor } from "@/lib/services/service-context";
 import type { PromptSuggestion } from "@/types/domain/prompt-suggestion";
 
-function hasPrivilegedClinicRole(actor: ServiceActor, clinicId: string): boolean {
-  return actor.memberships.some(
-    (membership) =>
-      membership.clinicId === clinicId &&
-      (membership.role === "owner" || membership.role === "admin"),
-  );
-}
-
+/**
+ * Permission is enforced once, upstream, by requireProviderAdmin() at the
+ * API route boundary — this service does no actor/role checking of its own.
+ */
 export class PromptSuggestionService {
   constructor(private readonly repo: PromptSuggestionRepository) {}
 
-  async listPending(actor: ServiceActor): Promise<Result<PromptSuggestion[]>> {
-    return this.repo.listByStatus(actor.clinicIds, "pending");
+  async listPending(): Promise<Result<PromptSuggestion[]>> {
+    return this.repo.listByStatus("pending");
   }
 
-  async reject(actor: ServiceActor, id: string): Promise<Result<PromptSuggestion>> {
+  async reject(reviewedByUserId: string, id: string): Promise<Result<PromptSuggestion>> {
     const existing = await this.repo.findById(id);
     if (!existing.ok) return existing;
     if (!existing.value) return err(AppError.notFound("Prompt suggestion not found"));
-    if (!hasPrivilegedClinicRole(actor, existing.value.clinicId)) {
-      return err(AppError.forbidden("Only owner or admin can reject prompt suggestions"));
-    }
     if (existing.value.status !== "pending") {
       return err(AppError.conflict(`Prompt suggestion already ${existing.value.status}`));
     }
 
-    return this.repo.markRejected(id, actor.userId);
+    return this.repo.markRejected(id, reviewedByUserId);
   }
 
   /**
@@ -41,21 +33,18 @@ export class PromptSuggestionService {
    * suggestions carry a suggested_prompt at all — everything else is marked
    * approved directly, for manual follow-through outside this pipeline.
    */
-  async approve(actor: ServiceActor, id: string): Promise<Result<PromptSuggestion>> {
+  async approve(reviewedByUserId: string, id: string): Promise<Result<PromptSuggestion>> {
     const existing = await this.repo.findById(id);
     if (!existing.ok) return existing;
     if (!existing.value) return err(AppError.notFound("Prompt suggestion not found"));
     const suggestion = existing.value;
 
-    if (!hasPrivilegedClinicRole(actor, suggestion.clinicId)) {
-      return err(AppError.forbidden("Only owner or admin can approve prompt suggestions"));
-    }
     if (suggestion.status !== "pending") {
       return err(AppError.conflict(`Prompt suggestion already ${suggestion.status}`));
     }
 
     if (suggestion.category !== "prompt") {
-      return this.repo.markApproved(id, actor.userId);
+      return this.repo.markApproved(id, reviewedByUserId);
     }
 
     if (!suggestion.suggestedPrompt) {
@@ -75,7 +64,7 @@ export class PromptSuggestionService {
       return this.repo.recordRegressionResult(id, {
         status: regression.allPassed === false ? "failed_regression" : "pending",
         regressionResult: regression.raw,
-        reviewedByUserId: actor.userId,
+        reviewedByUserId,
       });
     }
 
@@ -97,7 +86,7 @@ export class PromptSuggestionService {
       regressionResult: regression.raw,
       previousPrompt,
       publishResult,
-      reviewedByUserId: actor.userId,
+      reviewedByUserId,
     });
   }
 }

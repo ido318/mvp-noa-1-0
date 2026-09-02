@@ -1,4 +1,5 @@
-import { getActorAndServices } from "@/lib/api/actor";
+import { createServices } from "@/lib/services/factory";
+import { requireProviderAdmin } from "@/lib/api/provider-admin";
 import { createRequestId } from "@/lib/api/request-id";
 import { handleRouteError, jsonSuccess } from "@/lib/api/response";
 import type { PromptSuggestion } from "@/types/domain/prompt-suggestion";
@@ -6,13 +7,13 @@ import type { PromptSuggestion } from "@/types/domain/prompt-suggestion";
 function messageFor(suggestion: PromptSuggestion): string {
   switch (suggestion.status) {
     case "published":
-      return "Regression tests passed — the new prompt was published to the live agent.";
+      return "בדיקות הרגרסיה עברו בהצלחה — הפרומפט החדש פורסם לסוכן החי.";
     case "approved":
-      return "Marked approved for manual follow-through — this fix isn't a prompt rewrite, so no regression test or publish was run.";
+      return "סומן כמאושר להמשך טיפול ידני — התיקון הזה אינו שינוי פרומפט, ולכן לא הורצה בדיקת רגרסיה ולא בוצע פרסום.";
     case "failed_regression":
-      return "One or more regression tests failed. The prompt was not published; see regressionResult.";
+      return "בדיקת רגרסיה אחת או יותר נכשלה. הפרומפט לא פורסם; ראה regressionResult.";
     case "pending":
-      return "Could not confidently determine pass/fail from the ElevenLabs response. The prompt was not published; see regressionResult for the raw response.";
+      return "לא ניתן היה לקבוע בביטחון הצלחה או כישלון מתגובת ElevenLabs. הפרומפט לא פורסם; ראה regressionResult לתגובה הגולמית.";
     default:
       return "";
   }
@@ -25,9 +26,10 @@ export async function POST(
   const requestId = createRequestId();
 
   try {
-    const { actor, promptSuggestion } = await getActorAndServices();
+    const services = await createServices();
+    const { user } = await requireProviderAdmin(services.auth);
     const { id } = await params;
-    const result = await promptSuggestion.approve(actor, id);
+    const result = await services.promptSuggestion.approve(user.id, id);
     if (!result.ok) return handleRouteError(result.error, requestId);
 
     return jsonSuccess(
