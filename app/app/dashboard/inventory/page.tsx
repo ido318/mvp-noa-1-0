@@ -3,6 +3,9 @@
 import { useEffect, useState } from "react";
 import { Card } from "@/components/dashboard/ui/card";
 import { Btn } from "@/components/dashboard/ui/btn";
+import { Field, Input } from "@/components/dashboard/ui/field";
+import { EmptyState } from "@/components/dashboard/ui/empty-state";
+import { SkeletonRow } from "@/components/dashboard/ui/skeleton";
 import { InventoryTable } from "@/components/dashboard/inventory/inventory-table";
 import { StockAdjustModal } from "@/components/dashboard/inventory/stock-adjust-modal";
 import type { InventoryItem } from "@/types/domain/inventory";
@@ -10,6 +13,7 @@ import type { MeResponse } from "@/types/api/me";
 
 export default function InventoryPage() {
   const [items, setItems] = useState<InventoryItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [clinicId, setClinicId] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [quantity, setQuantity] = useState("");
@@ -30,6 +34,7 @@ export default function InventoryPage() {
         setClinicId(me.data.profile.defaultClinicId ?? me.data.memberships[0]?.clinicId ?? null);
       }
       await load();
+      setLoading(false);
     })();
   }, []);
 
@@ -47,24 +52,52 @@ export default function InventoryPage() {
 
   return (
     <div className="mx-auto w-full max-w-[1000px] space-y-5 p-6">
-      <h1 className="text-[28px] font-semibold text-[var(--ink)]">מלאי</h1>
+      <h1 className="text-[28px] font-semibold" style={{ color: "var(--text-primary)" }}>מלאי</h1>
       <Card>
-        <div className="grid gap-2 sm:grid-cols-[1fr_140px_auto]">
-          <input value={name} onChange={(event) => setName(event.target.value)} placeholder="שם פריט" className="h-10 rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--bg)] px-3 text-sm" />
-          <input type="number" value={quantity} onChange={(event) => setQuantity(event.target.value)} placeholder="כמות" className="h-10 rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--bg)] px-3 text-sm" />
+        <div className="grid gap-3 sm:grid-cols-[1fr_140px_auto] sm:items-end">
+          <Field label="שם פריט" htmlFor="newInventoryItemName">
+            <Input
+              id="newInventoryItemName"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+            />
+          </Field>
+          <Field label="כמות" htmlFor="newInventoryItemQuantity">
+            <Input
+              id="newInventoryItemQuantity"
+              type="number"
+              value={quantity}
+              onChange={(event) => setQuantity(event.target.value)}
+            />
+          </Field>
           <Btn type="button" disabled={!name.trim()} onClick={() => void createItem()}>הוסף פריט</Btn>
         </div>
       </Card>
-      <Card noPad>
-        <InventoryTable items={items} />
-        <div className="divide-y divide-[var(--line-2)] border-t border-[var(--line-2)]">
-          {items.map((item) => (
-            <div key={`${item.id}-adjust`} className="px-4 py-3">
-              <StockAdjustModal item={item} onAdjusted={() => void load()} />
+      {loading ? (
+        <Card noPad>
+          <div className="divide-y divide-[var(--border-row)]">
+            {Array.from({ length: 4 }).map((_, i) => <SkeletonRow key={i} />)}
+          </div>
+        </Card>
+      ) : items.length === 0 ? (
+        <EmptyState
+          title="אין פריטי מלאי"
+          subtitle="פריטים שתוסיפו יופיעו כאן"
+        />
+      ) : (
+        <>
+          <InventoryTable items={items} />
+          <Card noPad>
+            <div className="divide-y divide-[var(--border-row)]">
+              {items.map((item) => (
+                <div key={`${item.id}-adjust`} className="px-4 py-3">
+                  <StockAdjustModal item={item} onAdjusted={() => void load()} />
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-      </Card>
+          </Card>
+        </>
+      )}
     </div>
   );
 }
