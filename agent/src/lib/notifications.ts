@@ -2,11 +2,14 @@ import { getSupabase } from "./supabase.js";
 import {
   smsTemplates,
   formatAppointmentDateTime,
+  israelDateIso,
+  israelDateAtHour,
+  israelDayHourMinute,
   CLINIC_LOCATION,
   HOME_VISIT_LOCATION,
   type BookingConfirmationData,
   type MorningReminderData,
-} from "../services/sms.templates.js";
+} from "@tomer/shared";
 import { getVisitConfig, type VisitType } from "./appointments.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -36,45 +39,21 @@ const VISIT_PRICE: Record<VisitType, string> = {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Jerusalem timezone helpers (DST-correct via Intl — no fixed offset)
+// Jerusalem timezone helpers — Intl-based math lives in @tomer/shared; the
+// quiet-hours business rule (21:00–07:59) stays local to the agent.
 // ─────────────────────────────────────────────────────────────────────────────
 
-function israelHour(d: Date): number {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "Asia/Jerusalem",
-    hour: "numeric",
-    hour12: false,
-  }).formatToParts(d);
-  return parseInt(parts.find((p) => p.type === "hour")?.value ?? "0", 10);
-}
-
-/** Returns the date portion (YYYY-MM-DD) in Israel timezone. */
-export function israelDateIso(d: Date): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Jerusalem",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(d);
-}
+export { israelDateIso };
 
 /** Returns true if `now` falls in quiet hours (21:00–07:59 Israel time). */
 export function isQuietHours(now: Date): boolean {
-  const h = israelHour(now);
-  return h >= 21 || h < 8;
+  const { hour } = israelDayHourMinute(now);
+  return hour >= 21 || hour < 8;
 }
 
-/**
- * Returns the UTC Date representing 08:00 Israel time for `dateIso` (YYYY-MM-DD).
- * Israel is UTC+2 (winter) or UTC+3 (summer); Intl handles DST automatically.
- */
+/** Alias kept for call sites that read "morning reminder = 08:00 Israel". */
 export function morningReminderTime(dateIso: string): Date {
-  // Try UTC 05:00 (= 08:00 Israel UTC+3 summer) then 06:00 (= 08:00 Israel UTC+2 winter)
-  for (const utcHour of [5, 6]) {
-    const candidate = new Date(`${dateIso}T${String(utcHour).padStart(2, "0")}:00:00Z`);
-    if (israelHour(candidate) === 8) return candidate;
-  }
-  return new Date(`${dateIso}T05:00:00Z`); // fallback (should never be reached)
+  return israelDateAtHour(dateIso, 8);
 }
 
 /**

@@ -5,7 +5,8 @@
   "description": "Tomer — Voice AI Agent + Vet Clinic Dashboard (unified monorepo)",
   "workspaces": [
     "agent",
-    "app"
+    "app",
+    "packages/shared"
   ],
   "scripts": {
     "test:agent": "npm test --workspace=agent",

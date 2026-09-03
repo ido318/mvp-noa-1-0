@@ -8,6 +8,9 @@ primary_region = 'fra'
 
 [build]
   dockerfile = "Dockerfile"
+  # Build context is the repo root, not agent/ — the Dockerfile needs to reach
+  # the packages/shared workspace agent/ depends on (@tomer/shared).
+  context = ".."
 
 [http_service]
   internal_port = 3000

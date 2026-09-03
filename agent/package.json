@@ -5,17 +5,22 @@
   "description": "Tomer — Voice AI Agent for Get A Vet (Dr. Noa Cabasheny)",
   "type": "module",
   "scripts": {
+    "predev": "npm run build --prefix ../packages/shared",
     "dev": "node --env-file=.env --import tsx/esm --watch src/index.ts",
+    "prebuild": "npm run build --prefix ../packages/shared",
     "build": "tsc && cp -r src/knowledge dist/knowledge",
     "start": "node dist/index.js",
     "lint": "eslint src",
+    "pretypecheck": "npm run build --prefix ../packages/shared",
     "typecheck": "tsc --noEmit",
+    "pretest": "npm run build --prefix ../packages/shared",
     "test": "vitest run",
     "test:watch": "vitest"
   },
   "dependencies": {
     "@hono/node-server": "^1.13.7",
     "@supabase/supabase-js": "^2.108.1",
+    "@tomer/shared": "*",
     "elevenlabs": "^1.59.0",
     "hono": "^4.6.14",
     "pino": "^9.5.0",
