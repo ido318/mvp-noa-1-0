@@ -57,7 +57,7 @@ async function readErrorMessage(response: Response, fallback: string): Promise<s
 }
 
 const textareaClass =
-  "w-full rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-[var(--brand-400)]";
+  "w-full rounded-[var(--radius-2)] border border-[var(--border-hairline)] bg-[var(--surface-canvas)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]";
 
 type Props = {
   visitId: string;
@@ -182,16 +182,16 @@ function NoteListItem({ note, visitId, childrenByParent, depth }: NoteListItemPr
 
   return (
     <li className={depth > 0 ? "mr-3 mt-2 border-r-2 border-[var(--brand-200)] pr-3" : ""}>
-      <div className="rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--surface-2)] p-3 text-sm">
+      <div className="rounded-[var(--radius-2)] border border-[var(--border-hairline)] bg-[var(--surface-sunken)] p-3 text-sm">
         {depth > 0 ? (
-          <p className="mb-1.5 text-[11px] font-semibold text-[var(--muted)]">
+          <p className="mb-1.5 text-[11px] font-semibold text-[var(--text-muted)]">
             נספח מתאריך {formatNoteDateTime(note.createdAt)}
           </p>
         ) : null}
 
         <div className="flex flex-wrap items-center gap-2">
-          <Badge color="muted">{NOTE_TYPE_LABELS[note.noteType]}</Badge>
-          {locked ? <Badge color="muted">נעול</Badge> : null}
+          <Badge tone="neutral">{NOTE_TYPE_LABELS[note.noteType]}</Badge>
+          {locked ? <Badge tone="neutral">נעול</Badge> : null}
         </div>
 
         {editing ? (
@@ -209,28 +209,28 @@ function NoteListItem({ note, visitId, childrenByParent, depth }: NoteListItemPr
                 value={editSubjective}
                 onChange={(event) => setEditSubjective(event.target.value)}
                 rows={2}
-                placeholder="subjective"
+                placeholder="תלונת הלקוח (S)"
                 className={textareaClass}
               />
               <textarea
                 value={editObjective}
                 onChange={(event) => setEditObjective(event.target.value)}
                 rows={2}
-                placeholder="objective"
+                placeholder="ממצאים אובייקטיביים (O)"
                 className={textareaClass}
               />
               <textarea
                 value={editAssessment}
                 onChange={(event) => setEditAssessment(event.target.value)}
                 rows={2}
-                placeholder="assessment"
+                placeholder="הערכה (A)"
                 className={textareaClass}
               />
               <textarea
                 value={editPlan}
                 onChange={(event) => setEditPlan(event.target.value)}
                 rows={2}
-                placeholder="plan"
+                placeholder="תוכנית טיפול (P)"
                 className={textareaClass}
               />
             </div>
@@ -246,9 +246,9 @@ function NoteListItem({ note, visitId, childrenByParent, depth }: NoteListItemPr
           </form>
         ) : (
           <>
-            <p className="mt-1.5 whitespace-pre-wrap text-[var(--ink)]">{note.content}</p>
+            <p className="mt-1.5 whitespace-pre-wrap text-[var(--text-primary)]">{note.content}</p>
             {(note.subjective || note.objective || note.assessment || note.plan) && (
-              <dl className="mt-3 grid gap-2 text-xs text-[var(--ink-2)] sm:grid-cols-2">
+              <dl className="mt-3 grid gap-2 text-xs text-[var(--text-secondary)] sm:grid-cols-2">
                 {note.subjective && <div><dt className="font-bold">S</dt><dd className="whitespace-pre-wrap">{note.subjective}</dd></div>}
                 {note.objective && <div><dt className="font-bold">O</dt><dd className="whitespace-pre-wrap">{note.objective}</dd></div>}
                 {note.assessment && <div><dt className="font-bold">A</dt><dd className="whitespace-pre-wrap">{note.assessment}</dd></div>}
@@ -277,7 +277,7 @@ function NoteListItem({ note, visitId, childrenByParent, depth }: NoteListItemPr
         )}
 
         {addendumOpen ? (
-          <form onSubmit={onSaveAddendum} className="mt-3 space-y-2 border-t border-[var(--line-2)] pt-3">
+          <form onSubmit={onSaveAddendum} className="mt-3 space-y-2 border-t border-[var(--border-row)] pt-3">
             <textarea
               value={addendumContent}
               onChange={(event) => setAddendumContent(event.target.value)}
@@ -375,7 +375,7 @@ export function VisitNotesSection({ visitId, initialNotes }: Props) {
     <div className="space-y-4">
       <ul className="space-y-2">
         {rootNotes.length === 0 ? (
-          <li className="text-sm text-[var(--faint)]">אין עדיין הערות.</li>
+          <li className="text-sm text-[var(--text-faint)]">אין עדיין הערות.</li>
         ) : (
           rootNotes.map((note) => (
             <NoteListItem
@@ -389,11 +389,11 @@ export function VisitNotesSection({ visitId, initialNotes }: Props) {
         )}
       </ul>
 
-      <form onSubmit={onSubmit} className="space-y-3 border-t border-[var(--line-2)] pt-4">
+      <form onSubmit={onSubmit} className="space-y-3 border-t border-[var(--border-row)] pt-4">
         <select
           value={noteType}
           onChange={(event) => setNoteType(event.target.value as MedicalNoteType)}
-          className="w-full rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-[var(--brand-400)]"
+          className="w-full rounded-[var(--radius-2)] border border-[var(--border-hairline)] bg-[var(--surface-canvas)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]"
         >
           {NOTE_TYPES.map((value) => (
             <option key={value} value={value}>
@@ -414,28 +414,28 @@ export function VisitNotesSection({ visitId, initialNotes }: Props) {
             value={subjective}
             onChange={(event) => setSubjective(event.target.value)}
             rows={2}
-            placeholder="subjective"
+            placeholder="תלונת הלקוח (S)"
             className={textareaClass}
           />
           <textarea
             value={objective}
             onChange={(event) => setObjective(event.target.value)}
             rows={2}
-            placeholder="objective"
+            placeholder="ממצאים אובייקטיביים (O)"
             className={textareaClass}
           />
           <textarea
             value={assessment}
             onChange={(event) => setAssessment(event.target.value)}
             rows={2}
-            placeholder="assessment"
+            placeholder="הערכה (A)"
             className={textareaClass}
           />
           <textarea
             value={plan}
             onChange={(event) => setPlan(event.target.value)}
             rows={2}
-            placeholder="plan"
+            placeholder="תוכנית טיפול (P)"
             className={textareaClass}
           />
         </div>

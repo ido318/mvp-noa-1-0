@@ -9,8 +9,8 @@ export const PROBLEM_SEVERITY_LABELS: Record<ProblemListSeverity, string> = {
   severe: "חמור",
 };
 
-export const PROBLEM_SEVERITY_BADGE_COLOR: Record<ProblemListSeverity, "green" | "amber" | "red"> = {
-  mild: "green",
-  moderate: "amber",
-  severe: "red",
+export const PROBLEM_SEVERITY_BADGE_TONE: Record<ProblemListSeverity, "done" | "pending" | "critical"> = {
+  mild: "done",
+  moderate: "pending",
+  severe: "critical",
 };

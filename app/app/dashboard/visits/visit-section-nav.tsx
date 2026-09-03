@@ -1,24 +1,40 @@
 import React from "react";
 
-const SECTIONS = [
-  "Reason & Pre-Visit",
-  "Anamnesis",
-  "Vitals",
-  "Physical Exam",
-  "SOAP",
-  "Actions",
+/**
+ * A jump-nav of real <a href="#..."> anchors — not stateful tabs, so it
+ * doesn't use the Tabs component (which expects value/onChange state).
+ * Visually it matches Tabs' "pill" variant: a bordered segmented strip.
+ */
+
+const SECTIONS: { id: string; label: string }[] = [
+  { id: "reason-and-pre-visit", label: "סיבת הביקור" },
+  { id: "anamnesis", label: "אנמנזה" },
+  { id: "vitals", label: "מדדים חיוניים" },
+  { id: "physical-exam", label: "בדיקה גופנית" },
+  { id: "soap", label: "SOAP" },
+  { id: "actions", label: "פעולות" },
 ];
 
 export function VisitSectionNav() {
   return (
-    <nav className="flex flex-wrap gap-1.5">
-      {SECTIONS.map((section) => (
+    <nav
+      className="inline-flex flex-wrap overflow-hidden"
+      style={{ borderRadius: "var(--radius-2)", border: "var(--border-w) solid var(--border-field)" }}
+    >
+      {SECTIONS.map((section, i) => (
         <a
-          key={section}
-          href={`#${section.toLowerCase().replaceAll(" ", "-").replaceAll("&", "and")}`}
-          className="rounded-[10px] bg-[var(--surface-2)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-2)] hover:bg-[var(--line-2)]"
+          key={section.id}
+          href={`#${section.id}`}
+          className="px-3 text-[12px] font-semibold whitespace-nowrap hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)]"
+          style={{
+            height: "var(--control-h-sm)",
+            lineHeight: "var(--control-h-sm)",
+            borderInlineStart: i > 0 ? "var(--border-w) solid var(--border-field)" : "none",
+            color: "var(--text-secondary)",
+            transition: "var(--transition-color)",
+          }}
         >
-          {section}
+          {section.label}
         </a>
       ))}
     </nav>

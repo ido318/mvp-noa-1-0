@@ -24,7 +24,7 @@ export function RecordFilterBar({
   onQueryChange: (query: string) => void;
 }) {
   return (
-    <div className="flex flex-col gap-3 border-b border-[var(--line-2)] px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
+    <div className="flex flex-col gap-3 border-b border-[var(--border-row)] px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
       <div className="flex flex-wrap gap-1.5">
         {FILTERS.map((filter) => (
           <button
@@ -34,8 +34,8 @@ export function RecordFilterBar({
             className={[
               "h-8 rounded-[10px] px-3 text-xs font-semibold transition-colors",
               type === filter.value
-                ? "bg-[var(--brand-600)] text-white"
-                : "bg-[var(--surface-2)] text-[var(--ink-2)] hover:bg-[var(--line-2)]",
+                ? "bg-[var(--accent)] text-[var(--text-on-accent)]"
+                : "bg-[var(--surface-sunken)] text-[var(--text-secondary)] hover:bg-[var(--border-row)]",
             ].join(" ")}
           >
             {filter.label}
@@ -46,7 +46,7 @@ export function RecordFilterBar({
         value={query}
         onChange={(event) => onQueryChange(event.target.value)}
         placeholder="חיפוש בתיק"
-        className="h-9 w-full rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--surface)] px-3 text-sm text-[var(--ink)] outline-none placeholder:text-[var(--faint)] focus:border-[var(--brand-400)] lg:w-56"
+        className="h-9 w-full rounded-[var(--radius-2)] border border-[var(--border-hairline)] bg-[var(--surface-raised)] px-3 text-sm text-[var(--text-primary)] outline-none placeholder:text-[var(--text-faint)] focus:border-[var(--border-focus)] lg:w-56"
       />
     </div>
   );

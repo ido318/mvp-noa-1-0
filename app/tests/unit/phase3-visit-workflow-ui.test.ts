@@ -35,7 +35,7 @@ describe("phase3 appointment to visit UI", () => {
     expect(notes).toContain("assessment");
     expect(notes).toContain("plan");
     expect(notes).toContain("content");
-    expect(visitPage).toContain("Reason & Pre-Visit");
+    expect(visitPage).toContain("פרטי הביקור");
     expect(visitPage).toContain("/api/appointments/");
   });
 });
