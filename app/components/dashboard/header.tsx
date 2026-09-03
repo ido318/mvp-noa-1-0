@@ -16,7 +16,7 @@ interface HeaderProps {
 
 export function Header({
   clinicName = "Get A Vet",
-  clinicLocation = "מגדלי גינדי TLV · תל אביב",
+  clinicLocation,
   openEscalations = 0,
 }: HeaderProps) {
   const router = useRouter();
@@ -178,7 +178,7 @@ export function Header({
       {/* Clinic info */}
       <div className="text-end">
         <p className="text-[13.5px] font-semibold text-[var(--text-primary)]">{clinicName}</p>
-        <p className="text-[11px] text-[var(--text-muted)]">{clinicLocation}</p>
+        {clinicLocation && <p className="text-[11px] text-[var(--text-muted)]">{clinicLocation}</p>}
       </div>
 
       {/* Separator */}
