@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { processNotifications } from "../../../src/services/notification.processor.js";
+import { processNotifications } from "../../../src/lib/notificationProcessor.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Mocks
@@ -180,7 +180,7 @@ describe("quiet-hours deferral — deferred target comes from nextSendableTime",
         if (fields.scheduled_for) capturedScheduledFor = fields.scheduled_for;
         return chainOf({ data: [{ id: "n-1" }], error: null });
       }),
-    } as any);
+    });
 
     await processNotifications();
 
@@ -198,7 +198,7 @@ describe("quiet-hours deferral — deferred target comes from nextSendableTime",
         if (fields.scheduled_for) capturedScheduledFor = fields.scheduled_for;
         return chainOf({ data: [{ id: "n-1" }], error: null });
       }),
-    } as any);
+    });
 
     await processNotifications();
 
@@ -227,17 +227,17 @@ describe("stuck-row recovery", () => {
         b.lte    = vi.fn(self);
         b.select = vi.fn(self);
         b.returns = vi.fn(() => Promise.resolve({ data: [], error: null }));
-        (b as unknown as Promise<unknown>).then = (res: (v: unknown) => unknown) =>
+        (b as { then?: unknown }).then = (res: (v: unknown) => unknown) =>
           Promise.resolve({ data: [], error: null }).then(res);
         if (fields.status === "pending") recoveryUpdate = fields;
         return b;
       }),
-    } as any);
+    });
 
     await processNotifications();
 
     expect(recoveryUpdate).not.toBeNull();
-    expect(recoveryUpdate?.status).toBe("pending");
+    expect((recoveryUpdate as Record<string, unknown> | null)?.status).toBe("pending");
 
     // Threshold should be now − 5 minutes = 09:55 UTC
     expect(recoveryLtThreshold).toBe("2026-06-12T09:55:00.000Z");
