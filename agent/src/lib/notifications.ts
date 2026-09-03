@@ -196,6 +196,18 @@ export async function scheduleBookingNotifications(p: BookingNotificationParams)
 }
 
 /** Skip all pending future notifications for a given appointment. */
+/**
+ * Skips pending AND in-flight notifications for a cancelled/rescheduled
+ * appointment. 'processing' rows are included because the atomic-claim
+ * processor (notificationProcessor.ts) can be mid-send when a cancellation
+ * comes in — without this, that row stays 'processing' and never gets
+ * flagged, so the customer can receive an SMS seconds after cancelling.
+ * This can't recall an SMS already handed to Twilio, but it does prevent
+ * the processor's own post-send update from silently overwriting the
+ * cancellation back to 'sent' (that update is itself guarded on
+ * status='processing', so once this flips a row to 'skipped' first, the
+ * processor's write becomes a no-op instead of clobbering it).
+ */
 export async function cancelFutureNotifications(
   appointmentId: string,
   clinicId: string,
@@ -205,7 +217,7 @@ export async function cancelFutureNotifications(
     .update({ status: "skipped", updated_at: new Date().toISOString() })
     .eq("appointment_id", appointmentId)
     .eq("clinic_id", clinicId)
-    .eq("status", "pending");
+    .in("status", ["pending", "processing"]);
   if (error) throw new Error(`cancelFutureNotifications failed: ${error.message}`);
 }
 

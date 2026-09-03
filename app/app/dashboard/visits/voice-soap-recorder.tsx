@@ -147,11 +147,23 @@ export function VoiceSoapRecorder({ visitId }: { visitId: string }) {
   const chunksRef = useRef<Blob[]>([]);
   const mimeTypeRef = useRef<string>("audio/webm");
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Guards handleRecordingStopped's upload/transcribe window — separate from
+  // the onstop-neutralizing below, which only covers navigation *during*
+  // recording. Navigating away *after* "stop" (while the upload or the
+  // /soap-draft transcription call is still in flight) hits the exact same
+  // failure this component already guards against elsewhere: a real
+  // transcription/LLM call completing for a visit already left, creating an
+  // artifact nobody will ever review.
+  const cancelledRef = useRef(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Release the mic and stop the timer if the workspace navigates away
   // mid-recording.
   useEffect(() => {
     return () => {
+      cancelledRef.current = true;
+      abortControllerRef.current?.abort();
+
       if (timerRef.current) clearInterval(timerRef.current);
 
       // Neutralize the stop handler BEFORE releasing the stream below:
@@ -264,12 +276,17 @@ export function VoiceSoapRecorder({ visitId }: { visitId: string }) {
     const formData = new FormData();
     formData.append("file", blob, "recording.webm");
 
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     let uploadedPath: string;
     try {
       const uploadResponse = await fetch(`/api/visits/${visitId}/soap-recording`, {
         method: "POST",
         body: formData,
+        signal: controller.signal,
       });
+      if (cancelledRef.current) return;
       if (!uploadResponse.ok) {
         setError(await readErrorMessage(uploadResponse, "העלאת ההקלטה נכשלה"));
         setStage("idle");
@@ -278,11 +295,13 @@ export function VoiceSoapRecorder({ visitId }: { visitId: string }) {
       const uploadPayload = (await uploadResponse.json()) as { data: { storagePath: string } };
       uploadedPath = uploadPayload.data.storagePath;
     } catch {
+      if (cancelledRef.current) return;
       setError("העלאת ההקלטה נכשלה");
       setStage("idle");
       return;
     }
 
+    if (cancelledRef.current) return;
     setStoragePath(uploadedPath);
     setProcessingLabel("מתמלל ומנתח...");
 
@@ -291,7 +310,9 @@ export function VoiceSoapRecorder({ visitId }: { visitId: string }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ storagePath: uploadedPath }),
+        signal: controller.signal,
       });
+      if (cancelledRef.current) return;
       if (!draftResponse.ok) {
         setError(await readErrorMessage(draftResponse, "ניתוח ההקלטה נכשל"));
         setStage("idle");
@@ -308,6 +329,7 @@ export function VoiceSoapRecorder({ visitId }: { visitId: string }) {
           };
         };
       };
+      if (cancelledRef.current) return;
 
       setArtifactId(draftPayload.data.id);
       setFields({
@@ -318,6 +340,7 @@ export function VoiceSoapRecorder({ visitId }: { visitId: string }) {
       });
       setStage("review");
     } catch {
+      if (cancelledRef.current) return;
       setError("ניתוח ההקלטה נכשל");
       setStage("idle");
     }

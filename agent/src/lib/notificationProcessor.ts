@@ -87,10 +87,14 @@ export async function processNotifications(opts: ProcessOptions = {}): Promise<P
     try {
       const { sid } = await sendSms(row.phone, row.body);
 
+      // Guarded on status='processing' (not just id) so a cancelFutureNotifications
+      // call that raced this send and already flipped the row to 'skipped'
+      // isn't silently clobbered back to 'sent' — it's a no-op instead.
       const { error: sentErr } = await getSupabase()
         .from("notifications_log")
         .update({ status: "sent", sent_at: nowIso, twilio_message_sid: sid, updated_at: nowIso })
-        .eq("id", row.id);
+        .eq("id", row.id)
+        .eq("status", "processing");
 
       if (sentErr) {
         // SMS was delivered but we failed to record it. The 5-min recovery
@@ -106,10 +110,12 @@ export async function processNotifications(opts: ProcessOptions = {}): Promise<P
       const message = sendErr instanceof Error ? sendErr.message : String(sendErr);
       logger.error({ id: row.id, type: row.type, error: message }, "Failed to send SMS");
 
+      // Same guard as the 'sent' update above.
       const { error: failedErr } = await getSupabase()
         .from("notifications_log")
         .update({ status: "failed", error: message, updated_at: nowIso })
-        .eq("id", row.id);
+        .eq("id", row.id)
+        .eq("status", "processing");
 
       if (failedErr) {
         logger.error(
