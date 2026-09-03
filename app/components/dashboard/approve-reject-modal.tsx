@@ -1,6 +1,6 @@
 "use client";
-import React, { useEffect, useState } from "react";
-import { createPortal } from "react-dom";
+import React, { useState } from "react";
+import { Modal } from "@/components/dashboard/ui/modal";
 import { Btn } from "@/components/dashboard/ui/btn";
 import { useToast } from "@/components/dashboard/ui/toast";
 
@@ -22,10 +22,7 @@ export function ApproveRejectModal({
   onClose: () => void;
 }) {
   const [loading, setLoading] = useState(false);
-  const [mounted, setMounted] = useState(false);
   const { toast } = useToast();
-
-  useEffect(() => { setMounted(true); }, []);
 
   async function handleConfirm() {
     setLoading(true);
@@ -45,38 +42,29 @@ export function ApproveRejectModal({
     }
   }
 
-  if (!mounted) return null;
-
-  // Portalled to document.body - see the matching comment in drawer.tsx for why
-  // (the dashboard layout's .page-enter animation ends on a non-none transform,
-  // which breaks `position: fixed` containment for descendants otherwise).
-  return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={onClose}>
-      <div
-        className="w-full max-w-sm rounded-[var(--r-xl)] bg-[var(--surface)] p-6 shadow-[var(--sh-lg)] modal-enter"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <h3 className="text-[15px] font-semibold text-[var(--ink)]">
-          {mode === "approve" ? "אישור תור עיקור/סירוס" : "דחיית תור עיקור/סירוס"}
-        </h3>
-        <p className="mt-2 text-sm text-[var(--ink-2)]">
-          {mode === "approve"
-            ? `האם לאשר את תורו של ${petName}? לאחר האישור ישלח SMS ל-${customerName}.`
-            : `האם לדחות את תורו של ${petName}? לאחר הדחייה ישלח SMS ביטול ל-${customerName}.`}
-        </p>
-        <div className="mt-5 flex justify-end gap-2">
-          <Btn variant="ghost" size="sm" onClick={onClose}>ביטול</Btn>
-          <Btn
-            variant={mode === "approve" ? "primary" : "danger"}
-            size="sm"
-            loading={loading}
-            onClick={handleConfirm}
-          >
-            {mode === "approve" ? "אשר תור" : "דחה תור"}
-          </Btn>
-        </div>
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title={mode === "approve" ? "אישור תור עיקור/סירוס" : "דחיית תור עיקור/סירוס"}
+      maxWidth={384}
+    >
+      <p className="text-[13.5px]" style={{ color: "var(--text-secondary)" }}>
+        {mode === "approve"
+          ? `האם לאשר את תורו של ${petName}? לאחר האישור ישלח SMS ל-${customerName}.`
+          : `האם לדחות את תורו של ${petName}? לאחר הדחייה ישלח SMS ביטול ל-${customerName}.`}
+      </p>
+      <div className="mt-5 flex justify-end gap-2">
+        <Btn variant="ghost" size="sm" onClick={onClose}>ביטול</Btn>
+        <Btn
+          variant={mode === "approve" ? "primary" : "danger"}
+          size="sm"
+          loading={loading}
+          onClick={handleConfirm}
+        >
+          {mode === "approve" ? "אשר תור" : "דחה תור"}
+        </Btn>
       </div>
-    </div>,
-    document.body,
+    </Modal>
   );
 }
