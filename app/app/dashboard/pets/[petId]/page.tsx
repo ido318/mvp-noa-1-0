@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { dashboardApiFetch } from "@/app/dashboard/api-client";
 import { AnimalIcon } from "@/components/dashboard/icons";
+import { Alert } from "@/components/dashboard/ui/alert";
+import { Badge } from "@/components/dashboard/ui/badge";
+import { Btn } from "@/components/dashboard/ui/btn";
 import { PetDetailTabs } from "@/app/dashboard/pets/[petId]/pet-detail-tabs";
 import type { Customer } from "@/types/domain/customer";
 import type { Pet } from "@/types/domain/pet";
@@ -33,9 +36,9 @@ export default async function PetProfilePage({ params }: Params) {
 
   if (!pet) {
     return (
-      <section className="rounded-[var(--r-lg)] border border-[var(--red-100)] bg-[var(--red-50)] p-6 text-sm text-[var(--red-700)]">
-        החיה לא נמצאה.
-      </section>
+      <div className="mx-auto w-full max-w-[1000px] p-6">
+        <Alert tone="critical">החיה לא נמצאה.</Alert>
+      </div>
     );
   }
 
@@ -57,32 +60,32 @@ export default async function PetProfilePage({ params }: Params) {
 
   return (
     <div className="mx-auto w-full max-w-[1000px] space-y-5 p-6">
-      <Link href={`/dashboard/clients?customerId=${pet.customerId}`} className="text-sm font-semibold text-[var(--brand-600)] hover:underline">
+      <Link href={`/dashboard/clients?customerId=${pet.customerId}`} className="text-sm font-semibold text-[var(--accent)] hover:underline">
         ← חזרה ללקוח
       </Link>
 
       {/* Hero */}
-      <div className="flex flex-wrap items-center justify-between gap-6 rounded-[var(--r-lg)] border border-[var(--line)] bg-[var(--surface)] p-6">
+      <div className="flex flex-wrap items-center justify-between gap-6 rounded-[var(--radius-3)] border border-[var(--border-hairline)] bg-[var(--surface-raised)] p-6">
         <div className="flex flex-wrap items-center gap-6">
           {pet.weight != null && (
             <div className="text-end">
-              <p className="text-[11px] text-[var(--muted)]">משקל אחרון</p>
-              <p className="text-[20px] font-semibold tabular-nums text-[var(--ink)]">{pet.weight} ק״ג</p>
+              <p className="text-[11px] text-[var(--text-muted)]">משקל אחרון</p>
+              <p className="text-[20px] font-semibold tabular-nums text-[var(--text-primary)]">{pet.weight} ק״ג</p>
             </div>
           )}
           {age && (
             <div className="text-end">
-              <p className="text-[11px] text-[var(--muted)]">גיל</p>
-              <p className="text-[20px] font-semibold text-[var(--ink)]">{age}</p>
+              <p className="text-[11px] text-[var(--text-muted)]">גיל</p>
+              <p className="text-[20px] font-semibold text-[var(--text-primary)]">{age}</p>
             </div>
           )}
           {owner && (
             <div className="text-end">
-              <p className="text-[11px] text-[var(--muted)]">בעלים</p>
-              <Link href={`/dashboard/clients?customerId=${owner.id}`} className="text-[16px] font-semibold text-[var(--brand-600)] hover:underline">
+              <p className="text-[11px] text-[var(--text-muted)]">בעלים</p>
+              <Link href={`/dashboard/clients?customerId=${owner.id}`} className="text-[16px] font-semibold text-[var(--accent)] hover:underline">
                 {owner.fullName}
               </Link>
-              {owner.phone && <p className="text-xs text-[var(--muted)]">{owner.phone}</p>}
+              {owner.phone && <p className="text-xs text-[var(--text-muted)]">{owner.phone}</p>}
             </div>
           )}
         </div>
@@ -90,15 +93,15 @@ export default async function PetProfilePage({ params }: Params) {
         <div className="flex items-center gap-3">
           <div className="text-end">
             <div className="flex items-center gap-2">
-              {pet.isNeutered && <span className="rounded px-1.5 py-0.5 text-[11px] font-semibold text-[#1d4ed8] bg-[#eff6ff]">מעוקר/ת</span>}
-              <p className="text-[20px] font-semibold text-[var(--ink)]">{pet.name}</p>
+              {pet.isNeutered && <Badge tone="neutral">מעוקר/ת</Badge>}
+              <p className="text-[20px] font-semibold text-[var(--text-primary)]">{pet.name}</p>
             </div>
-            <p className="text-sm text-[var(--ink-2)]">
+            <p className="text-sm text-[var(--text-secondary)]">
               {pet.species}{pet.breed ? ` · ${pet.breed}` : ""}
               {pet.sex ? ` · ${PET_SEX_LABELS[pet.sex] ?? pet.sex}` : ""}
             </p>
           </div>
-          <span className="flex h-16 w-16 items-center justify-center rounded-full bg-[var(--brand-100)]">
+          <span className="flex h-16 w-16 items-center justify-center rounded-full bg-[var(--active-wash)]">
             <AnimalIcon species={pet.species} size={32} />
           </span>
         </div>
@@ -107,35 +110,24 @@ export default async function PetProfilePage({ params }: Params) {
       {/* Medical alerts */}
       {hasAlerts && (
         <div className="space-y-2">
-          {pet.allergies && (
-            <div className="flex items-start gap-2 rounded-[var(--r-md)] border border-[var(--red-500)] bg-[var(--red-50)] p-3">
-              <p className="text-[13px] font-semibold text-[var(--red-700)]">אלרגיה: {pet.allergies}</p>
-            </div>
-          )}
-          {pet.chronicConditions && (
-            <div className="flex items-start gap-2 rounded-[var(--r-md)] border border-[var(--amber-500)] bg-[var(--amber-50)] p-3">
-              <p className="text-[13px] font-semibold text-[var(--amber-600)]">מצב כרוני: {pet.chronicConditions}</p>
-            </div>
-          )}
+          {pet.allergies && <Alert tone="critical" title="אלרגיה">{pet.allergies}</Alert>}
+          {pet.chronicConditions && <Alert tone="pending" title="מצב כרוני">{pet.chronicConditions}</Alert>}
         </div>
       )}
 
       {/* Quick actions */}
       <div className="flex flex-wrap justify-end gap-2">
         {owner?.phone && (
-          <a href={`tel:${owner.phone}`} className="rounded-full border border-[var(--line)] bg-[var(--surface)] px-4 py-2 text-[13px] font-semibold text-[var(--ink)] hover:bg-[var(--surface-2)]">
+          <Btn href={`tel:${owner.phone}`} variant="soft" size="sm">
             התקשר לבעלים
-          </a>
+          </Btn>
         )}
-        <Link
-          href={`/dashboard/calendar?newAppointment=1&customerId=${pet.customerId}&petId=${pet.id}`}
-          className="rounded-full border border-[var(--line)] bg-[var(--surface)] px-4 py-2 text-[13px] font-semibold text-[var(--ink)] hover:bg-[var(--surface-2)]"
-        >
+        <Btn href={`/dashboard/calendar?newAppointment=1&customerId=${pet.customerId}&petId=${pet.id}`} variant="soft" size="sm">
           קבע תור
-        </Link>
-        <Link href={`/dashboard/visits/new?petId=${pet.id}`} className="rounded-full bg-[var(--brand-600)] px-4 py-2 text-[13px] font-semibold text-white">
+        </Btn>
+        <Btn href={`/dashboard/visits/new?petId=${pet.id}`} variant="primary" size="sm">
           פתח ביקור חדש
-        </Link>
+        </Btn>
       </div>
 
       <PetDetailTabs

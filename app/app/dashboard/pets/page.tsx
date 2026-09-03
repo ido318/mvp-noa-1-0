@@ -18,10 +18,10 @@ export default async function PetsPage() {
     <div className="p-6 space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-[var(--ink)]">חיות מחמד</h1>
-          <p className="mt-1 text-sm text-[var(--muted)]">פרופילים, תרופות קבועות, חיסונים וביקורים.</p>
+          <h1 className="text-xl font-semibold text-[var(--text-primary)]">חיות מחמד</h1>
+          <p className="mt-1 text-sm text-[var(--text-muted)]">פרופילים, תרופות קבועות, חיסונים וביקורים.</p>
         </div>
-        <Badge color="muted">{pets.length} חיות</Badge>
+        <Badge tone="neutral">{pets.length} חיות</Badge>
       </div>
 
       {pets.length === 0 ? (
@@ -37,33 +37,33 @@ export default async function PetsPage() {
               <Card className="h-full">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <h2 className="truncate text-base font-semibold text-[var(--ink)]">{pet.name}</h2>
-                    <p className="mt-1 text-xs text-[var(--muted)]">{petMeta(pet)}</p>
+                    <h2 className="truncate text-base font-semibold text-[var(--text-primary)]">{pet.name}</h2>
+                    <p className="mt-1 text-xs text-[var(--text-muted)]">{petMeta(pet)}</p>
                   </div>
-                  <Badge color={pet.status === "active" ? "green" : "muted"}>
+                  <Badge tone={pet.status === "active" ? "done" : "neutral"}>
                     {pet.status === "active" ? "פעיל" : "לא פעיל"}
                   </Badge>
                 </div>
 
                 <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
                   <div>
-                    <p className="text-[var(--faint)]">משקל</p>
-                    <p className="font-semibold text-[var(--ink)]">{pet.weight != null ? `${pet.weight} ק״ג` : "—"}</p>
+                    <p className="text-[var(--text-faint)]">משקל</p>
+                    <p className="font-semibold text-[var(--text-primary)]">{pet.weight != null ? `${pet.weight} ק״ג` : "—"}</p>
                   </div>
                   <div>
-                    <p className="text-[var(--faint)]">שבב</p>
-                    <p className="font-semibold text-[var(--ink)]">{pet.chipNumber ?? "—"}</p>
+                    <p className="text-[var(--text-faint)]">שבב</p>
+                    <p className="font-semibold text-[var(--text-primary)]">{pet.chipNumber ?? "—"}</p>
                   </div>
                 </div>
 
                 <div className="mt-4 space-y-2 text-xs">
                   <div>
-                    <p className="font-semibold text-[var(--ink-2)]">תרופות קבועות</p>
-                    <p className="line-clamp-2 text-[var(--muted)]">{pet.currentMedications || "לא רשום"}</p>
+                    <p className="font-semibold text-[var(--text-secondary)]">תרופות קבועות</p>
+                    <p className="line-clamp-2 text-[var(--text-muted)]">{pet.currentMedications || "לא רשום"}</p>
                   </div>
                   <div>
-                    <p className="font-semibold text-[var(--ink-2)]">רגישויות / מצבים כרוניים</p>
-                    <p className="line-clamp-2 text-[var(--muted)]">
+                    <p className="font-semibold text-[var(--text-secondary)]">רגישויות / מצבים כרוניים</p>
+                    <p className="line-clamp-2 text-[var(--text-muted)]">
                       {[pet.allergies, pet.chronicConditions].filter(Boolean).join(" · ") || "לא רשום"}
                     </p>
                   </div>
