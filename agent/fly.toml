@@ -8,9 +8,13 @@ primary_region = 'fra'
 
 [build]
   dockerfile = "Dockerfile"
-  # Build context is the repo root, not agent/ — the Dockerfile needs to reach
-  # the packages/shared workspace agent/ depends on (@tomer/shared).
-  context = ".."
+  # fly.toml has no [build] key for the Docker build context — flyctl only
+  # takes it as a positional argument. The Dockerfile needs the repo root as
+  # context to reach the packages/shared workspace agent/ depends on
+  # (@tomer/shared), so deploy with:
+  #   flyctl deploy .. --config agent/fly.toml --dockerfile agent/Dockerfile
+  # (run from agent/, or adjust paths accordingly) instead of a bare
+  # `cd agent && flyctl deploy`.
 
 [http_service]
   internal_port = 3000
