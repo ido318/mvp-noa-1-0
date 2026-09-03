@@ -1,10 +1,11 @@
 "use client";
 import React, { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
-import { Card } from "@/components/dashboard/ui/card";
+import { useRouter } from "next/navigation";
 import { Badge } from "@/components/dashboard/ui/badge";
 import { EmptyState } from "@/components/dashboard/ui/empty-state";
 import { SkeletonRow } from "@/components/dashboard/ui/skeleton";
+import { Tabs } from "@/components/dashboard/ui/tabs";
+import { Table } from "@/components/dashboard/ui/table";
 import type { CallReview, CallReviewSeverityFilter } from "@/types/domain/call-review";
 
 const SEVERITY_TONE: Record<string, "critical" | "pending" | "info" | "done"> = {
@@ -26,7 +27,9 @@ const SEVERITY_LABEL: Record<string, string> = {
 const FILTERS: { value: CallReviewSeverityFilter; label: string }[] = [
   { value: "all", label: "הכול" },
   { value: "critical", label: "קריטית" },
+  { value: "high", label: "גבוהה" },
   { value: "medium", label: "בינונית" },
+  { value: "low", label: "נמוכה" },
   { value: "none", label: "ללא חריגה" },
 ];
 
@@ -35,6 +38,7 @@ function fmtDate(iso: string) {
 }
 
 export default function ProviderAdminCallsPage() {
+  const router = useRouter();
   const [items, setItems] = useState<CallReview[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -66,22 +70,7 @@ export default function ProviderAdminCallsPage() {
     <div className="p-6 space-y-5">
       <div className="flex items-center justify-between">
         <h1 style={{ font: "var(--type-page-title)", color: "var(--text-primary)" }}>שיחות עם ניקוד QA</h1>
-        <div className="flex rounded-[var(--radius-2)] border border-[var(--border-field)] overflow-hidden">
-          {FILTERS.map((f) => (
-            <button
-              key={f.value}
-              onClick={() => setSeverity(f.value)}
-              aria-pressed={severity === f.value}
-              className="px-3 h-[var(--control-h)] text-[13px] font-medium transition-colors"
-              style={{
-                background: severity === f.value ? "var(--accent)" : "transparent",
-                color: severity === f.value ? "var(--text-on-accent)" : "var(--text-secondary)",
-              }}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
+        <Tabs variant="pill" value={severity} onChange={setSeverity} items={FILTERS} />
       </div>
 
       {loading ? (
@@ -93,49 +82,51 @@ export default function ProviderAdminCallsPage() {
       ) : items.length === 0 ? (
         <EmptyState title="אין שיחות בטווח הזה" subtitle="שיחות עם ניקוד QA מ-30 הימים האחרונים יופיעו כאן." />
       ) : (
-        <Card noPad>
-          <table className="w-full">
-            <thead>
-              <tr style={{ borderBottom: "1px solid var(--border-hairline)" }}>
-                <th className="px-4 py-3 text-start text-[12px] font-semibold" style={{ color: "var(--text-faint)" }}>מתקשר</th>
-                <th className="px-4 py-3 text-start text-[12px] font-semibold" style={{ color: "var(--text-faint)" }}>ציון כללי</th>
-                <th className="px-4 py-3 text-start text-[12px] font-semibold" style={{ color: "var(--text-faint)" }}>חומרה</th>
-                <th className="px-4 py-3 text-start text-[12px] font-semibold" style={{ color: "var(--text-faint)" }}>סיכום</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((item, i) => (
-                <tr key={item.id}>
-                  <td colSpan={4} className="p-0">
-                    <Link
-                      href={`/provider-admin/calls/${item.id}`}
-                      className="grid grid-cols-4 items-center px-0 py-0 cursor-pointer"
-                      style={{
-                        borderBottom: i < items.length - 1 ? "1px solid var(--border-row)" : "none",
-                      }}
-                    >
-                      <span className="px-4 py-3 text-[13.5px]" style={{ color: "var(--text-primary)" }}>
-                        {item.conversationId}
-                        <span className="block text-[11.5px]" style={{ color: "var(--text-faint)" }}>{fmtDate(item.createdAt)}</span>
-                      </span>
-                      <span className="px-4 py-3" style={{ font: "var(--type-metric)", color: "var(--text-primary)" }}>
-                        {item.overallScore ?? "—"}
-                      </span>
-                      <span className="px-4 py-3">
-                        <Badge tone={SEVERITY_TONE[item.exceptionSeverity ?? "none"]}>
-                          {SEVERITY_LABEL[item.exceptionSeverity ?? "none"]}
-                        </Badge>
-                      </span>
-                      <span className="px-4 py-3 text-[12.5px] truncate block" style={{ color: "var(--text-secondary)" }}>
-                        {item.reviewerSummary ?? "—"}
-                      </span>
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Card>
+        <Table
+          rows={items}
+          rowKey={(item) => item.id}
+          onRowClick={(item) => router.push(`/provider-admin/calls/${item.id}`)}
+          columns={[
+            {
+              key: "caller",
+              header: "מתקשר",
+              render: (item) => (
+                <span className="text-[13.5px]" style={{ color: "var(--text-primary)" }}>
+                  {item.conversationId}
+                  <span className="block text-[11.5px]" style={{ color: "var(--text-faint)" }}>{fmtDate(item.createdAt)}</span>
+                </span>
+              ),
+            },
+            {
+              key: "score",
+              header: "ציון כללי",
+              render: (item) => (
+                <span style={{ font: "var(--type-metric)", color: "var(--text-primary)" }}>
+                  {item.overallScore ?? "—"}
+                </span>
+              ),
+            },
+            {
+              key: "severity",
+              header: "חומרה",
+              render: (item) => (
+                <Badge tone={SEVERITY_TONE[item.exceptionSeverity ?? "none"]}>
+                  {SEVERITY_LABEL[item.exceptionSeverity ?? "none"]}
+                </Badge>
+              ),
+            },
+            {
+              key: "summary",
+              header: "סיכום",
+              className: "max-w-[280px]",
+              render: (item) => (
+                <span className="truncate block text-[12.5px]" style={{ color: "var(--text-secondary)" }}>
+                  {item.reviewerSummary ?? "—"}
+                </span>
+              ),
+            },
+          ]}
+        />
       )}
     </div>
   );
