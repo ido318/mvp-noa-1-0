@@ -76,12 +76,15 @@ export function Btn({
   );
 
   if (href) {
+    const isDisabled = disabled || loading;
     return (
       <Link
         href={href}
-        className={classes}
+        className={[classes, isDisabled ? "opacity-45 pointer-events-none" : ""].join(" ")}
         style={{ transition: "var(--transition-color)" }}
-        aria-disabled={disabled || loading || undefined}
+        aria-disabled={isDisabled || undefined}
+        tabIndex={isDisabled ? -1 : undefined}
+        onClick={isDisabled ? (e) => e.preventDefault() : undefined}
       >
         {loading ? spinner : children}
       </Link>

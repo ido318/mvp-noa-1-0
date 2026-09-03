@@ -37,7 +37,7 @@ export function Tabs<T extends string>({
   if (variant === "pill") {
     return (
       <div
-        role="tablist"
+        role="group"
         className={["inline-flex overflow-hidden flex-shrink-0", className].join(" ")}
         style={{ borderRadius: "var(--radius-2)", border: "var(--border-w) solid var(--border-field)" }}
       >
@@ -47,8 +47,7 @@ export function Tabs<T extends string>({
             <button
               key={item.value}
               type="button"
-              role="tab"
-              aria-selected={active}
+              aria-pressed={active}
               onClick={() => onChange(item.value)}
               className={["px-3 whitespace-nowrap", size === "sm" ? "text-[12px]" : "text-[13px]"].join(" ")}
               style={{

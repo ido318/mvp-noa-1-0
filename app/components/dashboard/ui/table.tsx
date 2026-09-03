@@ -49,7 +49,14 @@ export function Table<T>({ columns, rows, rowKey, onRowClick, className = "" }: 
             <tr
               key={rowKey(row)}
               onClick={onRowClick ? () => onRowClick(row) : undefined}
-              className={onRowClick ? "cursor-pointer hover:bg-[var(--surface-hover)]" : ""}
+              onKeyDown={onRowClick ? (e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onRowClick(row);
+                }
+              } : undefined}
+              tabIndex={onRowClick ? 0 : undefined}
+              className={onRowClick ? "cursor-pointer hover:bg-[var(--surface-hover)] focus-visible:bg-[var(--surface-hover)]" : ""}
               style={{ borderBottom: "var(--rule-row)", transition: "var(--transition-color)" }}
             >
               {columns.map((col) => (
