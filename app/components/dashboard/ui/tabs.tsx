@@ -23,6 +23,9 @@ interface TabsProps<T extends string> {
   onChange: (value: T) => void;
   variant?: TabsVariant;
   size?: TabsSize;
+  /** Pill only: lets the group wrap onto multiple lines instead of clipping
+   * overflow — for filter rows with enough options that one row won't fit. */
+  wrap?: boolean;
   className?: string;
 }
 
@@ -32,9 +35,46 @@ export function Tabs<T extends string>({
   onChange,
   variant = "underline",
   size = "md",
+  wrap = false,
   className = "",
 }: TabsProps<T>) {
   if (variant === "pill") {
+    const pillHeight = size === "sm" ? "var(--control-h-sm)" : "var(--control-h)";
+    const pillTextClass = size === "sm" ? "text-[12px]" : "text-[13px]";
+
+    if (wrap) {
+      return (
+        <div role="group" className={["flex flex-wrap gap-1.5", className].join(" ")}>
+          {items.map((item) => {
+            const active = item.value === value;
+            return (
+              <button
+                key={item.value}
+                type="button"
+                aria-pressed={active}
+                onClick={() => onChange(item.value)}
+                className={["px-3 whitespace-nowrap", pillTextClass].join(" ")}
+                style={{
+                  height: pillHeight,
+                  borderRadius: "var(--radius-2)",
+                  border: "var(--border-w) solid var(--border-field)",
+                  background: active ? "var(--accent)" : "transparent",
+                  color: active ? "var(--text-on-accent)" : "var(--text-secondary)",
+                  fontWeight: active ? "var(--w-semibold)" : "var(--w-regular)",
+                  transition: "var(--transition-color)",
+                }}
+              >
+                {item.label}
+                {item.count != null && (
+                  <span className="gv-data ms-1.5" style={{ opacity: 0.75 }}>{item.count}</span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      );
+    }
+
     return (
       <div
         role="group"
@@ -49,9 +89,9 @@ export function Tabs<T extends string>({
               type="button"
               aria-pressed={active}
               onClick={() => onChange(item.value)}
-              className={["px-3 whitespace-nowrap", size === "sm" ? "text-[12px]" : "text-[13px]"].join(" ")}
+              className={["px-3 whitespace-nowrap", pillTextClass].join(" ")}
               style={{
-                height: size === "sm" ? "var(--control-h-sm)" : "var(--control-h)",
+                height: pillHeight,
                 borderInlineStart: i > 0 ? "var(--border-w) solid var(--border-field)" : "none",
                 background: active ? "var(--accent)" : "transparent",
                 color: active ? "var(--text-on-accent)" : "var(--text-secondary)",

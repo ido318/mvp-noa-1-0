@@ -26,7 +26,7 @@ export function VisitWorkspace({
         <VisitSectionNav />
       </Card>
       <Card>
-        <h3 id="reason-and-pre-visit" className="text-[15px] font-semibold text-[var(--text-primary)]">אנמנזה</h3>
+        <h3 id="anamnesis" className="text-[15px] font-semibold text-[var(--text-primary)]">אנמנזה</h3>
         <div className="mt-3">
           <AnamnesisForm chiefComplaint={visit.chiefComplaint} manualVisitSummary={visit.manualVisitSummary} />
         </div>
