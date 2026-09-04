@@ -39,7 +39,7 @@ npm run seed:all          # seed dev user + demo data (requires local Supabase)
 ### Single test file
 ```bash
 # Agent
-cd agent && npx vitest run src/tests/foo.test.ts
+cd agent && npx vitest run tests/unit/foo.test.ts
 
 # App
 cd app && npx vitest run tests/unit/foo.test.ts
@@ -185,6 +185,7 @@ Shared (same Supabase project): `SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_URL`, `SU
 - אסור לקמט קבצי `.env`, סודות, או קבצי `*.timestamp-*.mjs`.
 - תקשורת עם המשתמש בעברית. קוד והודעות commit באנגלית.
 - תיעוד מרכזי בנושן: דף Voxly-Tomer (`36f1354b584881b587c5c6f42a6bf6c7`).
+- **נוהל worktree/session:** יותר מ-session אחד עובד לעיתים על אותו repo במקביל (ראה זיכרון "Graphite Pro concurrent session", "PIMS parallel initiative"). לפני עבודה על התיקייה הראשית — `git worktree list` כדי לבדוק אם יש worktree/branch פעיל אחר, ולהעדיף `git worktree add` לעבודה מבודדת על פני checkout ישיר בתיקייה הראשית. תסמינים אופייניים לתקרית כזו: קבצים שהשתנו בלי שביקשת (למשל `lang="he"`→`lang="he-IL"` שהופיע ב-worktree אחר), או נעילת gpg/git תקועה (`gpg failed to sign the data ... waiting for lock (held by <pid>)`) — אם ה-PID כבר לא רץ (`ps -p <pid>`), זו נעילה תקועה (`~/.gnupg/public-keys.d/pubring.db.lock` וכדומה) שבטוח למחוק.
 
 ## cron (pg_cron)
 
