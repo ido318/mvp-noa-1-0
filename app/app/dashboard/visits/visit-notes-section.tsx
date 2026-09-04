@@ -34,6 +34,14 @@ const NOTE_TYPE_LABELS: Record<MedicalNoteType, string> = {
   addendum: "נספח",
 };
 
+// Matches voice-soap-recorder.tsx's SOAP_FIELD_LABELS wording.
+const SOAP_SUBFIELD_LABELS = {
+  subjective: "סובייקטיבי",
+  objective: "אובייקטיבי",
+  assessment: "הערכה",
+  plan: "תוכנית טיפול",
+} as const;
+
 function fieldToNull(value: string): string | null {
   return value.trim() ? value : null;
 }
@@ -205,34 +213,42 @@ function NoteListItem({ note, visitId, childrenByParent, depth }: NoteListItemPr
               className={textareaClass}
             />
             <div className="grid gap-2 sm:grid-cols-2">
-              <textarea
-                value={editSubjective}
-                onChange={(event) => setEditSubjective(event.target.value)}
-                rows={2}
-                placeholder="subjective"
-                className={textareaClass}
-              />
-              <textarea
-                value={editObjective}
-                onChange={(event) => setEditObjective(event.target.value)}
-                rows={2}
-                placeholder="objective"
-                className={textareaClass}
-              />
-              <textarea
-                value={editAssessment}
-                onChange={(event) => setEditAssessment(event.target.value)}
-                rows={2}
-                placeholder="assessment"
-                className={textareaClass}
-              />
-              <textarea
-                value={editPlan}
-                onChange={(event) => setEditPlan(event.target.value)}
-                rows={2}
-                placeholder="plan"
-                className={textareaClass}
-              />
+              <label className="block space-y-1">
+                <span className="text-xs font-semibold text-[var(--ink-2)]">{SOAP_SUBFIELD_LABELS.subjective}</span>
+                <textarea
+                  value={editSubjective}
+                  onChange={(event) => setEditSubjective(event.target.value)}
+                  rows={2}
+                  className={textareaClass}
+                />
+              </label>
+              <label className="block space-y-1">
+                <span className="text-xs font-semibold text-[var(--ink-2)]">{SOAP_SUBFIELD_LABELS.objective}</span>
+                <textarea
+                  value={editObjective}
+                  onChange={(event) => setEditObjective(event.target.value)}
+                  rows={2}
+                  className={textareaClass}
+                />
+              </label>
+              <label className="block space-y-1">
+                <span className="text-xs font-semibold text-[var(--ink-2)]">{SOAP_SUBFIELD_LABELS.assessment}</span>
+                <textarea
+                  value={editAssessment}
+                  onChange={(event) => setEditAssessment(event.target.value)}
+                  rows={2}
+                  className={textareaClass}
+                />
+              </label>
+              <label className="block space-y-1">
+                <span className="text-xs font-semibold text-[var(--ink-2)]">{SOAP_SUBFIELD_LABELS.plan}</span>
+                <textarea
+                  value={editPlan}
+                  onChange={(event) => setEditPlan(event.target.value)}
+                  rows={2}
+                  className={textareaClass}
+                />
+              </label>
             </div>
             {editError ? <p className="text-xs font-semibold text-[var(--red-700)]">{editError}</p> : null}
             <div className="flex gap-2">
@@ -410,34 +426,42 @@ export function VisitNotesSection({ visitId, initialNotes }: Props) {
           className={textareaClass}
         />
         <div className="grid gap-3 sm:grid-cols-2">
-          <textarea
-            value={subjective}
-            onChange={(event) => setSubjective(event.target.value)}
-            rows={2}
-            placeholder="subjective"
-            className={textareaClass}
-          />
-          <textarea
-            value={objective}
-            onChange={(event) => setObjective(event.target.value)}
-            rows={2}
-            placeholder="objective"
-            className={textareaClass}
-          />
-          <textarea
-            value={assessment}
-            onChange={(event) => setAssessment(event.target.value)}
-            rows={2}
-            placeholder="assessment"
-            className={textareaClass}
-          />
-          <textarea
-            value={plan}
-            onChange={(event) => setPlan(event.target.value)}
-            rows={2}
-            placeholder="plan"
-            className={textareaClass}
-          />
+          <label className="block space-y-1">
+            <span className="text-xs font-semibold text-[var(--ink-2)]">{SOAP_SUBFIELD_LABELS.subjective}</span>
+            <textarea
+              value={subjective}
+              onChange={(event) => setSubjective(event.target.value)}
+              rows={2}
+              className={textareaClass}
+            />
+          </label>
+          <label className="block space-y-1">
+            <span className="text-xs font-semibold text-[var(--ink-2)]">{SOAP_SUBFIELD_LABELS.objective}</span>
+            <textarea
+              value={objective}
+              onChange={(event) => setObjective(event.target.value)}
+              rows={2}
+              className={textareaClass}
+            />
+          </label>
+          <label className="block space-y-1">
+            <span className="text-xs font-semibold text-[var(--ink-2)]">{SOAP_SUBFIELD_LABELS.assessment}</span>
+            <textarea
+              value={assessment}
+              onChange={(event) => setAssessment(event.target.value)}
+              rows={2}
+              className={textareaClass}
+            />
+          </label>
+          <label className="block space-y-1">
+            <span className="text-xs font-semibold text-[var(--ink-2)]">{SOAP_SUBFIELD_LABELS.plan}</span>
+            <textarea
+              value={plan}
+              onChange={(event) => setPlan(event.target.value)}
+              rows={2}
+              className={textareaClass}
+            />
+          </label>
         </div>
         {error ? <p className="text-sm font-semibold text-[var(--red-700)]">{error}</p> : null}
         <Btn type="submit" size="sm" loading={loading}>הוסף הערה</Btn>

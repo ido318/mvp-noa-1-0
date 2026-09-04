@@ -7,6 +7,7 @@ import { UrgencyMeter } from "@/components/dashboard/ui/urgency-meter";
 import { EmptyState } from "@/components/dashboard/ui/empty-state";
 import { Skeleton } from "@/components/dashboard/ui/skeleton";
 import { useToast } from "@/components/dashboard/ui/toast";
+import { Modal } from "@/components/dashboard/ui/modal";
 import { EscalationIcon, ClockIcon, PhoneIcon } from "@/components/dashboard/icons";
 import type { Escalation } from "@/types/domain/escalation";
 import { formatEscalationReason, parseEscalationReason } from "@/lib/triage-labels";
@@ -50,38 +51,31 @@ function ResolveModal({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4"
-      onClick={onClose}
+    <Modal
+      open
+      onClose={onClose}
+      title="סגירת אסקלציה"
+      subtitle={formatEscalationReason(escalation.reason)}
+      maxWidth={448}
     >
-      <div
-        className="w-full max-w-md rounded-[var(--r-xl)] bg-[var(--surface)] p-6 shadow-[var(--sh-lg)] modal-enter"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h3 className="text-[15px] font-semibold text-[var(--ink)]">סגירת אסקלציה</h3>
-        <p className="mt-1 text-sm text-[var(--muted)] truncate">
-          {formatEscalationReason(escalation.reason)}
-        </p>
-
-        <div className="mt-4">
-          <label className="block text-xs font-semibold text-[var(--ink-2)] mb-1">הערות (אופציונלי)</label>
-          <textarea
-            className="w-full rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--ink)] placeholder:text-[var(--faint)] focus:outline-none focus:border-[var(--brand-400)] resize-none"
-            rows={3}
-            placeholder="מה בוצע? הערות לתיק..."
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-          />
-        </div>
-
-        <div className="mt-5 flex justify-end gap-2">
-          <Btn variant="ghost" size="sm" onClick={onClose}>ביטול</Btn>
-          <Btn variant="primary" size="sm" loading={loading} onClick={handleResolve}>
-            סמן כטופלה
-          </Btn>
-        </div>
+      <div>
+        <label className="block text-xs font-semibold text-[var(--ink-2)] mb-1">הערות (אופציונלי)</label>
+        <textarea
+          className="w-full rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--ink)] placeholder:text-[var(--faint)] focus:outline-none focus:border-[var(--brand-400)] resize-none"
+          rows={3}
+          placeholder="מה בוצע? הערות לתיק..."
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+        />
       </div>
-    </div>
+
+      <div className="mt-5 flex justify-end gap-2">
+        <Btn variant="ghost" size="sm" onClick={onClose}>ביטול</Btn>
+        <Btn variant="primary" size="sm" loading={loading} onClick={handleResolve}>
+          סמן כטופלה
+        </Btn>
+      </div>
+    </Modal>
   );
 }
 

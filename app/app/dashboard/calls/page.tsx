@@ -5,8 +5,9 @@ import { Badge } from "@/components/dashboard/ui/badge";
 import { EmptyState } from "@/components/dashboard/ui/empty-state";
 import { Skeleton } from "@/components/dashboard/ui/skeleton";
 import { CallStatusBadge } from "@/components/dashboard/ui/call-status";
-import { PhoneIcon, ClockIcon, SparkleIcon, PlayIcon, XIcon } from "@/components/dashboard/icons";
+import { PhoneIcon, ClockIcon, SparkleIcon, PlayIcon } from "@/components/dashboard/icons";
 import { Btn } from "@/components/dashboard/ui/btn";
+import { Drawer } from "@/components/dashboard/ui/drawer";
 import { formatIsraelDateTime } from "@/lib/israel-date";
 import type { VoiceCall, TranscriptItem } from "@/types/domain/voice-call";
 
@@ -119,149 +120,128 @@ function CallDrawer({
   const [taskLoading, setTaskLoading] = useState(false);
   const [taskMessage, setTaskMessage] = useState<string | null>(null);
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
   return (
-    <>
-      <div className="fixed inset-0 z-40 bg-black/20" onClick={onClose} />
-      <div className="fixed inset-y-0 start-0 z-50 flex w-full max-w-[440px] flex-col bg-[var(--surface)] shadow-[var(--sh-lg)] drawer-enter">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-[var(--line)] px-5 py-4">
-          <div>
-            <p className="text-[14px] font-semibold text-[var(--ink)]">{call.fromNumber}</p>
-            <p className="text-xs text-[var(--muted)]">{fmtDate(call.startedAt)}</p>
-          </div>
-          <button onClick={onClose} className="rounded-full p-1.5 hover:bg-[var(--surface-2)]">
-            <XIcon size={18} />
-          </button>
-        </div>
-
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
-          {/* Meta row */}
-          <div className="flex flex-wrap gap-2">
-            <CallStatusBadge status={call.status} />
-            {call.callCategory && (
-              <Badge color={call.callCategory === "operation" ? "brand" : "muted"}>
-                {call.callCategory === "operation" ? "פעולה" : "מידע"}
-              </Badge>
-            )}
-            {call.durationSeconds != null && (
-              <Badge color="muted">
-                <ClockIcon size={10} /> {fmtDuration(call.durationSeconds)}
-              </Badge>
-            )}
-          </div>
-
-          <div className="flex rounded-[var(--r-md)] border border-[var(--line)] overflow-hidden">
-            {[
-              ["summary", "סיכום"],
-              ["transcript", "תמלול"],
-              ["recording", "הקלטה"],
-            ].map(([value, label]) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => setTab(value as "summary" | "transcript" | "recording")}
-                className={[
-                  "flex-1 px-3 py-1.5 text-xs font-semibold transition-colors",
-                  tab === value
-                    ? "bg-[var(--brand-600)] text-white"
-                    : "text-[var(--ink-2)] hover:bg-[var(--surface-2)]",
-                ].join(" ")}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-
-          {tab === "summary" && (
-            <>
-              {call.aiSummary ? (
-                <div className="rounded-[var(--r-md)] bg-[var(--brand-50)] p-3">
-                  <div className="flex items-center gap-1.5 mb-1.5">
-                    <SparkleIcon size={13} className="text-[var(--brand-600)]" />
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--brand-700)]">סיכום AI</p>
-                  </div>
-                  <p className="text-[13px] text-[var(--ink)] leading-relaxed">{call.aiSummary}</p>
-                </div>
-              ) : (
-                <p className="text-sm text-[var(--muted)]">אין סיכום AI לשיחה הזו.</p>
-              )}
-              {call.customerId ? (
-                <div className="space-y-2 rounded-[var(--r-md)] border border-[var(--line)] p-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">משימת המשך מהשיחה</p>
-                  <input
-                    type="datetime-local"
-                    value={taskDueAt}
-                    onChange={(event) => setTaskDueAt(event.target.value)}
-                    className="h-9 w-full rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--bg)] px-3 text-sm text-[var(--ink)] outline-none focus:border-[var(--brand-400)]"
-                  />
-                  <Btn
-                    type="button"
-                    size="sm"
-                    variant="soft"
-                    loading={taskLoading}
-                    disabled={!taskDueAt}
-                    onClick={() => {
-                      setTaskLoading(true);
-                      setTaskMessage(null);
-                      void fetch("/api/follow-ups", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                          clinicId: call.clinicId,
-                          customerId: call.customerId,
-                          petId: call.petId,
-                          voiceCallId: call.id,
-                          reason: call.aiSummary ?? `מעקב אחרי שיחה מ-${call.fromNumber}`,
-                          dueAt: new Date(taskDueAt).toISOString(),
-                        }),
-                      }).then((res) => {
-                        setTaskMessage(res.ok ? "משימת המשך נוצרה" : "יצירת המשימה נכשלה");
-                      }).finally(() => setTaskLoading(false));
-                    }}
-                  >
-                    צור משימה מהשיחה
-                  </Btn>
-                  {taskMessage ? <p className="text-xs font-semibold text-[var(--muted)]">{taskMessage}</p> : null}
-                </div>
-              ) : null}
-            </>
+    <Drawer open onClose={onClose} title={call.fromNumber} subtitle={fmtDate(call.startedAt)}>
+      <div className="px-5 py-4 space-y-5">
+        {/* Meta row */}
+        <div className="flex flex-wrap gap-2">
+          <CallStatusBadge status={call.status} />
+          {call.callCategory && (
+            <Badge color={call.callCategory === "operation" ? "brand" : "muted"}>
+              {call.callCategory === "operation" ? "פעולה" : "מידע"}
+            </Badge>
           )}
-
-          {tab === "recording" && (
-            call.recordingStoragePath ? (
-              <div>
-                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">הקלטת השיחה</p>
-                <AudioPlayer callId={call.id} />
-              </div>
-            ) : (
-              <p className="text-sm text-[var(--muted)]">אין הקלטה שמורה לשיחה הזו.</p>
-            )
-          )}
-
-          {tab === "transcript" && (
-            call.transcript && call.transcript.length > 0 ? (
-              <div>
-                <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">תמלול השיחה</p>
-                <div className="space-y-3">
-                  {call.transcript.map((item, i) => (
-                    <TranscriptBubble key={i} item={item} />
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <p className="text-sm text-[var(--muted)]">אין תמלול שמור לשיחה הזו.</p>
-            )
+          {call.durationSeconds != null && (
+            <Badge color="muted">
+              <ClockIcon size={10} /> {fmtDuration(call.durationSeconds)}
+            </Badge>
           )}
         </div>
+
+        <div className="flex rounded-[var(--r-md)] border border-[var(--line)] overflow-hidden">
+          {[
+            ["summary", "סיכום"],
+            ["transcript", "תמלול"],
+            ["recording", "הקלטה"],
+          ].map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setTab(value as "summary" | "transcript" | "recording")}
+              className={[
+                "flex-1 px-3 py-1.5 text-xs font-semibold transition-colors",
+                tab === value
+                  ? "bg-[var(--brand-600)] text-white"
+                  : "text-[var(--ink-2)] hover:bg-[var(--surface-2)]",
+              ].join(" ")}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {tab === "summary" && (
+          <>
+            {call.aiSummary ? (
+              <div className="rounded-[var(--r-md)] bg-[var(--brand-50)] p-3">
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <SparkleIcon size={13} className="text-[var(--brand-600)]" />
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--brand-700)]">סיכום AI</p>
+                </div>
+                <p className="text-[13px] text-[var(--ink)] leading-relaxed">{call.aiSummary}</p>
+              </div>
+            ) : (
+              <p className="text-sm text-[var(--muted)]">אין סיכום AI לשיחה הזו.</p>
+            )}
+            {call.customerId ? (
+              <div className="space-y-2 rounded-[var(--r-md)] border border-[var(--line)] p-3">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">משימת המשך מהשיחה</p>
+                <input
+                  type="datetime-local"
+                  value={taskDueAt}
+                  onChange={(event) => setTaskDueAt(event.target.value)}
+                  className="h-9 w-full rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--bg)] px-3 text-sm text-[var(--ink)] outline-none focus:border-[var(--brand-400)]"
+                />
+                <Btn
+                  type="button"
+                  size="sm"
+                  variant="soft"
+                  loading={taskLoading}
+                  disabled={!taskDueAt}
+                  onClick={() => {
+                    setTaskLoading(true);
+                    setTaskMessage(null);
+                    void fetch("/api/follow-ups", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        clinicId: call.clinicId,
+                        customerId: call.customerId,
+                        petId: call.petId,
+                        voiceCallId: call.id,
+                        reason: call.aiSummary ?? `מעקב אחרי שיחה מ-${call.fromNumber}`,
+                        dueAt: new Date(taskDueAt).toISOString(),
+                      }),
+                    }).then((res) => {
+                      setTaskMessage(res.ok ? "משימת המשך נוצרה" : "יצירת המשימה נכשלה");
+                    }).finally(() => setTaskLoading(false));
+                  }}
+                >
+                  צור משימה מהשיחה
+                </Btn>
+                {taskMessage ? <p className="text-xs font-semibold text-[var(--muted)]">{taskMessage}</p> : null}
+              </div>
+            ) : null}
+          </>
+        )}
+
+        {tab === "recording" && (
+          call.recordingStoragePath ? (
+            <div>
+              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">הקלטת השיחה</p>
+              <AudioPlayer callId={call.id} />
+            </div>
+          ) : (
+            <p className="text-sm text-[var(--muted)]">אין הקלטה שמורה לשיחה הזו.</p>
+          )
+        )}
+
+        {tab === "transcript" && (
+          call.transcript && call.transcript.length > 0 ? (
+            <div>
+              <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">תמלול השיחה</p>
+              <div className="space-y-3">
+                {call.transcript.map((item, i) => (
+                  <TranscriptBubble key={i} item={item} />
+                ))}
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-[var(--muted)]">אין תמלול שמור לשיחה הזו.</p>
+          )
+        )}
       </div>
-    </>
+    </Drawer>
   );
 }
 

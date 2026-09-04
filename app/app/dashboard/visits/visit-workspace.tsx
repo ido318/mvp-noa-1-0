@@ -26,21 +26,21 @@ export function VisitWorkspace({
         <VisitSectionNav />
       </Card>
       <Card>
-        <h3 id="reason-and-pre-visit" className="text-[15px] font-semibold text-[var(--ink)]">Anamnesis</h3>
+        <h3 id="reason-and-pre-visit" className="text-[15px] font-semibold text-[var(--ink)]">אנמנזה</h3>
         <div className="mt-3">
           <AnamnesisForm chiefComplaint={visit.chiefComplaint} manualVisitSummary={visit.manualVisitSummary} />
         </div>
       </Card>
       <Card>
-        <h3 id="vitals" className="text-[15px] font-semibold text-[var(--ink)]">Vitals</h3>
+        <h3 id="vitals" className="text-[15px] font-semibold text-[var(--ink)]">מדדים חיוניים</h3>
         <div className="mt-3">
           <VitalsForm visitId={visit.id} initialVitals={vitals} />
         </div>
       </Card>
       <Card>
-        <h3 className="text-[15px] font-semibold text-[var(--ink)]">Physical Exam</h3>
+        <h3 className="text-[15px] font-semibold text-[var(--ink)]">בדיקה גופנית</h3>
         <div className="mt-3">
-          <ExamForm />
+          <ExamForm visitId={visit.id} />
         </div>
       </Card>
       <Card>
@@ -51,7 +51,7 @@ export function VisitWorkspace({
         </div>
       </Card>
       <Card>
-        <h3 id="actions" className="text-[15px] font-semibold text-[var(--ink)]">Close Visit</h3>
+        <h3 id="actions" className="text-[15px] font-semibold text-[var(--ink)]">סיום ביקור</h3>
         <div className="mt-3">
           <CloseVisitModal visitId={visit.id} version={visit.version} />
         </div>

@@ -104,7 +104,7 @@ export default async function VisitDetailPage({ params }: Params) {
       </div>
 
       <Card>
-        <h3 className="text-[15px] font-semibold text-[var(--ink)]">Reason & Pre-Visit</h3>
+        <h3 className="text-[15px] font-semibold text-[var(--ink)]">רקע לביקור</h3>
         <div className="mt-3 grid gap-3 text-sm md:grid-cols-2">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">סיבת הביקור</p>
