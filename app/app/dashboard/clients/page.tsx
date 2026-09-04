@@ -418,7 +418,7 @@ function ClientProfile({
                       {visit.aiVisitSummary && <Badge color="brand">AI</Badge>}
                       <span className={[
                         "text-[11px] font-semibold px-2 py-0.5 rounded-full",
-                        visit.status === "completed" ? "bg-[#E9F5EF] text-[#2F7D5B]"
+                        visit.status === "completed" ? "bg-[var(--status-done-wash)] text-[var(--status-done-text)]"
                           : visit.status === "cancelled" ? "bg-[var(--line-2)] text-[var(--muted)]"
                           : "bg-[var(--brand-50)] text-[var(--brand-700)]",
                       ].join(" ")}>

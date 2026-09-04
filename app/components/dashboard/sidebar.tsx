@@ -97,7 +97,7 @@ function NavLink({ item, count }: { item: NavItem; count?: number }) {
             className="gv-data text-[11.5px]"
             style={{
               fontWeight: "var(--w-semibold)",
-              color: item.critical ? "#E9908A" : "var(--rail-text-muted)",
+              color: item.critical ? "var(--rail-critical-text)" : "var(--rail-text-muted)",
             }}
           >
             {count}

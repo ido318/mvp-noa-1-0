@@ -126,7 +126,7 @@ export default function ProviderAdminCallDetailPage() {
           <SectionHeading title="הצעת תיקון מקושרת" />
           <p className="text-[13.5px]" style={{ color: "var(--text-secondary)" }}>{linkedSuggestion.patternSummary}</p>
           <Link href="/provider-admin/improvements" className="text-[12.5px] mt-2 inline-block" style={{ color: "var(--text-link)" }}>
-            לתיבת ההצעות ←
+            לתיבת ההצעות →
           </Link>
         </Card>
       )}

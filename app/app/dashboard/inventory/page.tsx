@@ -3,6 +3,9 @@
 import { useEffect, useState } from "react";
 import { Card } from "@/components/dashboard/ui/card";
 import { Btn } from "@/components/dashboard/ui/btn";
+import { Skeleton } from "@/components/dashboard/ui/skeleton";
+import { EmptyState } from "@/components/dashboard/ui/empty-state";
+import { PackageIcon } from "@/components/dashboard/icons";
 import { InventoryTable } from "@/components/dashboard/inventory/inventory-table";
 import { StockAdjustModal } from "@/components/dashboard/inventory/stock-adjust-modal";
 import type { InventoryItem } from "@/types/domain/inventory";
@@ -13,6 +16,7 @@ export default function InventoryPage() {
   const [clinicId, setClinicId] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [quantity, setQuantity] = useState("");
+  const [loading, setLoading] = useState(true);
 
   async function load() {
     const res = await fetch("/api/inventory");
@@ -30,6 +34,7 @@ export default function InventoryPage() {
         setClinicId(me.data.profile.defaultClinicId ?? me.data.memberships[0]?.clinicId ?? null);
       }
       await load();
+      setLoading(false);
     })();
   }, []);
 
@@ -49,22 +54,52 @@ export default function InventoryPage() {
     <div className="mx-auto w-full max-w-[1000px] space-y-5 p-6">
       <h1 className="text-[28px] font-semibold text-[var(--ink)]">מלאי</h1>
       <Card>
-        <div className="grid gap-2 sm:grid-cols-[1fr_140px_auto]">
-          <input value={name} onChange={(event) => setName(event.target.value)} placeholder="שם פריט" className="h-10 rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--bg)] px-3 text-sm" />
-          <input type="number" value={quantity} onChange={(event) => setQuantity(event.target.value)} placeholder="כמות" className="h-10 rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--bg)] px-3 text-sm" />
+        <div className="grid gap-2 sm:grid-cols-[1fr_140px_auto] sm:items-end">
+          <label className="block space-y-1">
+            <span className="text-xs font-semibold text-[var(--ink-2)]">שם פריט</span>
+            <input
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              className="h-10 w-full rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--bg)] px-3 text-sm"
+            />
+          </label>
+          <label className="block space-y-1">
+            <span className="text-xs font-semibold text-[var(--ink-2)]">כמות</span>
+            <input
+              type="number"
+              value={quantity}
+              onChange={(event) => setQuantity(event.target.value)}
+              className="h-10 w-full rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--bg)] px-3 text-sm"
+            />
+          </label>
           <Btn type="button" disabled={!name.trim()} onClick={() => void createItem()}>הוסף פריט</Btn>
         </div>
       </Card>
-      <Card noPad>
-        <InventoryTable items={items} />
-        <div className="divide-y divide-[var(--line-2)] border-t border-[var(--line-2)]">
-          {items.map((item) => (
-            <div key={`${item.id}-adjust`} className="px-4 py-3">
-              <StockAdjustModal item={item} onAdjusted={() => void load()} />
-            </div>
-          ))}
+
+      {loading ? (
+        <div className="space-y-3">
+          <Skeleton className="h-16" />
+          <Skeleton className="h-16" />
+          <Skeleton className="h-16" />
         </div>
-      </Card>
+      ) : items.length === 0 ? (
+        <EmptyState
+          icon={<PackageIcon size={32} />}
+          title="אין פריטי מלאי עדיין"
+          subtitle="פריטים שתוסיפו יופיעו כאן עם מצב המלאי שלהם"
+        />
+      ) : (
+        <Card noPad>
+          <InventoryTable items={items} />
+          <div className="divide-y divide-[var(--line-2)] border-t border-[var(--line-2)]">
+            {items.map((item) => (
+              <div key={`${item.id}-adjust`} className="px-4 py-3">
+                <StockAdjustModal item={item} onAdjusted={() => void load()} />
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
     </div>
   );
 }

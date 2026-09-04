@@ -90,7 +90,7 @@ export default async function PetProfilePage({ params }: Params) {
         <div className="flex items-center gap-3">
           <div className="text-end">
             <div className="flex items-center gap-2">
-              {pet.isNeutered && <span className="rounded px-1.5 py-0.5 text-[11px] font-semibold text-[#1d4ed8] bg-[#eff6ff]">מעוקר/ת</span>}
+              {pet.isNeutered && <span className="rounded px-1.5 py-0.5 text-[11px] font-semibold text-[var(--status-info-text)] bg-[var(--status-info-wash)]">מעוקר/ת</span>}
               <p className="text-[20px] font-semibold text-[var(--ink)]">{pet.name}</p>
             </div>
             <p className="text-sm text-[var(--ink-2)]">

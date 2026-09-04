@@ -1,7 +1,8 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { XIcon } from "@/components/dashboard/icons";
+import { useFocusTrap } from "@/components/dashboard/ui/use-focus-trap";
 
 interface DrawerProps {
   open: boolean;
@@ -15,6 +16,7 @@ interface DrawerProps {
 
 export function Drawer({ open, onClose, title, subtitle, children, width, footer }: DrawerProps) {
   const [mounted, setMounted] = useState(false);
+  const panelRef = useRef<HTMLElement>(null);
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -24,6 +26,8 @@ export function Drawer({ open, onClose, title, subtitle, children, width, footer
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [open, onClose]);
+
+  useFocusTrap(open && mounted, panelRef);
 
   if (!open || !mounted) return null;
 
@@ -40,15 +44,18 @@ export function Drawer({ open, onClose, title, subtitle, children, width, footer
       />
       {/* Panel — anchored to the inline end, opposite the navigation rail. */}
       <aside
+        ref={panelRef}
         className="absolute inset-y-0 end-0 flex flex-col drawer-enter"
         style={{
           width: width ?? "var(--drawer-w)",
           maxWidth: "94vw",
           background: "var(--surface-raised)",
           boxShadow: "var(--shadow-drawer)",
+          outline: "none",
         }}
         role="dialog"
         aria-modal="true"
+        tabIndex={-1}
       >
         <header
           className="flex items-center gap-3 flex-shrink-0 px-5"

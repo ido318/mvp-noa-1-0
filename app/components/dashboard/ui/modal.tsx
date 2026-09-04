@@ -1,7 +1,8 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { XIcon } from "@/components/dashboard/icons";
+import { useFocusTrap } from "@/components/dashboard/ui/use-focus-trap";
 
 interface ModalProps {
   open: boolean;
@@ -14,6 +15,7 @@ interface ModalProps {
 
 export function Modal({ open, onClose, title, subtitle, children, maxWidth }: ModalProps) {
   const [mounted, setMounted] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -23,6 +25,8 @@ export function Modal({ open, onClose, title, subtitle, children, maxWidth }: Mo
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [open, onClose]);
+
+  useFocusTrap(open && mounted, panelRef);
 
   if (!open || !mounted) return null;
 
@@ -34,16 +38,19 @@ export function Modal({ open, onClose, title, subtitle, children, maxWidth }: Mo
       onClick={onClose}
     >
       <div
+        ref={panelRef}
         className="w-full modal-enter"
         style={{
           maxWidth: maxWidth ?? "var(--modal-w-lg)",
           background: "var(--surface-raised)",
           borderRadius: "var(--radius-3)",
           boxShadow: "var(--shadow-modal)",
+          outline: "none",
         }}
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
+        tabIndex={-1}
       >
         {(title || subtitle) && (
           <div

@@ -157,14 +157,14 @@ export function AppointmentDrawer({
 
             <div className="flex flex-col gap-2 border-t border-[var(--line-2)] pt-4">
               <Link href={`/dashboard/pets/${appointment.petId}`} className="text-[13px] font-semibold text-[var(--brand-600)] hover:underline">
-                פתח כרטיס מטופל ←
+                פתח כרטיס מטופל →
               </Link>
               {appointment.status === "in_visit" && (
                 <Link
                   href={`/dashboard/visits/new?appointmentId=${appointment.id}`}
                   className="text-[13px] font-semibold text-[var(--brand-600)] hover:underline"
                 >
-                  עבור לביקור ←
+                  עבור לביקור →
                 </Link>
               )}
             </div>

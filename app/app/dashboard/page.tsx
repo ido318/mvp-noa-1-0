@@ -1,6 +1,8 @@
 "use client";
 import React, { useCallback, useEffect, useState } from "react";
 import { Skeleton } from "@/components/dashboard/ui/skeleton";
+import { EmptyState } from "@/components/dashboard/ui/empty-state";
+import { Btn } from "@/components/dashboard/ui/btn";
 import { ApproveRejectModal } from "@/components/dashboard/approve-reject-modal";
 import {
   AttentionPanel,
@@ -52,11 +54,13 @@ export default function TodayPage() {
   const [todayCalls, setTodayCalls] = useState<VoiceCall[]>([]);
   const [waitlistCount, setWaitlistCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [modal, setModal] = useState<{ mode: "approve" | "reject"; appt: Appointment } | null>(null);
 
   const today = todayIso();
 
   const fetchData = useCallback(async () => {
+    setLoadError(false);
     try {
       const callRange = israelDayUtcRange(today);
       const [apptRes, escRes, callRes, waitlistRes] = await Promise.all([
@@ -65,6 +69,13 @@ export default function TodayPage() {
         fetch(`/api/voice/calls?from=${encodeURIComponent(callRange.from)}&to=${encodeURIComponent(callRange.to)}`),
         fetch("/api/waitlist"),
       ]);
+
+      // Any failed request means the dashboard is showing incomplete data —
+      // surface that instead of silently rendering "no activity today",
+      // which pending/failed requests would otherwise look identical to.
+      if (!apptRes.ok || !escRes.ok || !callRes.ok || !waitlistRes.ok) {
+        setLoadError(true);
+      }
 
       if (apptRes.ok) {
         const d = await apptRes.json() as { data: { items: Appointment[] } };
@@ -84,6 +95,10 @@ export default function TodayPage() {
         const d = await waitlistRes.json() as { data: { items: WaitlistEntry[] } };
         setWaitlistCount((d.data.items ?? []).length);
       }
+    } catch {
+      // Network failure (offline, DNS, etc.) — same "incomplete data" story
+      // as a non-ok response, just before any response existed to check.
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -123,7 +138,19 @@ export default function TodayPage() {
         />
       </div>
 
-      {model.scheduleRows.length === 0 && model.attentionItems.length === 0 && model.activityItems.length === 0 && (
+      {loadError && (
+        <EmptyState
+          title="טעינת נתוני היום נכשלה"
+          subtitle="ייתכן שהמידע המוצג חלקי. נסה לרענן."
+          action={
+            <Btn type="button" size="sm" variant="soft" onClick={() => void fetchData()}>
+              נסה שוב
+            </Btn>
+          }
+        />
+      )}
+
+      {!loadError && model.scheduleRows.length === 0 && model.attentionItems.length === 0 && model.activityItems.length === 0 && (
         <TodayEmptyState />
       )}
 
