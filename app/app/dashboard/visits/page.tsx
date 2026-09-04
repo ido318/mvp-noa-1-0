@@ -1,4 +1,7 @@
 import Link from "next/link";
+import { Card } from "@/components/dashboard/ui/card";
+import { Btn } from "@/components/dashboard/ui/btn";
+import { EmptyState } from "@/components/dashboard/ui/empty-state";
 import { dashboardApiFetch } from "@/app/dashboard/api-client";
 import { formatIsraelDateTime } from "@/lib/israel-date";
 import type { Visit, VisitStatus } from "@/types/domain/visit";
@@ -31,37 +34,31 @@ export default async function VisitsPage({
   return (
     <section className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold text-zinc-900">ביקורים</h2>
-        <Link
-          href={newHref}
-          className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-medium text-white"
-        >
-          ביקור חדש
-        </Link>
+        <h2 className="text-[22px] font-semibold text-[var(--text-primary)]">ביקורים</h2>
+        <Btn href={newHref}>ביקור חדש</Btn>
       </div>
 
-      <div className="rounded-2xl border border-zinc-200 bg-white">
-        <ul className="divide-y divide-zinc-200">
-          {items.length === 0 ? (
-            <li className="p-4 text-sm text-zinc-500">לא נמצאו ביקורים.</li>
-          ) : (
-            items.map((visit) => (
+      <Card noPad>
+        {items.length === 0 ? (
+          <EmptyState title="לא נמצאו ביקורים." className="px-4" />
+        ) : (
+          <ul className="divide-y divide-[var(--border-row)]">
+            {items.map((visit) => (
               <li key={visit.id} className="p-4">
                 <Link
                   href={`/dashboard/visits/${visit.id}`}
-                  className="font-medium text-zinc-900 hover:text-emerald-700"
+                  className="text-sm font-semibold text-[var(--text-primary)] hover:text-[var(--accent)]"
                 >
-                  {formatIsraelDateTime(visit.startedAt)} ·{" "}
-                  {VISIT_STATUS_LABELS[visit.status]}
+                  {formatIsraelDateTime(visit.startedAt)} · {VISIT_STATUS_LABELS[visit.status]}
                 </Link>
-                <p className="text-sm text-zinc-600">
+                <p className="text-sm text-[var(--text-secondary)]">
                   {visit.chiefComplaint ?? "לא נרשמה סיבת ביקור"}
                 </p>
               </li>
-            ))
-          )}
-        </ul>
-      </div>
+            ))}
+          </ul>
+        )}
+      </Card>
     </section>
   );
 }

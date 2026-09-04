@@ -3,6 +3,8 @@ import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { Card } from "@/components/dashboard/ui/card";
 import { Badge } from "@/components/dashboard/ui/badge";
 import { Btn } from "@/components/dashboard/ui/btn";
+import { Field, Input } from "@/components/dashboard/ui/field";
+import { Alert } from "@/components/dashboard/ui/alert";
 import { EmptyState } from "@/components/dashboard/ui/empty-state";
 import { Skeleton } from "@/components/dashboard/ui/skeleton";
 import { AnimalIcon, ChevLeftIcon, ChevRightIcon, CalendarIcon, PlusIcon } from "@/components/dashboard/icons";
@@ -23,6 +25,13 @@ const HOUR_END   = 20;
 const HOUR_SPAN  = HOUR_END - HOUR_START;
 const HOUR_HEIGHT_PX = 150;
 const TIMELINE_HEIGHT_PX = HOUR_SPAN * HOUR_HEIGHT_PX;
+
+// Matches the hour-gutter (`w-16`) + per-day (`min-w-[156px]`) widths below —
+// used only to give the shared horizontal-scroll wrapper an explicit min-width
+// so the day-header row and the hour grid stay pixel-aligned while scrolling.
+const HOUR_GUTTER_WIDTH_PX = 64;
+const DAY_COLUMN_MIN_WIDTH_PX = 156;
+const WEEK_GRID_MIN_WIDTH_PX = HOUR_GUTTER_WIDTH_PX + DAY_COLUMN_MIN_WIDTH_PX * 7;
 
 // Days: Sun(0)=א, Mon(1)=ב, Tue(2)=ג, Wed(3)=ד, Thu(4)=ה, Fri(5)=ו
 const HE_DAYS = ["א'", "ב'", "ג'", "ד'", "ה'", "ו'", "ש'"];
@@ -150,6 +159,15 @@ function ApptBlock({ appt, onClick }: { appt: Appointment; onClick: () => void }
   const customerName = appt.customerName ?? "לקוח";
   const title = `${petName} · ${customerName} · ${visitLabel(appt.appointmentType)}`;
 
+  // The stored duration is "effective" (real visit time + trailing buffer —
+  // see VISIT_TYPE_CONFIG in lib/appointment-rules.ts), so split the block
+  // visually: the buffer tail renders with --hatch, the same texture
+  // CalendarBlockOverlay already uses below for "not actually occupied" time.
+  const canonicalType = LEGACY_TYPE_ALIASES[appt.appointmentType] ?? (appt.appointmentType as keyof typeof VISIT_TYPE_CONFIG);
+  const visitMinutes = VISIT_TYPE_CONFIG[canonicalType]?.durationMin ?? appt.durationMinutes;
+  const bufferMinutes = Math.max(0, appt.durationMinutes - visitMinutes);
+  const bufferHeightPx = bufferMinutes > 0 ? heightPx(bufferMinutes) : 0;
+
   return (
     <button
       type="button"
@@ -171,22 +189,31 @@ function ApptBlock({ appt, onClick }: { appt: Appointment; onClick: () => void }
       }}
       title={title}
     >
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <div className="truncate text-[14px] font-semibold leading-tight">{petName}</div>
-          <div className="mt-0.5 truncate text-[11px]" style={{ color: "var(--text-muted)" }}>{customerName}</div>
-        </div>
-        <AnimalIcon species={appt.petSpecies ?? "dog"} size={16} className="mt-0.5 flex-shrink-0 text-[var(--text-faint)]" />
-      </div>
-      <div className="mt-2 flex items-center justify-between gap-1 text-[11px]" style={{ color: "var(--text-muted)" }}>
-        <span className="truncate">{visitLabel(appt.appointmentType)}</span>
-        <span className="gv-data shrink-0">{appointmentTime(appt.scheduledAt)}</span>
-      </div>
-      {pending && (
-        <div className="mt-1 text-[10px]" style={{ color: "var(--status-pending-text)", fontWeight: "var(--w-semibold)" }}>
-          ממתין לאישור
-        </div>
+      {bufferMinutes > 0 && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 bottom-0"
+          style={{ height: `${bufferHeightPx}px`, background: "var(--hatch)" }}
+        />
       )}
+      <div className="relative">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <div className="truncate text-[14px] font-semibold leading-tight">{petName}</div>
+            <div className="mt-0.5 truncate text-[11px]" style={{ color: "var(--text-muted)" }}>{customerName}</div>
+          </div>
+          <AnimalIcon species={appt.petSpecies ?? "dog"} size={16} className="mt-0.5 flex-shrink-0 text-[var(--text-faint)]" />
+        </div>
+        <div className="mt-2 flex items-center justify-between gap-1 text-[11px]" style={{ color: "var(--text-muted)" }}>
+          <span className="truncate">{visitLabel(appt.appointmentType)}</span>
+          <span className="gv-data shrink-0">{appointmentTime(appt.scheduledAt)}</span>
+        </div>
+        {pending && (
+          <div className="mt-1 text-[10px]" style={{ color: "var(--status-pending-text)", fontWeight: "var(--w-semibold)" }}>
+            ממתין לאישור
+          </div>
+        )}
+      </div>
     </button>
   );
 }
@@ -216,10 +243,10 @@ function CalendarBlockOverlay({
       title={block.reason ?? "חסימת יומן"}
     >
       <div className="flex items-center justify-between gap-1">
-        <span className="font-semibold text-[var(--ink-2)]">חסום</span>
+        <span className="font-semibold text-[var(--text-secondary)]">חסום</span>
         <button
           type="button"
-          className="rounded px-1 text-[9px] text-[var(--red-700)] hover:bg-[var(--red-50)]"
+          className="rounded px-1 text-[9px] text-[var(--status-critical-text)] hover:bg-[var(--status-critical-wash)]"
           onClick={(event) => {
             event.stopPropagation();
             onDelete(block.id);
@@ -256,7 +283,7 @@ function DayColumn({
     return (
       <div className="relative min-w-[156px] flex-1 border-s border-[var(--border-hairline)] bg-[var(--surface-sunken)]">
         <div className="absolute inset-0 flex items-center justify-center opacity-60">
-          <span className="text-xs text-[var(--faint)]">סגור</span>
+          <span className="text-xs text-[var(--text-faint)]">סגור</span>
         </div>
       </div>
     );
@@ -281,7 +308,7 @@ function DayColumn({
       {/* Friday closed-after marker */}
       {isFriday && (
         <div
-          className="absolute inset-x-0 bottom-0 bg-[var(--bg)] opacity-60"
+          className="absolute inset-x-0 bottom-0 bg-[var(--surface-canvas)] opacity-60"
           style={{ top: `${friEnd}px` }}
         />
       )}
@@ -474,12 +501,12 @@ export default function CalendarPage() {
       <div className="mx-auto max-w-[1280px] space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-[28px] font-semibold leading-tight text-[var(--ink)]">יומן</h1>
-          <p className="mt-1 text-sm font-semibold text-[var(--muted)]">
+          <h1 className="text-[28px] font-semibold leading-tight text-[var(--text-primary)]">יומן</h1>
+          <p className="mt-1 text-sm font-semibold text-[var(--text-muted)]">
             {weekRange} · בחרו תור כדי לשנות מועד
           </p>
           {pendingCount > 0 && (
-            <Badge color="amber" dot className="mt-2">
+            <Badge tone="pending" dot className="mt-2">
               {pendingCount} ממתין{pendingCount > 1 ? "ים" : ""} לאישור
             </Badge>
           )}
@@ -489,7 +516,7 @@ export default function CalendarPage() {
           <button
             type="button"
             onClick={() => setWizardOpen(true)}
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-[var(--radius-2)] bg-[var(--accent)] px-4 text-sm font-semibold text-white shadow-[var(--sh-sm)] transition-all"
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-[var(--radius-2)] bg-[var(--accent)] px-4 text-sm font-semibold text-white shadow-[var(--shadow-raised)] transition-all"
           >
             <PlusIcon size={15} />
             תור חדש
@@ -497,17 +524,17 @@ export default function CalendarPage() {
           <div className="flex h-10 items-center overflow-hidden rounded-[var(--radius-2)] bg-[var(--surface-raised)] shadow-[var(--shadow-raised)]">
             <button
               type="button"
-              className="flex h-full w-11 items-center justify-center text-[var(--ink-2)] transition-colors hover:bg-[var(--surface-2)]"
+              className="flex h-full w-11 items-center justify-center text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-hover)]"
               onClick={() => setWeekStart(addDays(weekStart, 7))}
             >
               <ChevRightIcon size={14} />
             </button>
-            <span className="min-w-[112px] border-x border-[var(--border-hairline)] px-4 text-center text-sm font-semibold text-[var(--ink)]">
+            <span className="min-w-[112px] border-x border-[var(--border-hairline)] px-4 text-center text-sm font-semibold text-[var(--text-primary)]">
               השבוע
             </span>
             <button
               type="button"
-              className="flex h-full w-11 items-center justify-center text-[var(--ink-2)] transition-colors hover:bg-[var(--surface-2)]"
+              className="flex h-full w-11 items-center justify-center text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-hover)]"
               onClick={() => setWeekStart(addDays(weekStart, -7))}
             >
               <ChevLeftIcon size={14} />
@@ -522,59 +549,67 @@ export default function CalendarPage() {
       <Card className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="text-sm font-semibold text-[var(--ink)]">חסימת יומן</h2>
-            <p className="text-xs text-[var(--muted)]">חסום שעות שבהן נועה לא זמינה. תומר לא יציע תורים בטווחים האלה.</p>
+            <h2 className="text-sm font-semibold text-[var(--text-primary)]">חסימת יומן</h2>
+            <p className="text-xs text-[var(--text-muted)]">חסום שעות שבהן נועה לא זמינה. תומר לא יציע תורים בטווחים האלה.</p>
           </div>
-          <Badge color="muted">{blocks.length} חסימות השבוע</Badge>
+          <Badge tone="neutral">{blocks.length} חסימות השבוע</Badge>
         </div>
 
-        <form className="grid gap-2 md:grid-cols-[1fr_120px_120px_1.4fr_auto]" onSubmit={createBlock}>
-          <input
-            type="date"
-            value={blockDate}
-            onChange={(event) => setBlockDate(event.target.value)}
-            className="h-9 rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--bg)] px-3 text-sm text-[var(--ink)] outline-none focus:border-[var(--brand-400)]"
-            required
-          />
-          <input
-            type="time"
-            value={blockStart}
-            onChange={(event) => setBlockStart(event.target.value)}
-            className="h-9 rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--bg)] px-3 text-sm text-[var(--ink)] outline-none focus:border-[var(--brand-400)]"
-            required
-          />
-          <input
-            type="time"
-            value={blockEnd}
-            onChange={(event) => setBlockEnd(event.target.value)}
-            className="h-9 rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--bg)] px-3 text-sm text-[var(--ink)] outline-none focus:border-[var(--brand-400)]"
-            required
-          />
-          <input
-            type="text"
-            value={blockReason}
-            onChange={(event) => setBlockReason(event.target.value)}
-            placeholder="סיבה"
-            className="h-9 rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--bg)] px-3 text-sm text-[var(--ink)] outline-none placeholder:text-[var(--faint)] focus:border-[var(--brand-400)]"
-          />
+        <form className="grid items-end gap-2 md:grid-cols-[1fr_120px_120px_1.4fr_auto]" onSubmit={createBlock}>
+          <Field label="תאריך" htmlFor="block-date">
+            <Input
+              id="block-date"
+              type="date"
+              value={blockDate}
+              onChange={(event) => setBlockDate(event.target.value)}
+              className="h-9"
+              required
+            />
+          </Field>
+          <Field label="משעה" htmlFor="block-start">
+            <Input
+              id="block-start"
+              type="time"
+              value={blockStart}
+              onChange={(event) => setBlockStart(event.target.value)}
+              className="h-9"
+              required
+            />
+          </Field>
+          <Field label="עד שעה" htmlFor="block-end">
+            <Input
+              id="block-end"
+              type="time"
+              value={blockEnd}
+              onChange={(event) => setBlockEnd(event.target.value)}
+              className="h-9"
+              required
+            />
+          </Field>
+          <Field label="סיבה" htmlFor="block-reason">
+            <Input
+              id="block-reason"
+              type="text"
+              value={blockReason}
+              onChange={(event) => setBlockReason(event.target.value)}
+              placeholder="סיבה"
+              className="h-9"
+            />
+          </Field>
           <Btn type="submit" size="sm" loading={savingBlock}>חסום</Btn>
         </form>
 
-        {blockError && <p className="text-xs font-semibold text-[var(--red-700)]">{blockError}</p>}
+        {blockError && <p className="text-xs font-semibold text-[var(--status-critical-text)]">{blockError}</p>}
       </Card>
 
-      {calendarError && (
-        <div className="rounded-[var(--r-md)] border border-[var(--red-100)] bg-[var(--red-50)] px-3 py-2 text-sm font-semibold text-[var(--red-700)]">
-          {calendarError}
-        </div>
-      )}
+      {calendarError && <Alert tone="critical">{calendarError}</Alert>}
 
       {loading ? (
         <Skeleton className="h-[560px]" />
       ) : (
         <Card noPad className="overflow-hidden">
           <div className="flex items-center justify-between gap-3 border-b border-[var(--border-hairline)] bg-white px-6 py-4">
-            <div className="flex flex-wrap items-center gap-4 text-[11px] font-semibold text-[var(--muted)]">
+            <div className="flex flex-wrap items-center gap-4 text-[11px] font-semibold text-[var(--text-muted)]">
               {CALENDAR_LEGEND.map(({ label, color }) => (
                 <span key={label} className="inline-flex items-center gap-1.5">
                   <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />
@@ -582,64 +617,72 @@ export default function CalendarPage() {
                 </span>
               ))}
             </div>
-            <span className="text-xs font-semibold text-[var(--muted)]">
+            <span className="text-xs font-semibold text-[var(--text-muted)]">
               {appointments.length} תורים השבוע
             </span>
           </div>
 
-          <div className="flex border-b border-[var(--border-hairline)] bg-white">
-            <div className="w-16 flex-shrink-0" />
-            {weekDays.map((day, i) => {
-              const isToday = isoOfDate(day) === today;
-              const isSat   = day.getDay() === 6;
-              return (
-                <div
-                  key={i}
-                  className={[
-                    "min-w-[156px] flex-1 border-s border-[var(--border-row)] py-3 text-center",
-                    isToday ? "bg-[var(--active-wash)] text-[var(--brand-700)]" : "text-[var(--ink-2)]",
-                    isSat ? "text-[var(--faint)]" : "",
-                  ].join(" ")}
-                >
-                  <div className="text-[12px] font-semibold">{HE_DAYS[day.getDay()]}</div>
-                  <div className="mt-0.5 text-[22px] font-semibold leading-none">{new Intl.DateTimeFormat("he-IL", { timeZone: TZ, day: "2-digit" }).format(day)}</div>
-                </div>
-              );
-            })}
-          </div>
+          {/* Shared horizontal scroll: the day-header row and the hour grid below share
+              one scrollbar so they can never drift out of column alignment, and this
+              stays contained in its own box instead of forcing the whole page to
+              scroll sideways on narrower laptop widths. */}
+          <div className="overflow-x-auto">
+            <div style={{ minWidth: `${WEEK_GRID_MIN_WIDTH_PX}px` }}>
+              <div className="flex border-b border-[var(--border-hairline)] bg-white">
+                <div className="w-16 flex-shrink-0" />
+                {weekDays.map((day, i) => {
+                  const isToday = isoOfDate(day) === today;
+                  const isSat   = day.getDay() === 6;
+                  return (
+                    <div
+                      key={i}
+                      className={[
+                        "min-w-[156px] flex-1 border-s border-[var(--border-row)] py-3 text-center",
+                        isToday ? "bg-[var(--active-wash)] text-[var(--text-accent)]" : "text-[var(--text-secondary)]",
+                        isSat ? "text-[var(--text-faint)]" : "",
+                      ].join(" ")}
+                    >
+                      <div className="text-[12px] font-semibold">{HE_DAYS[day.getDay()]}</div>
+                      <div className="mt-0.5 text-[22px] font-semibold leading-none">{new Intl.DateTimeFormat("he-IL", { timeZone: TZ, day: "2-digit" }).format(day)}</div>
+                    </div>
+                  );
+                })}
+              </div>
 
-          <div
-            className="flex overflow-auto bg-white"
-            style={{ height: `${TIMELINE_HEIGHT_PX}px` }}
-          >
-            <div className="relative w-16 flex-shrink-0 bg-white">
-              {HOURS.map(h => (
-                <div
-                  key={h}
-                  className="absolute w-16 pe-3 text-end text-[11px] font-semibold leading-none text-[var(--muted)]"
-                  style={{
-                    top: `${(h - HOUR_START) * HOUR_HEIGHT_PX}px`,
-                    transform: "translateY(-50%)",
-                    height: `${HOUR_HEIGHT_PX}px`,
-                  }}
-                >
-                  {String(h).padStart(2, "0")}:00
+              <div
+                className="flex bg-white"
+                style={{ height: `${TIMELINE_HEIGHT_PX}px` }}
+              >
+                <div className="relative w-16 flex-shrink-0 bg-white">
+                  {HOURS.map(h => (
+                    <div
+                      key={h}
+                      className="absolute w-16 pe-3 text-end text-[11px] font-semibold leading-none text-[var(--text-muted)]"
+                      style={{
+                        top: `${(h - HOUR_START) * HOUR_HEIGHT_PX}px`,
+                        transform: "translateY(-50%)",
+                        height: `${HOUR_HEIGHT_PX}px`,
+                      }}
+                    >
+                      {String(h).padStart(2, "0")}:00
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
 
-            <div className="relative flex h-full flex-1">
-              {weekDays.map((day, i) => (
-                <DayColumn
-                  key={i}
-                  day={day}
-                  appointments={apptForDay(day)}
-                  blocks={blocksForDay(day)}
-                  isToday={isoOfDate(day) === today}
-                  onDeleteBlock={deleteBlock}
-                  onSelectAppointment={setSelectedAppointment}
-                />
-              ))}
+                <div className="relative flex h-full flex-1">
+                  {weekDays.map((day, i) => (
+                    <DayColumn
+                      key={i}
+                      day={day}
+                      appointments={apptForDay(day)}
+                      blocks={blocksForDay(day)}
+                      isToday={isoOfDate(day) === today}
+                      onDeleteBlock={deleteBlock}
+                      onSelectAppointment={setSelectedAppointment}
+                    />
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         </Card>

@@ -3,12 +3,9 @@ import React, { useState, useEffect, FormEvent, useTransition } from "react";
 import Link from "next/link";
 import { Modal } from "@/components/dashboard/ui/modal";
 import { Btn } from "@/components/dashboard/ui/btn";
+import { Field, Input, Select, Textarea } from "@/components/dashboard/ui/field";
 import { useToast } from "@/components/dashboard/ui/toast";
 import type { Customer, CustomerDuplicate, PreferredContactMethod } from "@/types/domain/customer";
-
-const inputClass =
-  "w-full rounded-[var(--r-lg)] border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--ink)] placeholder:text-[var(--faint)] focus:outline-none focus:border-[var(--brand-400)]";
-const labelClass = "mb-1 block text-xs font-semibold text-[var(--ink-2)]";
 
 interface NewCustomerModalProps {
   open: boolean;
@@ -100,80 +97,68 @@ export function NewCustomerModal({ open, onClose, onCreated }: NewCustomerModalP
   return (
     <Modal open={open} onClose={onClose} title="לקוח חדש" subtitle="הוספת לקוח ידנית לדשבורד">
       <form onSubmit={onSubmit} className="space-y-4">
-        <div>
-          <label htmlFor="fullName" className={labelClass}>שם מלא *</label>
-          <input
+        <Field label="שם מלא *" htmlFor="fullName">
+          <Input
             id="fullName"
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
-            className={inputClass}
             required
             minLength={2}
           />
-        </div>
-        <div>
-          <label htmlFor="phone" className={labelClass}>טלפון</label>
-          <input
+        </Field>
+        <Field label="טלפון" htmlFor="phone">
+          <Input
             id="phone"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
-            className={inputClass}
             dir="ltr"
           />
-        </div>
-        <div>
-          <label htmlFor="email" className={labelClass}>אימייל</label>
-          <input
+        </Field>
+        <Field label="אימייל" htmlFor="email">
+          <Input
             id="email"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className={inputClass}
             dir="ltr"
           />
-        </div>
-        <div>
-          <label htmlFor="address" className={labelClass}>כתובת</label>
-          <input
+        </Field>
+        <Field label="כתובת" htmlFor="address">
+          <Input
             id="address"
             value={address}
             onChange={(e) => setAddress(e.target.value)}
-            className={inputClass}
           />
-        </div>
-        <div>
-          <label htmlFor="preferredContactMethod" className={labelClass}>ערוץ מועדף</label>
-          <select
+        </Field>
+        <Field label="ערוץ מועדף" htmlFor="preferredContactMethod">
+          <Select
             id="preferredContactMethod"
             value={preferredContactMethod}
             onChange={(e) => setPreferredContactMethod(e.target.value as PreferredContactMethod)}
-            className={inputClass}
           >
             <option value="phone">טלפון</option>
             <option value="sms">SMS</option>
             <option value="whatsapp">WhatsApp</option>
             <option value="email">אימייל</option>
-          </select>
-        </div>
-        <div>
-          <label htmlFor="notes" className={labelClass}>הערות</label>
-          <textarea
+          </Select>
+        </Field>
+        <Field label="הערות" htmlFor="notes">
+          <Textarea
             id="notes"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            className={inputClass}
             rows={3}
           />
-        </div>
+        </Field>
         {duplicateCustomers.length > 0 && (
-          <div className="rounded-[var(--r-md)] border border-[var(--amber-500)] bg-[var(--amber-50)] p-3">
-            <p className="text-xs font-semibold text-[var(--amber-600)]">ייתכן שהלקוח כבר קיים</p>
+          <div className="rounded-[var(--radius-2)] border p-3" style={{ borderColor: "var(--status-pending-text)", background: "var(--status-pending-wash)" }}>
+            <p className="text-xs font-semibold" style={{ color: "var(--status-pending-text)" }}>ייתכן שהלקוח כבר קיים</p>
             <div className="mt-2 space-y-1">
               {duplicateCustomers.map((duplicate) => (
                 <Link
                   key={duplicate.id}
                   href={`/dashboard/clients?customerId=${duplicate.id}`}
-                  className="block rounded-[var(--r-sm)] px-2 py-1 text-xs font-semibold text-[var(--ink)] hover:bg-white/70"
+                  className="block rounded-[var(--radius-1)] px-2 py-1 text-xs font-semibold text-[var(--text-primary)] hover:bg-white/70"
                   onClick={onClose}
                 >
                   {duplicate.fullName} · {duplicate.phone ?? duplicate.email ?? "ללא פרטי קשר"}

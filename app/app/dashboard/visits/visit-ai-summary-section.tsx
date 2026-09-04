@@ -93,43 +93,43 @@ export function VisitAiSummarySection({
   return (
     <div className="space-y-4">
       <div>
-        <h4 className="text-sm font-semibold text-[var(--ink)]">סיכום ביקור ידני</h4>
+        <h4 className="text-sm font-semibold text-[var(--text-primary)]">סיכום ביקור ידני</h4>
         {manualVisitSummary ? (
-          <p className="mt-1 whitespace-pre-wrap text-sm text-[var(--ink-2)]">
+          <p className="mt-1 whitespace-pre-wrap text-sm text-[var(--text-secondary)]">
             {manualVisitSummary}
           </p>
         ) : (
-          <p className="mt-1 text-sm text-[var(--faint)]">אין עדיין סיכום ידני.</p>
+          <p className="mt-1 text-sm text-[var(--text-faint)]">אין עדיין סיכום ידני.</p>
         )}
       </div>
 
-      <div className="border-t border-[var(--line-2)] pt-4">
+      <div className="border-t border-[var(--border-row)] pt-4">
         <div className="flex items-center gap-2">
-          <h4 className="text-sm font-semibold text-[var(--ink)]">סיכום ביקור AI</h4>
-          <Badge color="brand">AI</Badge>
+          <h4 className="text-sm font-semibold text-[var(--text-primary)]">סיכום ביקור AI</h4>
+          <Badge tone="info">AI</Badge>
         </div>
-        <p className="mt-1 text-xs text-[var(--muted)]">
+        <p className="mt-1 text-xs text-[var(--text-muted)]">
           טיוטות AI מחייבות בדיקה ואישור של וטרינר לפני שימוש. לא לשליחה ישירה
           ללקוח.
         </p>
 
         {aiVisitSummary ? (
-          <p className="mt-2 whitespace-pre-wrap rounded-[var(--r-md)] border border-[var(--brand-200)] bg-[var(--brand-50)] p-3 text-sm text-[var(--ink)]">
+          <p className="mt-2 whitespace-pre-wrap rounded-[var(--radius-2)] border border-[var(--brand-200)] bg-[var(--brand-50)] p-3 text-sm text-[var(--text-primary)]">
             {aiVisitSummary}
           </p>
         ) : (
-          <p className="mt-2 text-sm text-[var(--faint)]">אין עדיין סיכום AI מאושר.</p>
+          <p className="mt-2 text-sm text-[var(--text-faint)]">אין עדיין סיכום AI מאושר.</p>
         )}
 
         {!canUseAi ? (
-          <p className="mt-2 text-sm text-[var(--faint)]">
+          <p className="mt-2 text-sm text-[var(--text-faint)]">
             יצירה או אישור של סיכומי AI זמינים רק לבעלים, מנהל או וטרינר.
           </p>
         ) : null}
 
         {draftText !== null ? (
           <div className="mt-3 space-y-3">
-            <label htmlFor="aiDraft" className="block text-sm font-semibold text-[var(--ink-2)]">
+            <label htmlFor="aiDraft" className="block text-sm font-semibold text-[var(--text-secondary)]">
               טיוטה לעריכה
             </label>
             <textarea
@@ -137,7 +137,7 @@ export function VisitAiSummarySection({
               value={draftText}
               onChange={(event) => setDraftText(event.target.value)}
               rows={8}
-              className="w-full rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-[var(--brand-400)]"
+              className="w-full rounded-[var(--radius-2)] border border-[var(--border-hairline)] bg-[var(--surface-canvas)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]"
             />
             <div className="flex flex-wrap gap-2">
               <Btn size="sm" loading={loading} onClick={onAccept}>אשר סיכום</Btn>

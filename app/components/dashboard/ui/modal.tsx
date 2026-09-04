@@ -1,7 +1,8 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { XIcon } from "@/components/dashboard/icons";
+import { useFocusTrap } from "@/components/dashboard/ui/use-focus-trap";
 
 interface ModalProps {
   open: boolean;
@@ -14,6 +15,7 @@ interface ModalProps {
 
 export function Modal({ open, onClose, title, subtitle, children, maxWidth }: ModalProps) {
   const [mounted, setMounted] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -23,6 +25,8 @@ export function Modal({ open, onClose, title, subtitle, children, maxWidth }: Mo
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [open, onClose]);
+
+  useFocusTrap(panelRef, open);
 
   if (!open || !mounted) return null;
 
@@ -34,7 +38,9 @@ export function Modal({ open, onClose, title, subtitle, children, maxWidth }: Mo
       onClick={onClose}
     >
       <div
-        className="w-full modal-enter"
+        ref={panelRef}
+        tabIndex={-1}
+        className="w-full modal-enter outline-none"
         style={{
           maxWidth: maxWidth ?? "var(--modal-w-lg)",
           background: "var(--surface-raised)",

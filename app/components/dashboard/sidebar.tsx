@@ -28,6 +28,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/dashboard", label: "היום" },
       { href: "/dashboard/calendar", label: "לוח שנה" },
       { href: "/dashboard/clients", label: "לקוחות ומטופלים" },
+      { href: "/dashboard/pets", label: "חיות מחמד" },
       { href: "/dashboard/waitlist", label: "המתנה" },
     ],
   },
@@ -42,6 +43,7 @@ const NAV_GROUPS: NavGroup[] = [
     label: "רפואה",
     items: [
       { href: "/dashboard/visits", label: "ביקורים" },
+      { href: "/dashboard/records", label: "תיקים רפואיים" },
       { href: "/dashboard/tasks", label: "משימות", countKey: "tasks" },
       { href: "/dashboard/lab", label: "מעבדה" },
     ],

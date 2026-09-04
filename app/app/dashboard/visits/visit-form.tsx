@@ -53,30 +53,30 @@ export function VisitForm({ clinicId, customerId, petId, appointmentId }: Props)
   return (
     <form onSubmit={onSubmit} className="space-y-4">
       <div>
-        <label htmlFor="chiefComplaint" className="mb-1 block text-sm font-semibold text-[var(--ink-2)]">
+        <label htmlFor="chiefComplaint" className="mb-1 block text-sm font-semibold text-[var(--text-secondary)]">
           סיבת הביקור
         </label>
         <input
           id="chiefComplaint"
           value={chiefComplaint}
           onChange={(event) => setChiefComplaint(event.target.value)}
-          className="w-full rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-[var(--brand-400)]"
+          className="w-full rounded-[var(--radius-2)] border border-[var(--border-hairline)] bg-[var(--surface-canvas)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]"
         />
       </div>
       <div>
-        <label htmlFor="manualVisitSummary" className="mb-1 block text-sm font-semibold text-[var(--ink-2)]">
+        <label htmlFor="manualVisitSummary" className="mb-1 block text-sm font-semibold text-[var(--text-secondary)]">
           סיכום ביקור ידני
         </label>
         <textarea
           id="manualVisitSummary"
           value={manualVisitSummary}
           onChange={(event) => setManualVisitSummary(event.target.value)}
-          className="w-full rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-[var(--brand-400)]"
+          className="w-full rounded-[var(--radius-2)] border border-[var(--border-hairline)] bg-[var(--surface-canvas)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]"
           rows={4}
         />
       </div>
       {appointmentId ? (
-        <p className="text-sm text-[var(--muted)]">תור מקושר: {appointmentId}</p>
+        <p className="text-sm text-[var(--text-muted)]">תור מקושר: {appointmentId}</p>
       ) : null}
       {error ? <p className="text-sm font-semibold text-[var(--red-700)]">{error}</p> : null}
       <Btn type="submit" loading={loading}>צור ביקור</Btn>

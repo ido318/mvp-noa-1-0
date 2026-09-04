@@ -118,7 +118,7 @@ export function buildTodayDashboardModel({
         urgency: escalation.urgency,
         escalation,
       })),
-    ].slice(0, 3),
+    ],
     activityItems: todayCalls.slice(0, 4).map((call) => ({
       id: call.id,
       title: call.status === "completed" ? "שיחה הושלמה" : "שיחה נכנסת",

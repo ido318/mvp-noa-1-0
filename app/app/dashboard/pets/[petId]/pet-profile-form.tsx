@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Btn } from "@/components/dashboard/ui/btn";
+import { Field, Input, Select, Textarea } from "@/components/dashboard/ui/field";
+import { Alert } from "@/components/dashboard/ui/alert";
 import { useToast } from "@/components/dashboard/ui/toast";
 import type { Pet } from "@/types/domain/pet";
 
@@ -19,9 +21,6 @@ function nullableNumber(value: FormDataEntryValue | null): number | null {
   const text = typeof value === "string" ? value.trim() : "";
   return text.length > 0 ? Number(text) : null;
 }
-
-const fieldClass = "w-full rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--bg)] px-3 py-2 font-normal text-[var(--ink)] outline-none focus:border-[var(--brand-400)]";
-const labelClass = "space-y-1 text-sm font-semibold text-[var(--ink-2)]";
 
 export function PetProfileForm({ pet }: Props) {
   const router = useRouter();
@@ -76,82 +75,81 @@ export function PetProfileForm({ pet }: Props) {
     <form onSubmit={onSubmit}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h3 className="text-[15px] font-semibold text-[var(--ink)]">פרופיל רפואי</h3>
-          <p className="mt-0.5 text-xs text-[var(--muted)]">פרטים קבועים שחייבים להיות זמינים בכל ביקור</p>
+          <h3 className="text-[15px] font-semibold text-[var(--text-primary)]">פרופיל רפואי</h3>
+          <p className="mt-0.5 text-xs text-[var(--text-muted)]">פרטים קבועים שחייבים להיות זמינים בכל ביקור</p>
         </div>
         <Btn type="submit" size="sm" loading={saving}>שמור פרטים</Btn>
       </div>
 
       <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <label className={labelClass}>
-          שם החיה
-          <input name="name" defaultValue={pet.name} required className={fieldClass} />
-        </label>
-        <label className={labelClass}>
-          סוג חיה
-          <select name="species" defaultValue={pet.species} className={fieldClass}>
+        <Field label="שם החיה" htmlFor="pet-name" required>
+          <Input id="pet-name" name="name" defaultValue={pet.name} required />
+        </Field>
+        <Field label="סוג חיה" htmlFor="pet-species">
+          <Select id="pet-species" name="species" defaultValue={pet.species}>
             <option value="dog">כלב</option>
             <option value="cat">חתול</option>
             <option value="other">אחר</option>
-          </select>
-        </label>
-        <label className={labelClass}>
-          גזע
-          <input name="breed" defaultValue={pet.breed ?? ""} className={fieldClass} />
-        </label>
-        <label className={labelClass}>
-          מין
-          <select name="sex" defaultValue={pet.sex ?? ""} className={fieldClass}>
+          </Select>
+        </Field>
+        <Field label="גזע" htmlFor="pet-breed">
+          <Input id="pet-breed" name="breed" defaultValue={pet.breed ?? ""} />
+        </Field>
+        <Field label="מין" htmlFor="pet-sex">
+          <Select id="pet-sex" name="sex" defaultValue={pet.sex ?? ""}>
             <option value="">לא ידוע</option>
             <option value="male">זכר</option>
             <option value="female">נקבה</option>
-          </select>
-        </label>
-        <label className={labelClass}>
-          משקל בק״ג
-          <input name="weight" type="number" step="0.01" min="0" defaultValue={pet.weight ?? ""} className={fieldClass} />
-        </label>
-        <label className={labelClass}>
-          תאריך לידה
-          <input name="birthDate" type="date" defaultValue={pet.birthDate ?? ""} className={fieldClass} />
-        </label>
-        <label className={labelClass}>
-          מספר שבב
-          <input name="chipNumber" defaultValue={pet.chipNumber ?? ""} className={fieldClass} />
-        </label>
-        <label className={labelClass}>
-          סטטוס
-          <select name="status" defaultValue={pet.status} className={fieldClass}>
+          </Select>
+        </Field>
+        <Field label="משקל בק״ג" htmlFor="pet-weight">
+          <Input id="pet-weight" name="weight" type="number" step="0.01" min="0" defaultValue={pet.weight ?? ""} />
+        </Field>
+        <Field label="תאריך לידה" htmlFor="pet-birthDate">
+          <Input id="pet-birthDate" name="birthDate" type="date" defaultValue={pet.birthDate ?? ""} />
+        </Field>
+        <Field label="מספר שבב" htmlFor="pet-chipNumber">
+          <Input id="pet-chipNumber" name="chipNumber" defaultValue={pet.chipNumber ?? ""} />
+        </Field>
+        <Field label="סטטוס" htmlFor="pet-status">
+          <Select id="pet-status" name="status" defaultValue={pet.status}>
             <option value="active">פעיל</option>
             <option value="inactive">לא פעיל</option>
-          </select>
-        </label>
-        <label className="flex items-center gap-2 self-end rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm font-semibold text-[var(--ink-2)]">
+          </Select>
+        </Field>
+        <label
+          className="flex items-center gap-2 self-end px-3 text-sm font-semibold"
+          style={{
+            height: "var(--field-h)",
+            borderRadius: "var(--radius-2)",
+            border: "1px solid var(--border-field)",
+            background: "var(--surface-raised)",
+            color: "var(--text-secondary)",
+          }}
+        >
           <input name="isNeutered" type="checkbox" defaultChecked={pet.isNeutered} />
           מעוקר / מסורס
         </label>
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
-        <label className={labelClass}>
-          אלרגיות
-          <textarea name="allergies" defaultValue={pet.allergies ?? ""} rows={3} className={fieldClass} />
-        </label>
-        <label className={labelClass}>
-          מחלות כרוניות
-          <textarea name="chronicConditions" defaultValue={pet.chronicConditions ?? ""} rows={3} className={fieldClass} />
-        </label>
-        <label className={labelClass}>
-          תרופות קבועות
-          <textarea name="currentMedications" defaultValue={pet.currentMedications ?? ""} rows={3} className={fieldClass} />
-        </label>
-        <label className={labelClass}>
-          הערות
-          <textarea name="notes" defaultValue={pet.notes ?? ""} rows={3} className={fieldClass} />
-        </label>
+        <Field label="אלרגיות" htmlFor="pet-allergies">
+          <Textarea id="pet-allergies" name="allergies" defaultValue={pet.allergies ?? ""} rows={3} />
+        </Field>
+        <Field label="מחלות כרוניות" htmlFor="pet-chronicConditions">
+          <Textarea id="pet-chronicConditions" name="chronicConditions" defaultValue={pet.chronicConditions ?? ""} rows={3} />
+        </Field>
+        <Field label="תרופות קבועות" htmlFor="pet-currentMedications">
+          <Textarea id="pet-currentMedications" name="currentMedications" defaultValue={pet.currentMedications ?? ""} rows={3} />
+        </Field>
+        <Field label="הערות" htmlFor="pet-notes">
+          <Textarea id="pet-notes" name="notes" defaultValue={pet.notes ?? ""} rows={3} />
+        </Field>
       </div>
 
-      {error ? <p className="mt-3 text-sm font-semibold text-[var(--red-700)]">{error}</p> : null}
+      {error ? (
+        <Alert tone="critical" className="mt-3">{error}</Alert>
+      ) : null}
     </form>
   );
 }

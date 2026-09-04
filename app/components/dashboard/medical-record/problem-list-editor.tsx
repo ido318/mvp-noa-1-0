@@ -22,8 +22,8 @@ type Draft = {
 const SEVERITY_OPTIONS: ProblemListSeverity[] = ["mild", "moderate", "severe"];
 
 const fieldClass =
-  "w-full rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--bg)] px-2.5 py-1.5 text-xs font-normal text-[var(--ink)] outline-none focus:border-[var(--brand-400)]";
-const labelClass = "space-y-1 text-[11px] font-semibold text-[var(--ink-2)]";
+  "w-full rounded-[var(--radius-2)] border border-[var(--border-hairline)] bg-[var(--surface-canvas)] px-2.5 py-1.5 text-xs font-normal text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]";
+const labelClass = "space-y-1 text-[11px] font-semibold text-[var(--text-secondary)]";
 
 function emptyDraft(): Draft {
   return { condition: "", severity: "", onsetDate: "", notes: "" };
@@ -84,9 +84,9 @@ export function ProblemListEditor({ petId, activeProblemList }: Props) {
   }
 
   return (
-    <div className="rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--surface)] p-3">
+    <div className="rounded-[var(--radius-2)] border border-[var(--border-hairline)] bg-[var(--surface-raised)] p-3">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">עריכת בעיות פעילות</p>
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">עריכת בעיות פעילות</p>
         <Btn type="button" size="sm" loading={saving} onClick={() => void onSave()}>
           שמור
         </Btn>
@@ -97,9 +97,9 @@ export function ProblemListEditor({ petId, activeProblemList }: Props) {
           {items.map((problem, index) => (
             <li
               key={index}
-              className="flex items-center justify-between gap-2 rounded-[var(--r-sm)] bg-[var(--surface-2)] px-2 py-1 text-xs"
+              className="flex items-center justify-between gap-2 rounded-[var(--radius-1)] bg-[var(--surface-sunken)] px-2 py-1 text-xs"
             >
-              <span className="font-semibold text-[var(--ink)]">
+              <span className="font-semibold text-[var(--text-primary)]">
                 {problem.condition}
                 {problem.severity ? ` · ${PROBLEM_SEVERITY_LABELS[problem.severity]}` : ""}
               </span>
@@ -115,7 +115,7 @@ export function ProblemListEditor({ petId, activeProblemList }: Props) {
         </ul>
       )}
 
-      <form onSubmit={onAddDraft} className="mt-3 space-y-2 border-t border-[var(--line)] pt-3">
+      <form onSubmit={onAddDraft} className="mt-3 space-y-2 border-t border-[var(--border-hairline)] pt-3">
         <label className={labelClass}>
           מצב כרוני
           <input

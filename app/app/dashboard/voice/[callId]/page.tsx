@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { dashboardApiFetch } from "@/app/dashboard/api-client";
 import { formatIsraelDateTime } from "@/lib/israel-date";
-import { Badge } from "@/components/dashboard/ui/badge";
-import { CallStatusBadge, CallDirection } from "@/components/dashboard/ui/call-status";
+import { CallStatusBadge, CallDirection, CallCategoryBadge } from "@/components/dashboard/ui/call-status";
 import { EmptyState } from "@/components/dashboard/ui/empty-state";
 import { CallRecordingPlayer } from "@/app/dashboard/voice/[callId]/call-recording-player";
 import type { VoiceCall } from "@/types/domain/voice-call";
@@ -106,9 +105,7 @@ export default async function VoiceCallDetailPage({
           </h1>
           <CallStatusBadge status={call.status} />
           <CallDirection direction={call.direction} />
-          {call.callCategory && (
-            <Badge tone="info">{call.callCategory === "operation" ? "תפעולית" : "מידע"}</Badge>
-          )}
+          <CallCategoryBadge category={call.callCategory} />
         </div>
         <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>
           {formatIsraelDateTime(call.startedAt)}

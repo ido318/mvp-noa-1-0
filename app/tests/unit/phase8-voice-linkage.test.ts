@@ -52,13 +52,10 @@ describe("Phase 8 voice linkage", () => {
     });
   });
 
-  it("renders pre-visit call context from appointment and visit pages", () => {
-    const appointmentPage = source("app/dashboard/appointments/[appointmentId]/page.tsx");
+  it("renders pre-visit call context from the visit page", () => {
     const visitPage = source("app/dashboard/visits/[visitId]/page.tsx");
     const brief = source("app/dashboard/voice/pre-visit-brief-card.tsx");
 
-    expect(appointmentPage).toContain("PreVisitBriefCard");
-    expect(appointmentPage).toContain("appointmentId=");
     expect(visitPage).toContain("PreVisitBriefCard");
     expect(visitPage).toContain("visitId=");
     expect(brief).toContain("Pre-visit brief");

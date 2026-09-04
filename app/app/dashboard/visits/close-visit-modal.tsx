@@ -45,7 +45,7 @@ export function CloseVisitModal({
 
   return (
     <div className="space-y-3">
-      <label className="flex items-center gap-2 text-sm font-semibold text-[var(--ink-2)]">
+      <label className="flex items-center gap-2 text-sm font-semibold text-[var(--text-secondary)]">
         <input
           type="checkbox"
           checked={followUpEnabled}
@@ -59,13 +59,13 @@ export function CloseVisitModal({
             value={followUpReason}
             onChange={(event) => setFollowUpReason(event.target.value)}
             placeholder="סיבת מעקב"
-            className="h-10 rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--bg)] px-3 text-sm text-[var(--ink)] outline-none focus:border-[var(--brand-400)]"
+            className="h-10 rounded-[var(--radius-2)] border border-[var(--border-hairline)] bg-[var(--surface-canvas)] px-3 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]"
           />
           <input
             type="datetime-local"
             value={followUpDueAt}
             onChange={(event) => setFollowUpDueAt(event.target.value)}
-            className="h-10 rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--bg)] px-3 text-sm text-[var(--ink)] outline-none focus:border-[var(--brand-400)]"
+            className="h-10 rounded-[var(--radius-2)] border border-[var(--border-hairline)] bg-[var(--surface-canvas)] px-3 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]"
           />
         </div>
       ) : null}

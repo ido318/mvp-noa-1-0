@@ -27,12 +27,12 @@ function WaitlistRow({ entry }: { entry: WaitlistEntry }) {
     <div className="flex items-center gap-3 px-[18px] py-3">
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <p className="text-[13.5px] font-semibold text-[var(--ink)]">{entry.customerName ?? "לקוח לא ידוע"}</p>
-          {entry.petName && <span className="text-xs text-[var(--muted)]">· {entry.petName}</span>}
+          <p className="text-[13.5px] font-semibold text-[var(--text-primary)]">{entry.customerName ?? "לקוח לא ידוע"}</p>
+          {entry.petName && <span className="text-xs text-[var(--text-muted)]">· {entry.petName}</span>}
         </div>
-        <div className="mt-1 flex items-center gap-3 text-xs text-[var(--muted)]">
+        <div className="mt-1 flex items-center gap-3 text-xs text-[var(--text-muted)]">
           {entry.customerPhone && (
-            <a href={`tel:${entry.customerPhone}`} className="flex items-center gap-1 hover:text-[var(--brand-600)]">
+            <a href={`tel:${entry.customerPhone}`} className="flex items-center gap-1 hover:text-[var(--accent)]">
               <PhoneIcon size={12} /> {entry.customerPhone}
             </a>
           )}
@@ -42,10 +42,10 @@ function WaitlistRow({ entry }: { entry: WaitlistEntry }) {
             </span>
           )}
         </div>
-        {entry.notes && <p className="mt-1 text-xs text-[var(--faint)]">{entry.notes}</p>}
+        {entry.notes && <p className="mt-1 text-xs text-[var(--text-faint)]">{entry.notes}</p>}
       </div>
       <TypePill type={entry.visitType} />
-      <span className="flex-shrink-0 text-[11px] text-[var(--faint)]">{fmtDateTime(entry.createdAt)}</span>
+      <span className="flex-shrink-0 text-[11px] text-[var(--text-faint)]">{fmtDateTime(entry.createdAt)}</span>
     </div>
   );
 }
@@ -68,8 +68,10 @@ export default function WaitlistPage() {
   return (
     <div className="p-6 space-y-5">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-[var(--ink)]">המתנה</h1>
-        <span className="text-sm text-[var(--muted)]">{items.length} רשומים</span>
+        <div className="flex items-baseline gap-2">
+          <h1 className="text-xl font-semibold text-[var(--text-primary)]">המתנה</h1>
+          <span className="text-sm text-[var(--text-muted)]">{items.length} רשומים</span>
+        </div>
       </div>
 
       {loading ? (
@@ -86,7 +88,7 @@ export default function WaitlistPage() {
         />
       ) : (
         <Card noPad>
-          <div className="divide-y divide-[var(--line-2)]">
+          <div className="divide-y divide-[var(--border-row)]">
             {items.map((entry) => <WaitlistRow key={entry.id} entry={entry} />)}
           </div>
         </Card>
