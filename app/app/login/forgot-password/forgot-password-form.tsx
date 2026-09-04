@@ -1,20 +1,14 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
-type LoginFormProps = {
-  nextPath: string;
-};
-
-export function LoginForm({ nextPath }: LoginFormProps) {
-  const router = useRouter();
+export function ForgotPasswordForm() {
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [sent, setSent] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -22,20 +16,35 @@ export function LoginForm({ nextPath }: LoginFormProps) {
     setError(null);
 
     const supabase = createSupabaseBrowserClient();
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/auth/confirm?next=/login/reset-password`,
     });
 
     setLoading(false);
 
-    if (signInError) {
-      setError(signInError.message);
+    if (resetError) {
+      setError(resetError.message);
       return;
     }
 
-    router.push(nextPath);
-    router.refresh();
+    setSent(true);
+  }
+
+  if (sent) {
+    return (
+      <div className="mt-8">
+        <p className="text-[13px]" style={{ color: "var(--status-done-text)" }} role="status">
+          אם קיים חשבון עם האימייל הזה, נשלח אליו קישור לאיפוס סיסמה.
+        </p>
+        <Link
+          href="/login"
+          className="mt-4 inline-block text-[13px]"
+          style={{ color: "var(--text-link)" }}
+        >
+          חזרה להתחברות
+        </Link>
+      </div>
+    );
   }
 
   return (
@@ -68,42 +77,9 @@ export function LoginForm({ nextPath }: LoginFormProps) {
         />
       </div>
 
-      <div>
-        <label
-          htmlFor="password"
-          className="mb-1.5 block text-[12px]"
-          style={{ color: "var(--text-secondary)", fontWeight: "var(--w-medium)" }}
-        >
-          סיסמה
-        </label>
-        <input
-          id="password"
-          type="password"
-          autoComplete="current-password"
-          required
-          value={password}
-          onChange={(event) => setPassword(event.target.value)}
-          dir="ltr"
-          className="w-full px-3 text-[13px] outline-none focus:border-[var(--border-focus)]"
-          style={{
-            height: "var(--field-h)",
-            borderRadius: "var(--radius-2)",
-            border: "1px solid var(--border-field)",
-            background: "var(--surface-raised)",
-            color: "var(--text-primary)",
-            transition: "var(--transition-color)",
-          }}
-        />
-        <div className="mt-1.5 flex justify-end">
-          <Link href="/login/forgot-password" className="text-[12px]" style={{ color: "var(--text-link)" }}>
-            שכחתי סיסמה
-          </Link>
-        </div>
-      </div>
-
       {error ? (
         <p className="text-[13px]" style={{ color: "var(--status-critical-text)" }} role="alert">
-          שגיאת התחברות: {error}
+          שגיאה: {error}
         </p>
       ) : null}
 
@@ -120,8 +96,16 @@ export function LoginForm({ nextPath }: LoginFormProps) {
           transition: "var(--transition-color)",
         }}
       >
-        {loading ? "מתחבר..." : "התחברות"}
+        {loading ? "שולח..." : "שליחת קישור לאיפוס"}
       </button>
+
+      <Link
+        href="/login"
+        className="block text-center text-[13px]"
+        style={{ color: "var(--text-link)" }}
+      >
+        חזרה להתחברות
+      </Link>
     </form>
   );
 }

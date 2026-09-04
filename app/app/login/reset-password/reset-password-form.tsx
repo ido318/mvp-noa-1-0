@@ -2,39 +2,40 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
-type LoginFormProps = {
-  nextPath: string;
-};
-
-export function LoginForm({ nextPath }: LoginFormProps) {
+export function ResetPasswordForm() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setLoading(true);
     setError(null);
 
-    const supabase = createSupabaseBrowserClient();
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    setLoading(false);
-
-    if (signInError) {
-      setError(signInError.message);
+    if (password.length < 8) {
+      setError("הסיסמה חייבת להכיל לפחות 8 תווים");
       return;
     }
 
-    router.push(nextPath);
+    if (password !== confirmPassword) {
+      setError("הסיסמאות אינן תואמות");
+      return;
+    }
+
+    setLoading(true);
+    const supabase = createSupabaseBrowserClient();
+    const { error: updateError } = await supabase.auth.updateUser({ password });
+    setLoading(false);
+
+    if (updateError) {
+      setError(updateError.message);
+      return;
+    }
+
+    router.push("/dashboard");
     router.refresh();
   }
 
@@ -42,44 +43,16 @@ export function LoginForm({ nextPath }: LoginFormProps) {
     <form onSubmit={handleSubmit} className="mt-8 space-y-4">
       <div>
         <label
-          htmlFor="email"
-          className="mb-1.5 block text-[12px]"
-          style={{ color: "var(--text-secondary)", fontWeight: "var(--w-medium)" }}
-        >
-          אימייל
-        </label>
-        <input
-          id="email"
-          type="email"
-          autoComplete="email"
-          required
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
-          dir="ltr"
-          className="w-full px-3 text-[13px] outline-none focus:border-[var(--border-focus)]"
-          style={{
-            height: "var(--field-h)",
-            borderRadius: "var(--radius-2)",
-            border: "1px solid var(--border-field)",
-            background: "var(--surface-raised)",
-            color: "var(--text-primary)",
-            transition: "var(--transition-color)",
-          }}
-        />
-      </div>
-
-      <div>
-        <label
           htmlFor="password"
           className="mb-1.5 block text-[12px]"
           style={{ color: "var(--text-secondary)", fontWeight: "var(--w-medium)" }}
         >
-          סיסמה
+          סיסמה חדשה
         </label>
         <input
           id="password"
           type="password"
-          autoComplete="current-password"
+          autoComplete="new-password"
           required
           value={password}
           onChange={(event) => setPassword(event.target.value)}
@@ -94,16 +67,39 @@ export function LoginForm({ nextPath }: LoginFormProps) {
             transition: "var(--transition-color)",
           }}
         />
-        <div className="mt-1.5 flex justify-end">
-          <Link href="/login/forgot-password" className="text-[12px]" style={{ color: "var(--text-link)" }}>
-            שכחתי סיסמה
-          </Link>
-        </div>
+      </div>
+
+      <div>
+        <label
+          htmlFor="confirmPassword"
+          className="mb-1.5 block text-[12px]"
+          style={{ color: "var(--text-secondary)", fontWeight: "var(--w-medium)" }}
+        >
+          אימות סיסמה
+        </label>
+        <input
+          id="confirmPassword"
+          type="password"
+          autoComplete="new-password"
+          required
+          value={confirmPassword}
+          onChange={(event) => setConfirmPassword(event.target.value)}
+          dir="ltr"
+          className="w-full px-3 text-[13px] outline-none focus:border-[var(--border-focus)]"
+          style={{
+            height: "var(--field-h)",
+            borderRadius: "var(--radius-2)",
+            border: "1px solid var(--border-field)",
+            background: "var(--surface-raised)",
+            color: "var(--text-primary)",
+            transition: "var(--transition-color)",
+          }}
+        />
       </div>
 
       {error ? (
         <p className="text-[13px]" style={{ color: "var(--status-critical-text)" }} role="alert">
-          שגיאת התחברות: {error}
+          שגיאה: {error}
         </p>
       ) : null}
 
@@ -120,7 +116,7 @@ export function LoginForm({ nextPath }: LoginFormProps) {
           transition: "var(--transition-color)",
         }}
       >
-        {loading ? "מתחבר..." : "התחברות"}
+        {loading ? "מעדכן..." : "עדכון סיסמה"}
       </button>
     </form>
   );
