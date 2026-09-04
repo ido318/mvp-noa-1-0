@@ -9,7 +9,7 @@ export function AnamnesisForm({
   manualVisitSummary: string | null;
 }) {
   return (
-    <div id="anamnesis" className="space-y-3">
+    <div className="space-y-3">
       <div>
         <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">תלונה עיקרית</p>
         <p className="mt-1 text-sm text-[var(--text-primary)]">{chiefComplaint ?? "לא צוינה תלונה עיקרית."}</p>
