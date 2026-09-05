@@ -5,7 +5,8 @@
   "description": "Tomer — Voice AI Agent + Vet Clinic Dashboard (unified monorepo)",
   "workspaces": [
     "agent",
-    "app"
+    "app",
+    "packages/shared"
   ],
   "scripts": {
     "test:agent": "npm test --workspace=agent",
@@ -17,8 +18,5 @@
   },
   "engines": {
     "node": ">=20.0.0"
-  },
-  "dependencies": {
-    "@supabase/supabase-js": "^2.108.2"
   }
 }

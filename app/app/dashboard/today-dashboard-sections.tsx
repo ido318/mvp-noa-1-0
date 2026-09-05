@@ -76,7 +76,7 @@ export function ScheduleList({
       <div className="flex items-center justify-between px-5 pb-3 pt-5">
         <h2 className="text-[17px] font-semibold text-[var(--text-primary)]">סדר יום תורים</h2>
         <Link href="/dashboard/calendar" className="text-[13px] font-semibold text-[var(--accent)] hover:underline">
-          לוח שנה מלא ←
+          לוח שנה מלא →
         </Link>
       </div>
 

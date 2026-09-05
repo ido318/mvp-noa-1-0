@@ -26,7 +26,7 @@ export function Modal({ open, onClose, title, subtitle, children, maxWidth }: Mo
     return () => window.removeEventListener("keydown", handler);
   }, [open, onClose]);
 
-  useFocusTrap(panelRef, open);
+  useFocusTrap(open && mounted, panelRef);
 
   if (!open || !mounted) return null;
 
@@ -39,17 +39,18 @@ export function Modal({ open, onClose, title, subtitle, children, maxWidth }: Mo
     >
       <div
         ref={panelRef}
-        tabIndex={-1}
-        className="w-full modal-enter outline-none"
+        className="w-full modal-enter"
         style={{
           maxWidth: maxWidth ?? "var(--modal-w-lg)",
           background: "var(--surface-raised)",
           borderRadius: "var(--radius-3)",
           boxShadow: "var(--shadow-modal)",
+          outline: "none",
         }}
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
+        tabIndex={-1}
       >
         {(title || subtitle) && (
           <div

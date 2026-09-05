@@ -6,10 +6,10 @@ import { Skeleton } from "@/components/dashboard/ui/skeleton";
 import { CallStatusBadge, CallCategoryBadge } from "@/components/dashboard/ui/call-status";
 import { Table } from "@/components/dashboard/ui/table";
 import { Tabs } from "@/components/dashboard/ui/tabs";
-import { Drawer } from "@/components/dashboard/ui/drawer";
 import { Input } from "@/components/dashboard/ui/field";
 import { PhoneIcon, ClockIcon, SparkleIcon, PlayIcon } from "@/components/dashboard/icons";
 import { Btn } from "@/components/dashboard/ui/btn";
+import { Drawer } from "@/components/dashboard/ui/drawer";
 import { formatIsraelDateTime } from "@/lib/israel-date";
 import type { VoiceCall, TranscriptItem } from "@/types/domain/voice-call";
 

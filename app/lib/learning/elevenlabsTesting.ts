@@ -1,4 +1,4 @@
-import { ElevenLabsClient } from "elevenlabs";
+import { ElevenLabsClient } from "@elevenlabs/elevenlabs-js";
 import type { RegressionOutcome } from "@/types/domain/prompt-suggestion";
 
 function getConfig() {
@@ -91,8 +91,8 @@ function detectAllPassed(raw: Record<string, unknown>): boolean | null {
 /** Fetches the agent's current live conversation_config, for `previous_prompt` snapshotting. */
 export async function getLiveAgentConfig(): Promise<Record<string, unknown>> {
   const { apiKey, agentId } = getConfig();
-  const agent = await getClient(apiKey).conversationalAi.getAgent(agentId);
-  return agent.conversation_config as unknown as Record<string, unknown>;
+  const agent = await getClient(apiKey).conversationalAi.agents.get(agentId);
+  return agent.conversationConfig as unknown as Record<string, unknown>;
 }
 
 /**
@@ -107,16 +107,16 @@ export async function publishPrompt(newPromptText: string): Promise<Record<strin
   const { apiKey, agentId } = getConfig();
   const client = getClient(apiKey);
 
-  const current = await client.conversationalAi.getAgent(agentId);
-  const currentPrompt = current.conversation_config.agent?.prompt;
+  const current = await client.conversationalAi.agents.get(agentId);
+  const currentPrompt = current.conversationConfig.agent?.prompt;
 
-  const updated = await client.conversationalAi.updateAgent(agentId, {
-    conversation_config: {
+  const updated = await client.conversationalAi.agents.update(agentId, {
+    conversationConfig: {
       agent: {
         prompt: {
           prompt: newPromptText,
           tools: currentPrompt?.tools,
-          knowledge_base: currentPrompt?.knowledge_base,
+          knowledgeBase: currentPrompt?.knowledgeBase,
           rag: currentPrompt?.rag,
         },
       },

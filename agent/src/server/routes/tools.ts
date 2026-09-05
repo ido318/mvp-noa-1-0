@@ -3,6 +3,7 @@ import { z } from "zod";
 import { logger, maskPhone } from "../../lib/logger.js";
 import { getEnv } from "../../lib/env.js";
 import { isValidBearerToken } from "../middleware/bearerAuth.js";
+import { israelDateIso } from "@tomer/shared";
 import {
   findCustomerByPhone,
   addEscalation,
@@ -201,13 +202,6 @@ const triageSchema = z.object({
   pet_id:             z.string().uuid().optional(),
 });
 
-function todayIsraelIso(now: Date): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Jerusalem",
-    year: "numeric", month: "2-digit", day: "2-digit",
-  }).format(now);
-}
-
 toolsRoutes.post("/tools/triage-pet-case", async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const parsed = triageSchema.safeParse(body);
@@ -276,7 +270,7 @@ toolsRoutes.post("/tools/triage-pet-case", async (c) => {
       // Try to find a phone_consultation slot today
       let slotSuffix = "";
       try {
-        const todayIso = todayIsraelIso(now);
+        const todayIso = israelDateIso(now);
         const availability = await checkAvailability(todayIso, "phone_consultation");
         // If the response contains a time pattern (HH:MM), slots are available
         const firstSlot = availability.match(/\b(\d{2}:\d{2})\b/)?.[1];

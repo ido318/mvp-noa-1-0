@@ -1,4 +1,11 @@
 // Slot availability logic for Get A Vet clinic (Asia/Jerusalem).
+import {
+  ISRAEL_TIMEZONE,
+  israelDateIso,
+  israelDayOfWeek,
+  israelLocalToUtcIso,
+  israelDayHourMinute,
+} from "@tomer/shared";
 
 export type DayHours = {
   start: { h: number; m: number };
@@ -58,17 +65,17 @@ const HOURS_BY_DAY: Record<number, DayHours | null> = {
 };
 
 const HE_DAYS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
-const ISRAEL_TZ = "Asia/Jerusalem";
+const ISRAEL_TZ = ISRAEL_TIMEZONE;
 const SLOT_GRANULARITY_MIN = 10; // GCD of 20, 30 — candidate start times every 10 min
 const MAX_BOOKING_DAYS_AHEAD = 14;
 const LATE_CANCEL_HOURS = 4;
 
 export function getClinicHours(dateIso: string): DayHours | null {
-  return HOURS_BY_DAY[dayOfWeekInIsrael(dateIso)] ?? null;
+  return HOURS_BY_DAY[israelDayOfWeek(dateIso)] ?? null;
 }
 
 export function getDayNameHe(dateIso: string): string {
-  return HE_DAYS[dayOfWeekInIsrael(dateIso)] ?? "";
+  return HE_DAYS[israelDayOfWeek(dateIso)] ?? "";
 }
 
 /** Returns false if dateIso is more than 14 days from today (Israel time). */
@@ -100,12 +107,7 @@ export function maxBookingDateIso(): string {
 }
 
 export function toIsraelDateIso(d: Date): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: ISRAEL_TZ,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(d);
+  return israelDateIso(d);
 }
 
 /**
@@ -212,74 +214,14 @@ export function formatDateHe(dateIso: string): string {
 }
 
 export function toIso(dateIso: string, hours: number, minutes: number): string {
-  const totalMin = hours * 60 + minutes;
-  return `${dateIso}T${minToHHMM(totalMin)}:00${israelOffsetForLocalDateTime(dateIso, hours, minutes)}`;
-}
-
-function minToHHMM(totalMin: number): string {
-  const h = Math.floor(totalMin / 60);
-  const m = totalMin % 60;
-  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
-}
-
-function dayOfWeekInIsrael(dateIso: string): number {
-  const weekday = new Intl.DateTimeFormat("en-US", {
-    timeZone: ISRAEL_TZ,
-    weekday: "short",
-  }).format(new Date(toIso(dateIso, 12, 0)));
-  const map: Record<string, number> = {
-    Sun: 0,
-    Mon: 1,
-    Tue: 2,
-    Wed: 3,
-    Thu: 4,
-    Fri: 5,
-    Sat: 6,
-  };
-  return map[weekday] ?? 0;
-}
-
-function israelOffsetForLocalDateTime(
-  dateIso: string,
-  hours: number,
-  minutes: number,
-): string {
-  for (const offset of ["+02:00", "+03:00"]) {
-    const candidate = new Date(`${dateIso}T${minToHHMM(hours * 60 + minutes)}:00${offset}`);
-    const parts = new Intl.DateTimeFormat("en-CA", {
-      timeZone: ISRAEL_TZ,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    }).formatToParts(candidate);
-
-    const value = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
-    const localDate = `${value("year")}-${value("month")}-${value("day")}`;
-    const localTime = `${value("hour")}:${value("minute")}`;
-
-    if (localDate === dateIso && localTime === minToHHMM(hours * 60 + minutes)) {
-      return offset;
-    }
-  }
-
-  return "+02:00";
+  return israelLocalToUtcIso(dateIso, hours, minutes);
 }
 
 function earliestCandidateStartMin(dateIso: string): number {
   const now = new Date();
   if (toIsraelDateIso(now) !== dateIso) return 0;
 
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: ISRAEL_TZ,
-    hour: "numeric",
-    minute: "numeric",
-    hour12: false,
-  }).formatToParts(now);
-  const hour = parseInt(parts.find((p) => p.type === "hour")?.value ?? "0", 10);
-  const minute = parseInt(parts.find((p) => p.type === "minute")?.value ?? "0", 10);
+  const { hour, minute } = israelDayHourMinute(now);
   const total = hour * 60 + minute;
   return Math.ceil(total / SLOT_GRANULARITY_MIN) * SLOT_GRANULARITY_MIN;
 }

@@ -4,15 +4,17 @@ import React from "react";
  * A jump-nav of real <a href="#..."> anchors — not stateful tabs, so it
  * doesn't use the Tabs component (which expects value/onChange state).
  * Visually it matches Tabs' "pill" variant: a bordered segmented strip.
+ *
+ * ids must stay in sync with the matching `id` attributes in
+ * visit-workspace.tsx / [visitId]/page.tsx.
  */
-
 const SECTIONS: { id: string; label: string }[] = [
-  { id: "reason-and-pre-visit", label: "סיבת הביקור" },
+  { id: "reason-and-pre-visit", label: "רקע לביקור" },
   { id: "anamnesis", label: "אנמנזה" },
   { id: "vitals", label: "מדדים חיוניים" },
   { id: "physical-exam", label: "בדיקה גופנית" },
   { id: "soap", label: "SOAP" },
-  { id: "actions", label: "פעולות" },
+  { id: "actions", label: "סגירת ביקור" },
 ];
 
 export function VisitSectionNav() {

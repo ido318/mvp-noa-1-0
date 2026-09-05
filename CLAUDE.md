@@ -6,9 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Tomer** — a Hebrew-speaking voice AI agent for Dr. Noa Cabasheny's veterinary clinic (Get A Vet). Tomer answers inbound calls via Twilio + ElevenLabs Conversational AI when the vet is unavailable.
 
-Two packages, one Supabase project:
+Three npm workspaces, one Supabase project:
 - `agent/` — Hono server (Node.js 20, ESM) that bridges Twilio → ElevenLabs and exposes tool endpoints
 - `app/` — Next.js 16 dashboard for the clinic staff to view calls, customers, and visits
+- `packages/shared/` — `@tomer/shared`: the only source of Jerusalem-timezone math and the frozen SMS wording; both `agent/` and `app/` import it, never reimplement it (see "packages/shared" below)
 
 ## Commands
 
@@ -38,7 +39,7 @@ npm run seed:all          # seed dev user + demo data (requires local Supabase)
 ### Single test file
 ```bash
 # Agent
-cd agent && npx vitest run src/tests/foo.test.ts
+cd agent && npx vitest run tests/unit/foo.test.ts
 
 # App
 cd app && npx vitest run tests/unit/foo.test.ts
@@ -79,13 +80,22 @@ supabase db reset         # re-run all migrations + seed
 - `server/routes/jobs.ts` — `POST /jobs/process-notifications` (Bearer token auth); triggers SMS processor
 - `lib/store.ts` — all Supabase data access for the agent
 - `lib/appointments.ts` — slot logic: `VISIT_TYPE_CONFIG`, `generateSlotsForVisitType`, `isWithin14Days`, `isTooLateToCancel`
-- `lib/notifications.ts` — enqueue/cancel/reschedule SMS notifications; DST-correct Jerusalem time helpers
+- `lib/notifications.ts` — enqueue/cancel/reschedule SMS notifications; Jerusalem time math comes from `@tomer/shared`
 - `lib/env.ts` — typed env validation (throws on startup if vars are missing)
-- `services/sms.templates.ts` — 6 approved Hebrew SMS templates (wording frozen — do not change)
+- `services/sms.templates.ts` — thin re-export of `@tomer/shared`'s `smsTemplates` (8 approved Hebrew templates, wording frozen — do not change); kept as a shim so existing `../services/sms.templates.js` imports don't need to change
 - `services/sms.service.ts` — Twilio SMS wrapper: `sendSms(to, body)`
 - `services/notification.processor.ts` — atomic-claim processor: UPDATE WHERE status='pending' RETURNING *; 5-min stuck-row recovery
 - `services/triage.service.ts` — `decideTriage({ text, now })` → 4 decisions + `isWithinBusinessHours`; 4 fixed Hebrew scripts (frozen)
 - `knowledge/red-flags.ts` — 16 Hebrew red flags (TypeScript const); wording frozen — do not change without Noa's approval
+
+### packages/shared (`@tomer/shared`)
+Single source of truth for the two things that were independently reimplemented in both `agent/` and `app/` until 2026-09 (see the 2026-09-02 audit — that drift caused a real bug: the dashboard's vaccination-reminder SMS briefly diverged from the frozen wording before both sides were unified here):
+- `src/israel-time.ts` — all Jerusalem-timezone math: `israelDateIso`, `israelDayOfWeek`, `israelLocalToUtcIso`, `israelDateAtHour`, `israelDayHourMinute`, `formatAppointmentDateTime`, plus the app-facing `formatIsraelDate`/`formatIsraelTime`/`formatIsraelDateTime`/`israelDayUtcRange`.
+- `src/sms-templates.ts` — the 8 frozen Hebrew SMS templates (`smsTemplates`) + `CLINIC_LOCATION`/`HOME_VISIT_LOCATION`.
+
+Ships compiled (`dist/`, built via `tsc`) — both `agent/` and `app/` depend on it as a normal package (`@tomer/shared`). `agent/lib/notifications.ts`, `agent/lib/appointments.ts`, `agent/services/triage.service.ts`, `agent/services/sms.templates.ts` (shim), `app/lib/israel-date.ts` (shim), `app/lib/appointment-rules.ts`, `app/lib/services/dashboard-notifications.service.ts`, and `app/app/api/calendar/availability/route.ts` all import from it — **never re-add a local Jerusalem-time or SMS-template implementation in either workspace.**
+
+Every workspace's `predev`/`prebuild`/`pretypecheck`/`pretest` npm script rebuilds it automatically (`npm run build --prefix ../packages/shared`), so `cd agent && npm run dev` etc. keep working unchanged. `agent/Dockerfile`'s build context is the repo root (`agent/fly.toml`'s `[build] context = ".."`), not `agent/`, specifically so it can reach this package.
 
 ### App (`app/`)
 Architecture is layered: `UI (page.tsx) → API route → Service → Repository → Supabase`
@@ -96,6 +106,7 @@ Architecture is layered: `UI (page.tsx) → API route → Service → Repository
 - `app/middleware.ts` — redirects unauthenticated users away from `/dashboard/*`
 - `lib/repositories/` — one file per entity, thin wrappers around Supabase queries
 - `lib/validators/` — Zod schemas for request validation
+- `lib/israel-date.ts` — thin re-export of `@tomer/shared` (kept so the ~20 existing importers don't need to change)
 - `types/domain/` — shared domain types; `types/api/` — request/response shapes
 
 ### Supabase
@@ -174,6 +185,7 @@ Shared (same Supabase project): `SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_URL`, `SU
 - אסור לקמט קבצי `.env`, סודות, או קבצי `*.timestamp-*.mjs`.
 - תקשורת עם המשתמש בעברית. קוד והודעות commit באנגלית.
 - תיעוד מרכזי בנושן: דף Voxly-Tomer (`36f1354b584881b587c5c6f42a6bf6c7`).
+- **נוהל worktree/session:** יותר מ-session אחד עובד לעיתים על אותו repo במקביל (ראה זיכרון "Graphite Pro concurrent session", "PIMS parallel initiative"). לפני עבודה על התיקייה הראשית — `git worktree list` כדי לבדוק אם יש worktree/branch פעיל אחר, ולהעדיף `git worktree add` לעבודה מבודדת על פני checkout ישיר בתיקייה הראשית. תסמינים אופייניים לתקרית כזו: קבצים שהשתנו בלי שביקשת (למשל `lang="he"`→`lang="he-IL"` שהופיע ב-worktree אחר), או נעילת gpg/git תקועה (`gpg failed to sign the data ... waiting for lock (held by <pid>)`) — אם ה-PID כבר לא רץ (`ps -p <pid>`), זו נעילה תקועה (`~/.gnupg/public-keys.d/pubring.db.lock` וכדומה) שבטוח למחוק.
 
 ## cron (pg_cron)
 

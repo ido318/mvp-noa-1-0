@@ -125,7 +125,7 @@ export function VitalsForm({
           />
         </Field>
         {error ? (
-          <p className="text-sm font-semibold text-[var(--red-700)] sm:col-span-2">{error}</p>
+          <p className="text-sm font-semibold text-[var(--status-critical-text)] sm:col-span-2">{error}</p>
         ) : null}
         <div className="sm:col-span-2">
           <Btn type="submit" size="sm" loading={loading}>שמור מדדים</Btn>

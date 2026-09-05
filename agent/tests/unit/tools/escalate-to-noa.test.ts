@@ -9,7 +9,7 @@ function toolHeaders(): Record<string, string> {
   };
 }
 // Alias used throughout this file
-const signedHeaders = (_body: string) => toolHeaders();
+const signedHeaders = () => toolHeaders();
 
 import { toolsRoutes } from "../../../src/server/routes/tools.js";
 
@@ -35,7 +35,7 @@ describe("POST /tools/escalate-to-noa", () => {
   it("returns confirmation with low urgency", async () => {
     const res = await makeApp().request("/tools/escalate-to-noa", {
       method: "POST",
-      headers: signedHeaders(JSON.stringify({ reason: "לקוח מבקש שיחה עם נועה", urgency: 3 })),
+      headers: signedHeaders(),
       body: JSON.stringify({ reason: "לקוח מבקש שיחה עם נועה", urgency: 3 }),
     });
     expect(res.status).toBe(200);
@@ -51,7 +51,7 @@ describe("POST /tools/escalate-to-noa", () => {
   it("returns confirmation with high urgency (>=7)", async () => {
     const res = await makeApp().request("/tools/escalate-to-noa", {
       method: "POST",
-      headers: signedHeaders(JSON.stringify({ reason: "כלב מקיא דם", urgency: 9 })),
+      headers: signedHeaders(),
       body: JSON.stringify({ reason: "כלב מקיא דם", urgency: 9 }),
     });
     expect(res.status).toBe(200);

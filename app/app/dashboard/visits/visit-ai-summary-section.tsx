@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Btn } from "@/components/dashboard/ui/btn";
 import { Badge } from "@/components/dashboard/ui/badge";
@@ -28,6 +28,19 @@ export function VisitAiSummarySection({
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // Guards onGenerate/onAccept's in-flight request from writing state (or
+  // silently persisting a real AI artifact) after the vet has navigated away
+  // from this visit — same hazard voice-soap-recorder.tsx guards against.
+  const cancelledRef = useRef(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => {
+      cancelledRef.current = true;
+      abortControllerRef.current?.abort();
+    };
+  }, []);
+
   const canGenerate =
     canUseAi && visitStatus !== "cancelled" && draftText === null;
 
@@ -35,15 +48,29 @@ export function VisitAiSummarySection({
     setLoading(true);
     setError(null);
 
-    const response = await fetch(`/api/visits/${visitId}/ai-summary/generate`, {
-      method: "POST",
-    });
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
+    let response: Response;
+    try {
+      response = await fetch(`/api/visits/${visitId}/ai-summary/generate`, {
+        method: "POST",
+        signal: controller.signal,
+      });
+    } catch {
+      if (cancelledRef.current) return;
+      setLoading(false);
+      setError("יצירת סיכום AI נכשלה");
+      return;
+    }
+
+    if (cancelledRef.current) return;
     setLoading(false);
     if (!response.ok) {
       const payload = (await response.json()) as {
         error?: { message?: string };
       };
+      if (cancelledRef.current) return;
       setError(payload.error?.message ?? "יצירת סיכום AI נכשלה");
       return;
     }
@@ -51,6 +78,7 @@ export function VisitAiSummarySection({
     const payload = (await response.json()) as {
       data?: { draftText?: string };
     };
+    if (cancelledRef.current) return;
     setDraftText(payload.data?.draftText ?? "");
   }
 
@@ -63,24 +91,39 @@ export function VisitAiSummarySection({
     setLoading(true);
     setError(null);
 
-    const response = await fetch(`/api/visits/${visitId}/ai-summary/accept`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        version: visitVersion,
-        summaryText: draftText.trim(),
-      }),
-    });
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
+    let response: Response;
+    try {
+      response = await fetch(`/api/visits/${visitId}/ai-summary/accept`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          version: visitVersion,
+          summaryText: draftText.trim(),
+        }),
+        signal: controller.signal,
+      });
+    } catch {
+      if (cancelledRef.current) return;
+      setLoading(false);
+      setError("שמירת הסיכום נכשלה");
+      return;
+    }
+
+    if (cancelledRef.current) return;
     setLoading(false);
     if (!response.ok) {
       const payload = (await response.json()) as {
         error?: { message?: string };
       };
+      if (cancelledRef.current) return;
       setError(payload.error?.message ?? "שמירת הסיכום נכשלה");
       return;
     }
 
+    if (cancelledRef.current) return;
     setDraftText(null);
     router.refresh();
   }

@@ -22,7 +22,7 @@ import {
   cancelFutureNotifications,
   enqueueClientCancellationConfirmation,
 } from "./notifications.js";
-import { processNotifications } from "../services/notification.processor.js";
+import { processNotifications } from "./notificationProcessor.js";
 import { VALID_CALL_CATEGORIES } from "./callClassifier.js";
 
 export type Pet = { name: string; species: string; breed: string | null };
@@ -249,7 +249,10 @@ export async function checkAvailability(
     .from("appointments")
     .select("scheduled_at, end_at")
     .eq("clinic_id", env.AGENT_CLINIC_ID)
-    .in("status", ["scheduled", "confirmed", "pending_approval"])
+    // Must match appointments_no_active_overlap's WHERE clause exactly
+    // (20260831102335_phase1_database_core_alignment.sql) — otherwise Tomer
+    // can offer a slot the DB exclusion constraint will then reject.
+    .in("status", ["scheduled", "confirmed", "pending_approval", "checked_in", "in_visit"])
     .is("deleted_at", null)
     .gte("scheduled_at", dayStart)
     .lte("scheduled_at", dayEnd);
@@ -1070,7 +1073,7 @@ async function findActiveAppointmentNear(
     .select("id, customer_id, scheduled_at, appointment_type, duration_minutes, customers(full_name), pets(name)")
     .eq("clinic_id", clinicId)
     .eq("customer_id", customerId)
-    .in("status", ["scheduled", "confirmed", "pending_approval"])
+    .in("status", ["scheduled", "confirmed", "pending_approval", "checked_in", "in_visit"])
     .is("deleted_at", null)
     .gte("scheduled_at", rangeStart)
     .lte("scheduled_at", rangeEnd)
@@ -1151,10 +1154,38 @@ async function createOrFindCustomer(
     .select("id")
     .single();
 
-  if (error) throw new Error(`createOrFindCustomer failed: ${error.message}`);
+  if (error) {
+    // Two near-simultaneous calls for the same new phone number can both
+    // pass the find-step above before either inserts; customers_clinic_phone_unique_idx
+    // then rejects the loser here. Re-fetch instead of surfacing a spurious
+    // "internal error" — the winner's row already has what the caller needs.
+    if (error.code === "23505") {
+      const raceId = await findCustomerIdByPhone(phone);
+      if (raceId) return { customerId: raceId };
+    }
+    throw new Error(`createOrFindCustomer failed: ${error.message}`);
+  }
   const id = extractId(inserted);
   if (!id) throw new Error("createOrFindCustomer: no id returned");
   return { customerId: id };
+}
+
+async function findPetIdByName(
+  customerId: string,
+  petName: string,
+): Promise<string | null> {
+  const env = getEnv();
+  const { data, error } = await getSupabase()
+    .from("pets")
+    .select("id")
+    .eq("clinic_id", env.AGENT_CLINIC_ID)
+    .eq("customer_id", customerId)
+    .ilike("name", petName)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (error) throw new Error(`findPetIdByName failed: ${error.message}`);
+  return extractId(data);
 }
 
 async function createOrFindPet(
@@ -1165,18 +1196,7 @@ async function createOrFindPet(
 ): Promise<{ petId: string }> {
   const env = getEnv();
 
-  const { data: existing, error: findErr } = await getSupabase()
-    .from("pets")
-    .select("id")
-    .eq("clinic_id", env.AGENT_CLINIC_ID)
-    .eq("customer_id", customerId)
-    .ilike("name", petName)
-    .is("deleted_at", null)
-    .maybeSingle();
-
-  if (findErr) throw new Error(`createOrFindPet lookup failed: ${findErr.message}`);
-
-  const existingId = extractId(existing);
+  const existingId = await findPetIdByName(customerId, petName);
   if (existingId) return { petId: existingId };
 
   const { data: inserted, error: insertErr } = await getSupabase()
@@ -1192,7 +1212,15 @@ async function createOrFindPet(
     .select("id")
     .single();
 
-  if (insertErr) throw new Error(`createOrFindPet insert failed: ${insertErr.message}`);
+  if (insertErr) {
+    // Same race as createOrFindCustomer above, guarded here by
+    // pets_clinic_customer_name_unique_idx.
+    if (insertErr.code === "23505") {
+      const raceId = await findPetIdByName(customerId, petName);
+      if (raceId) return { petId: raceId };
+    }
+    throw new Error(`createOrFindPet insert failed: ${insertErr.message}`);
+  }
   const id = extractId(inserted);
   if (!id) throw new Error("createOrFindPet: no id returned");
   return { petId: id };

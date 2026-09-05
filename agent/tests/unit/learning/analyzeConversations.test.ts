@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 // ANTHROPIC_API_KEY default comes from tests/setup.ts (must be set before any
 // module that calls getEnv() at import time — e.g. logger.ts — is evaluated).
 
-const { mockFrom, callReviewsSelectResult, insertedIds, insertCalls, callReviewsEqClinicId, callReviewsEqIsException } =
+const { mockFrom, callReviewsSelectResult, insertCalls, callReviewsEqClinicId, callReviewsEqIsException } =
   vi.hoisted(() => {
     const callReviewsSelectResult: { data: unknown[]; error: null } = { data: [], error: null };
     const insertedIds = ["suggestion-1", "suggestion-2", "suggestion-3"];
