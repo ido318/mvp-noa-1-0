@@ -5,6 +5,23 @@
 -- (customers_clinic_phone_unique_idx, 20260527000005) — pets never got the
 -- equivalent. lower(name) matches the app's .ilike() lookup, so a case
 -- variation ("Rex" vs "REX") is treated as the same conflict here too.
+--
+-- Existing duplicates would make the unique index creation below fail, so
+-- soft-delete every duplicate except the earliest row per
+-- (clinic_id, customer_id, lower(name)) group first.
+with duplicates as (
+  select id,
+         row_number() over (
+           partition by clinic_id, customer_id, lower(name)
+           order by created_at, id
+         ) as rn
+  from public.pets
+  where deleted_at is null
+)
+update public.pets
+set deleted_at = now()
+where id in (select id from duplicates where rn > 1);
+
 create unique index pets_clinic_customer_name_unique_idx
   on public.pets (clinic_id, customer_id, lower(name))
   where deleted_at is null;
