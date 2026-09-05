@@ -28,7 +28,7 @@ beforeEach(() => {
 });
 
 describe("publishPrompt", () => {
-  it("preserves the live agent's tools, knowledge_base, and rag when publishing a new prompt", async () => {
+  it("preserves the live agent's tools, knowledgeBase, and rag when publishing a new prompt", async () => {
     mockGetAgent.mockResolvedValue({
       agentId: "test-agent",
       name: "Tomer",
@@ -37,7 +37,7 @@ describe("publishPrompt", () => {
           prompt: {
             prompt: "old prompt",
             tools: [{ type: "webhook", name: "lookup-customer" }],
-            knowledgeBase: [{ type: "text", name: "tomer-kb-clinic_info", id: "doc-1", usage_mode: "prompt" }],
+            knowledgeBase: [{ type: "text", name: "tomer-kb-clinic_info", id: "doc-1", usageMode: "prompt" }],
             rag: { enabled: false },
           },
         },
@@ -54,7 +54,7 @@ describe("publishPrompt", () => {
           prompt: {
             prompt: "new prompt text",
             tools: [{ type: "webhook", name: "lookup-customer" }],
-            knowledgeBase: [{ type: "text", name: "tomer-kb-clinic_info", id: "doc-1", usage_mode: "prompt" }],
+            knowledgeBase: [{ type: "text", name: "tomer-kb-clinic_info", id: "doc-1", usageMode: "prompt" }],
             rag: { enabled: false },
           },
         },
@@ -63,7 +63,7 @@ describe("publishPrompt", () => {
     expect(mockGetAgent).toHaveBeenCalledWith("test-agent");
   });
 
-  it("still publishes with undefined tools/knowledge_base/rag when the live agent has none set", async () => {
+  it("still publishes with undefined tools/knowledgeBase/rag when the live agent has none set", async () => {
     mockGetAgent.mockResolvedValue({
       agentId: "test-agent",
       name: "Tomer",

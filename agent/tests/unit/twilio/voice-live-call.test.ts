@@ -6,11 +6,13 @@ const { mockGetSignedUrl, mockSaveIncomingVoiceCall } = vi.hoisted(() => ({
   mockSaveIncomingVoiceCall: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock("elevenlabs", () => ({
+vi.mock("@elevenlabs/elevenlabs-js", () => ({
   ElevenLabsClient: vi.fn(function ElevenLabsClient() {
     return {
     conversationalAi: {
-      getSignedUrl: mockGetSignedUrl,
+      conversations: {
+        getSignedUrl: mockGetSignedUrl,
+      },
     },
     };
   }),
@@ -36,7 +38,7 @@ describe("POST /twilio/voice live call tracking", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetSignedUrl.mockResolvedValue({
-      signed_url: "wss://elevenlabs.test/stream?token=a&mode=voice",
+      signedUrl: "wss://elevenlabs.test/stream?token=a&mode=voice",
     });
   });
 

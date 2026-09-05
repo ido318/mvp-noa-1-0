@@ -11,7 +11,7 @@ import { EmptyState } from "@/components/dashboard/ui/empty-state";
 import { Skeleton } from "@/components/dashboard/ui/skeleton";
 import { PersonAvatar, AnimalAvatar } from "@/components/dashboard/ui/avatar";
 import { useToast } from "@/components/dashboard/ui/toast";
-import { SearchIcon, PhoneIcon, MailIcon, PinIcon, ChevRightIcon } from "@/components/dashboard/icons";
+import { SearchIcon, PhoneIcon, MailIcon, PinIcon, ChevRightIcon, XIcon } from "@/components/dashboard/icons";
 import { NewCustomerModal } from "@/components/dashboard/new-customer-modal";
 import { NewPetModal } from "@/components/dashboard/new-pet-modal";
 import { InvoicesSection } from "@/components/dashboard/invoices-section";
@@ -107,7 +107,24 @@ function ClientProfile({
   const [address, setAddress] = useState(customer.address ?? "");
   const [preferredContactMethod, setPreferredContactMethod] = useState<PreferredContactMethod>(customer.preferredContactMethod);
   const [notes, setNotes] = useState(customer.notes ?? "");
+  const [tags, setTags] = useState<string[]>(customer.tags);
+  const [tagInput, setTagInput] = useState("");
   const [, startTransition] = useTransition();
+
+  function addTag() {
+    const value = tagInput.trim();
+    if (!value) return;
+    if (tags.length >= 10) {
+      toast("עד 10 תגיות ללקוח", "error");
+      return;
+    }
+    if (!tags.includes(value)) setTags((current) => [...current, value]);
+    setTagInput("");
+  }
+
+  function removeTag(tag: string) {
+    setTags((current) => current.filter((item) => item !== tag));
+  }
 
   const fetchPets = useCallback(async (showLoading = true) => {
     if (showLoading) setPetsLoading(true);
@@ -133,6 +150,8 @@ function ClientProfile({
     setAddress(customer.address ?? "");
     setPreferredContactMethod(customer.preferredContactMethod);
     setNotes(customer.notes ?? "");
+    setTags(customer.tags);
+    setTagInput("");
   }, [customer]);
 
   useEffect(() => {
@@ -189,6 +208,7 @@ function ClientProfile({
           address: address.trim() || null,
           preferredContactMethod,
           notes: notes.trim() || null,
+          tags,
         }),
       });
       if (!res.ok) throw new Error();
@@ -285,11 +305,63 @@ function ClientProfile({
                   rows={3}
                 />
               </Field>
+              <Field label="תגיות" htmlFor="editCustomerTagInput" hint="למשל: VIP, רגיש להרדמה — עד 10 תגיות">
+                {tags.length > 0 && (
+                  <div className="mb-2 flex flex-wrap gap-1.5">
+                    {tags.map((tag) => (
+                      <span
+                        key={tag}
+                        className="inline-flex items-center gap-1 px-2 text-[12px]"
+                        style={{
+                          height: "var(--chip-h)",
+                          borderRadius: "var(--radius-1)",
+                          background: "var(--status-neutral-wash)",
+                          color: "var(--status-neutral-text)",
+                          fontWeight: "var(--w-semibold)",
+                        }}
+                      >
+                        {tag}
+                        <button
+                          type="button"
+                          onClick={() => removeTag(tag)}
+                          aria-label={`הסר תגית ${tag}`}
+                          className="hover:opacity-70"
+                        >
+                          <XIcon size={11} />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <Input
+                    id="editCustomerTagInput"
+                    value={tagInput}
+                    onChange={(event) => setTagInput(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        addTag();
+                      }
+                    }}
+                    placeholder="הוספת תגית..."
+                  />
+                  <Btn type="button" variant="soft" size="sm" onClick={addTag}>הוסף</Btn>
+                </div>
+              </Field>
               <div className="flex justify-end gap-2">
                 <Btn type="button" variant="ghost" size="sm" onClick={() => setEditing(false)}>ביטול</Btn>
                 <Btn type="submit" size="sm" loading={saving}>שמור</Btn>
               </div>
             </form>
+          )}
+
+          {!editing && customer.tags.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {customer.tags.map((tag) => (
+                <Badge key={tag} tone="neutral">{tag}</Badge>
+              ))}
+            </div>
           )}
 
           {/* Pets — hero */}
@@ -460,6 +532,13 @@ function ClientCard({ customer, onClick }: { customer: Customer; onClick: () => 
         </div>
         <ChevRightIcon size={14} className="flex-shrink-0 text-[var(--text-faint)]" />
       </div>
+      {customer.tags.length > 0 && (
+        <div className="mt-2.5 flex flex-wrap gap-1">
+          {customer.tags.map((tag) => (
+            <Badge key={tag} tone="neutral">{tag}</Badge>
+          ))}
+        </div>
+      )}
     </Card>
   );
 }

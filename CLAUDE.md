@@ -217,7 +217,7 @@ SELECT cron.schedule(
 
 לביטול: `SELECT cron.unschedule('process-sms-notifications');`
 
-**cron שני — לולאת שיפור פרומפט (prompt learning loop), שבועי — עדיין לא נוצר בפועל (jobid לא קיים ב-`cron.job`):**
+**cron שני — לולאת שיפור פרומפט (prompt learning loop), שבועי — פעיל (jobid 4, ראה הטבלה למעלה). ה-SQL למטה נשמר לתיעוד/שחזור בלבד, בדיוק כמו הראשון:**
 
 ```sql
 SELECT cron.schedule(
@@ -288,5 +288,7 @@ SELECT cron.schedule(
 - ~~דשבורד: ניהול `calendar_blocks` (UI לחסימת חופשות)~~ ✅ כבר בנוי (`app/app/dashboard/calendar/page.tsx`)
 - ~~דשבורד: תצוגת `waitlist`~~ ✅ כבר בנוי (`/dashboard/waitlist`)
 - ~~`npm audit`~~ ✅ נקי (0 חולשות, agent + app) — נבדק 2026-08-29
-- שדרוג ל-`@elevenlabs/elevenlabs-js` — **עדיין פתוח**, agent על החבילה הישנה `elevenlabs@^1.59.0`
-- customer tags (`customers.tags` — דורש מיגרציה חדשה)
+- ~~שדרוג ל-`@elevenlabs/elevenlabs-js`~~ ✅ הושלם (2026-09-05) — שני נתוני שימוש (`agent/src/server/routes/twilio.ts` הלא-פעיל, ו-`app/lib/learning/elevenlabsTesting.ts` החי) עודכנו ל-API המקונן/camelCase החדש
+- ~~customer tags (`customers.tags`)~~ ✅ הושלם (2026-09-05) — עמודת `text[]` + אינדקס GIN, עורך תגיות בכרטיס/מגירת הלקוח
+
+> הערה (2026-09-05): `npm audit` מראה כיום חולשה מודרטית אחת (`qs`, נמשכת ע"י `twilio` בשני החבילות) — לא קשורה לשדרוג ElevenLabs, לא תוקנה כאן.

@@ -14,6 +14,7 @@ function makeCustomer(overrides: Partial<Customer> = {}): Customer {
     preferredContactMethod: "phone",
     notes: null,
     status: "active",
+    tags: [],
     createdAt: "2026-01-01T00:00:00Z",
     updatedAt: "2026-01-01T00:00:00Z",
     deletedAt: null,

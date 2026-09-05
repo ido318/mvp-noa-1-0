@@ -11,6 +11,7 @@ export type Customer = {
   preferredContactMethod: PreferredContactMethod;
   notes: string | null;
   status: CustomerStatus;
+  tags: string[];
   createdAt: string;
   updatedAt: string;
   deletedAt: string | null;
@@ -30,6 +31,7 @@ export type CreateCustomerInput = {
   preferredContactMethod?: PreferredContactMethod;
   notes?: string | null;
   status?: CustomerStatus;
+  tags?: string[];
 };
 
 export type UpdateCustomerInput = Partial<

@@ -88,7 +88,7 @@ function detectAllPassed(raw: Record<string, unknown>): boolean | null {
   return outcomes.every((o) => o === true);
 }
 
-/** Fetches the agent's current live conversation_config, for `previous_prompt` snapshotting. */
+/** Fetches the agent's current live conversationConfig, for `previous_prompt` snapshotting. */
 export async function getLiveAgentConfig(): Promise<Record<string, unknown>> {
   const { apiKey, agentId } = getConfig();
   const agent = await getClient(apiKey).conversationalAi.agents.get(agentId);

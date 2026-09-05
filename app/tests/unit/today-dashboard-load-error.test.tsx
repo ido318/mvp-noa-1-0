@@ -31,7 +31,7 @@ describe("TodayPage load error handling", () => {
 
     render(<TodayPage />);
 
-    expect(await screen.findByText("טעינת נתוני היום נכשלה")).toBeInTheDocument();
+    expect(await screen.findByText("טעינת ההסלמות נכשלה")).toBeInTheDocument();
     expect(screen.queryByText("אין פעילות להיום")).not.toBeInTheDocument();
   });
 
@@ -40,7 +40,7 @@ describe("TodayPage load error handling", () => {
 
     render(<TodayPage />);
 
-    expect(await screen.findByText("טעינת נתוני היום נכשלה")).toBeInTheDocument();
+    expect(await screen.findByText("טעינת נתוני היום נכשלה. בדוק/י את החיבור ונסה/י שוב.")).toBeInTheDocument();
   });
 
   it("retry re-fetches and clears the error once every request succeeds", async () => {
@@ -54,12 +54,12 @@ describe("TodayPage load error handling", () => {
     });
 
     render(<TodayPage />);
-    await screen.findByText("טעינת נתוני היום נכשלה");
+    await screen.findByText("טעינת ההסלמות נכשלה");
 
     escalationsShouldFail = false;
     fireEvent.click(screen.getByRole("button", { name: "נסה שוב" }));
 
     expect(await screen.findByText("אין פעילות להיום")).toBeInTheDocument();
-    expect(screen.queryByText("טעינת נתוני היום נכשלה")).not.toBeInTheDocument();
+    expect(screen.queryByText("טעינת ההסלמות נכשלה")).not.toBeInTheDocument();
   });
 });
