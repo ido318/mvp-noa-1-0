@@ -56,18 +56,18 @@ function PetCard({ pet }: { pet: Pet }) {
           <AnimalAvatar species={pet.species} size={56} />
           <div className="w-full min-w-0">
             <div className="flex items-center gap-2">
-              <p className="font-semibold text-[15px] text-[var(--text-primary)]">{pet.name}</p>
-              {pet.isNeutered && <Badge tone="neutral">מעוקר/ת</Badge>}
+              <p className="min-w-0 flex-1 truncate font-semibold text-[15px] text-[var(--text-primary)]">{pet.name}</p>
+              {pet.isNeutered && <Badge tone="neutral" className="flex-shrink-0">מעוקר/ת</Badge>}
             </div>
-            <p className="text-xs text-[var(--text-muted)]">
+            <p className="truncate text-xs text-[var(--text-muted)]">
               {pet.species}{pet.breed ? ` · ${pet.breed}` : ""}{age ? ` · ${age}` : ""}
               {pet.sex === "male" ? " · זכר" : pet.sex === "female" ? " · נקבה" : ""}
             </p>
             {pet.weight && (
-              <p className="mt-0.5 text-xs text-[var(--text-muted)]">{`${pet.weight} ק"ג`}</p>
+              <p className="mt-0.5 truncate text-xs text-[var(--text-muted)]">{`${pet.weight} ק"ג`}</p>
             )}
             {pet.chronicConditions && (
-              <p className="mt-1 text-xs text-[var(--red-700)] bg-[var(--red-50)] rounded px-1.5 py-0.5 inline-block">
+              <p className="mt-1 line-clamp-2 rounded bg-[var(--red-50)] px-1.5 py-0.5 text-xs text-[var(--red-700)]">
                 {pet.chronicConditions}
               </p>
             )}
@@ -292,7 +292,7 @@ function ClientProfile({
 
           {/* Pets — hero */}
           <div>
-            <div className="mb-2.5 flex items-baseline justify-between">
+            <div className="mb-2.5 flex items-center justify-between">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
                 חיות מחמד ({petsLoading ? "…" : pets.length})
               </p>
@@ -518,7 +518,7 @@ export default function ClientsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-baseline gap-2.5">
-          <h1 className="text-[length:var(--size-page-title-lg)] text-[var(--text-primary)]">לקוחות</h1>
+          <h1 className="text-[length:var(--size-page-title-lg)] font-semibold text-[var(--text-primary)]">לקוחות</h1>
           <div className="flex items-baseline gap-1.5">
             <span className="text-[length:var(--size-metric)] font-semibold text-[var(--text-primary)] tabular-nums">{items.length}</span>
             <span className="text-xs text-[var(--text-muted)]">רשומים</span>
