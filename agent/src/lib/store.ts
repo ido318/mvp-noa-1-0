@@ -1073,7 +1073,7 @@ async function findActiveAppointmentNear(
     .select("id, customer_id, scheduled_at, appointment_type, duration_minutes, customers(full_name), pets(name)")
     .eq("clinic_id", clinicId)
     .eq("customer_id", customerId)
-    .in("status", ["scheduled", "confirmed", "pending_approval"])
+    .in("status", ["scheduled", "confirmed", "pending_approval", "checked_in", "in_visit"])
     .is("deleted_at", null)
     .gte("scheduled_at", rangeStart)
     .lte("scheduled_at", rangeEnd)

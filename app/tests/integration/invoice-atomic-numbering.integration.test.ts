@@ -24,8 +24,9 @@ const clinic1 = "00000000-0000-4000-8000-000000000001";
 // separate insert — two concurrent createInvoice calls for the same clinic
 // could compute the same number and collide on invoices_clinic_number_unique.
 // The create_invoice RPC (20260903020000) makes numbering-and-insert one
-// atomic, advisory-locked transaction; this proves concurrent callers each
-// get a distinct number instead of erroring.
+// atomic operation, using a per-clinic-year counter row bumped via
+// "insert ... on conflict ... do update" instead of a bare count(*); this
+// proves concurrent callers each get a distinct number instead of erroring.
 describe.runIf(runIntegration)("invoice atomic numbering", () => {
   let ownerClient: TestSupabaseClient;
   let adminClient: TestSupabaseClient;
