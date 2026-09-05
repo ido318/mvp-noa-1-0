@@ -1,16 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import { DashboardNotificationsService } from "@/lib/services/dashboard-notifications.service";
+import { smsTemplates } from "../../../agent/src/services/sms.templates";
 
-// The exact frozen wording from agent/src/services/sms.templates.ts's
-// vaccination_reminder template — kept here only to assert against, never as
-// a second source of truth to edit independently of that file.
+// Asserts against the real agent template (see sms-template-parity.test.ts
+// for the full cross-check across all five duplicated templates) rather than
+// a hand-copied string, so this test can't itself drift from the source it's
+// meant to guard.
 function frozenVaccinationReminderBody(customerName: string, petName: string, vaccineName: string): string {
-  return (
-    `שלום ${customerName}, כאן תומר מ-Get A Vet 💉\n` +
-    `הגיע הזמן לחיסון הבא של ${petName} (${vaccineName}) — מומלץ לתאם בקרוב לשמירה על הבריאות.\n` +
-    `לתיאום תור נוח — חייגו אלינו בכל עת.\n` +
-    `בריאות ל${petName} 🐾 תומר, Get A Vet`
-  );
+  return smsTemplates.vaccination_reminder({ customerName, petName, vaccineName });
 }
 
 function buildClient() {

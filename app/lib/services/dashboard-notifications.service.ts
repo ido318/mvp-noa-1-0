@@ -3,7 +3,12 @@
  * Used by the approve/reject flow for pending_approval appointments.
  *
  * Templates are frozen — do not modify without Noa's approval.
- * (Same templates as agent/src/services/sms.templates.ts — kept in sync manually.)
+ * (Same templates as agent/src/services/sms.templates.ts — kept in sync
+ * manually, since agent and app can't yet share a package without touching
+ * either's deploy pipeline. tests/unit/sms-template-parity.test.ts imports
+ * the real agent templates and fails the build if the two ever diverge —
+ * treat that test failing as "these two files disagree," not a fixture to
+ * update.)
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { AppError, err, ok, type Result } from "@/lib/errors/app-error";
