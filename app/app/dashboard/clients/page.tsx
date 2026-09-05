@@ -67,9 +67,11 @@ function PetCard({ pet }: { pet: Pet }) {
               <p className="mt-0.5 truncate text-xs text-[var(--text-muted)]">{`${pet.weight} ק"ג`}</p>
             )}
             {pet.chronicConditions && (
-              <p className="mt-1 line-clamp-2 rounded bg-[var(--red-50)] px-1.5 py-0.5 text-xs text-[var(--red-700)]">
-                {pet.chronicConditions}
-              </p>
+              <div className="mt-1 inline-block w-fit max-w-full rounded bg-[var(--red-50)] px-1.5 py-0.5">
+                <p className="line-clamp-2 text-xs text-[var(--red-700)]">
+                  {pet.chronicConditions}
+                </p>
+              </div>
             )}
           </div>
         </div>
