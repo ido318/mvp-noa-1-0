@@ -52,24 +52,26 @@ function PetCard({ pet }: { pet: Pet }) {
   return (
     <Link href={`/dashboard/pets/${pet.id}`} className="block">
       <Card hover>
-        <div className="flex items-start gap-3">
-          <AnimalAvatar species={pet.species} size={36} />
-          <div className="flex-1 min-w-0">
+        <div className="flex flex-col items-start gap-2.5">
+          <AnimalAvatar species={pet.species} size={56} />
+          <div className="w-full min-w-0">
             <div className="flex items-center gap-2">
-              <p className="font-semibold text-[14px] text-[var(--text-primary)]">{pet.name}</p>
-              {pet.isNeutered && <Badge tone="neutral">מעוקר/ת</Badge>}
+              <p className="min-w-0 flex-1 truncate font-semibold text-[15px] text-[var(--text-primary)]">{pet.name}</p>
+              {pet.isNeutered && <Badge tone="neutral" className="flex-shrink-0">מעוקר/ת</Badge>}
             </div>
-            <p className="text-xs text-[var(--text-muted)]">
+            <p className="truncate text-xs text-[var(--text-muted)]">
               {pet.species}{pet.breed ? ` · ${pet.breed}` : ""}{age ? ` · ${age}` : ""}
               {pet.sex === "male" ? " · זכר" : pet.sex === "female" ? " · נקבה" : ""}
             </p>
             {pet.weight && (
-              <p className="mt-0.5 text-xs text-[var(--text-muted)]">{`${pet.weight} ק"ג`}</p>
+              <p className="mt-0.5 truncate text-xs text-[var(--text-muted)]">{`${pet.weight} ק"ג`}</p>
             )}
             {pet.chronicConditions && (
-              <p className="mt-1 text-xs text-[var(--red-700)] bg-[var(--red-50)] rounded px-1.5 py-0.5 inline-block">
-                {pet.chronicConditions}
-              </p>
+              <div className="mt-1 inline-block w-fit max-w-full rounded bg-[var(--red-50)] px-1.5 py-0.5">
+                <p className="line-clamp-2 text-xs text-[var(--red-700)]">
+                  {pet.chronicConditions}
+                </p>
+              </div>
             )}
           </div>
         </div>
@@ -290,6 +292,28 @@ function ClientProfile({
             </form>
           )}
 
+          {/* Pets — hero */}
+          <div>
+            <div className="mb-2.5 flex items-center justify-between">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                חיות מחמד ({petsLoading ? "…" : pets.length})
+              </p>
+              <Btn size="sm" variant="ghost" onClick={() => setShowNewPet(true)}>+ הוסף חיה</Btn>
+            </div>
+            {petsLoading ? (
+              <div className="grid grid-cols-2 gap-3">
+                <Skeleton className="h-32" />
+                <Skeleton className="h-32" />
+              </div>
+            ) : pets.length === 0 ? (
+              <p className="text-sm text-[var(--text-faint)]">אין חיות מחמד רשומות</p>
+            ) : (
+              <div className="grid grid-cols-2 gap-3">
+                {pets.map(pet => <PetCard key={pet.id} pet={pet} />)}
+              </div>
+            )}
+          </div>
+
           {/* Contact info */}
           <div className="space-y-2">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">פרטי קשר</p>
@@ -322,25 +346,6 @@ function ClientProfile({
               <div className="flex items-center gap-2 text-sm text-[var(--text-primary)]">
                 <PinIcon size={14} className="text-[var(--text-muted)]" />
                 {customer.address}
-              </div>
-            )}
-          </div>
-
-          {/* Pets */}
-          <div>
-            <div className="mb-2 flex items-center justify-between">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                חיות מחמד ({petsLoading ? "…" : pets.length})
-              </p>
-              <Btn size="sm" variant="ghost" onClick={() => setShowNewPet(true)}>+ הוסף חיה</Btn>
-            </div>
-            {petsLoading ? (
-              <Skeleton className="h-24" />
-            ) : pets.length === 0 ? (
-              <p className="text-sm text-[var(--text-faint)]">אין חיות מחמד רשומות</p>
-            ) : (
-              <div className="space-y-2">
-                {pets.map(pet => <PetCard key={pet.id} pet={pet} />)}
               </div>
             )}
           </div>
@@ -514,9 +519,12 @@ export default function ClientsPage() {
     <div className="p-6 space-y-5">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-baseline gap-2">
-          <h1 className="text-xl font-semibold text-[var(--text-primary)]">לקוחות</h1>
-          <span className="text-sm text-[var(--text-muted)]">{items.length} רשומים</span>
+        <div className="flex items-baseline gap-2.5">
+          <h1 className="text-[length:var(--size-page-title-lg)] font-semibold text-[var(--text-primary)]">לקוחות</h1>
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-[length:var(--size-metric)] font-semibold text-[var(--text-primary)] tabular-nums">{items.length}</span>
+            <span className="text-xs text-[var(--text-muted)]">רשומים</span>
+          </div>
         </div>
         <Btn size="sm" onClick={() => setShowNewCustomer(true)}>לקוח חדש</Btn>
       </div>
