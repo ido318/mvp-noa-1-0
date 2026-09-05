@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { ElevenLabsClient } from "elevenlabs";
+import { ElevenLabsClient } from "@elevenlabs/elevenlabs-js";
 import { getEnv } from "../../lib/env.js";
 import { logger, maskPhone } from "../../lib/logger.js";
 import { saveIncomingVoiceCall } from "../../lib/store.js";
@@ -50,10 +50,10 @@ twilioRoutes.post("/twilio/voice", twilioValidate, async (c) => {
 
   let signed_url: string;
   try {
-    const result = await getElevenLabs().conversationalAi.getSignedUrl({
-      agent_id: env.ELEVENLABS_AGENT_ID,
+    const result = await getElevenLabs().conversationalAi.conversations.getSignedUrl({
+      agentId: env.ELEVENLABS_AGENT_ID,
     });
-    signed_url = result.signed_url;
+    signed_url = result.signedUrl;
   } catch (err) {
     logger.error({ err }, "twilio: failed to get ElevenLabs signed URL");
     return c.text(

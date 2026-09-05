@@ -209,6 +209,7 @@ export function mapCustomerRow(row: {
   preferred_contact_method: PreferredContactMethod;
   notes: string | null;
   status: CustomerStatus;
+  tags: string[] | null;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
@@ -223,6 +224,7 @@ export function mapCustomerRow(row: {
     preferredContactMethod: row.preferred_contact_method,
     notes: row.notes,
     status: row.status,
+    tags: row.tags ?? [],
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     deletedAt: row.deleted_at,
