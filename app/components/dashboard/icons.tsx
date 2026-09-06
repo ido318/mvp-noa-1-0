@@ -232,3 +232,38 @@ export function AnimalIcon({ species, size = 20, className = "" }: { species: st
   if (species === "cat") return <CatIcon size={size} className={className} />;
   return <DogIcon size={size} className={className} />;
 }
+
+// Toast/status variant icons — distinguish severity by shape, not colour alone.
+export const CheckCircleIcon = icon(
+  <>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M8 12.5l2.5 2.5L16 9.5" />
+  </>,
+);
+
+export const XCircleIcon = icon(
+  <>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M9.5 9.5l5 5M14.5 9.5l-5 5" />
+  </>,
+);
+
+export const AlertTriangleIcon = icon(
+  <>
+    <path d="M12 3l10 18H2L12 3z" />
+    <path d="M12 9v5M12 17h.01" />
+  </>,
+);
+
+export const InfoCircleIcon = icon(
+  <>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M12 8h.01M12 11v5" />
+  </>,
+);
+
+export const PackageIcon = icon(
+  <>
+    <path d="M3 8l9-5 9 5-9 5-9-5zM3 8v8l9 5 9-5V8M12 13v8" />
+  </>,
+);

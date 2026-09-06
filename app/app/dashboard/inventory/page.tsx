@@ -6,6 +6,7 @@ import { Btn } from "@/components/dashboard/ui/btn";
 import { Field, Input } from "@/components/dashboard/ui/field";
 import { EmptyState } from "@/components/dashboard/ui/empty-state";
 import { SkeletonRow } from "@/components/dashboard/ui/skeleton";
+import { PackageIcon } from "@/components/dashboard/icons";
 import { InventoryTable } from "@/components/dashboard/inventory/inventory-table";
 import { StockAdjustModal } from "@/components/dashboard/inventory/stock-adjust-modal";
 import type { InventoryItem } from "@/types/domain/inventory";
@@ -81,8 +82,9 @@ export default function InventoryPage() {
         </Card>
       ) : items.length === 0 ? (
         <EmptyState
-          title="אין פריטי מלאי"
-          subtitle="פריטים שתוסיפו יופיעו כאן"
+          icon={<PackageIcon size={32} />}
+          title="אין פריטי מלאי עדיין"
+          subtitle="פריטים שתוסיפו יופיעו כאן עם מצב המלאי שלהם"
         />
       ) : (
         <>

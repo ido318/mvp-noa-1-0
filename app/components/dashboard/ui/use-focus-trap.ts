@@ -1,48 +1,51 @@
-"use client";
 import { useEffect } from "react";
 
-const FOCUSABLE =
-  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), ' +
-  'textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+const FOCUSABLE_SELECTOR =
+  'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 /**
- * Moves focus into the panel on open, restores it on close, and keeps Tab
- * cycling inside — shared by Modal and Drawer so an overlay never leaks
- * keyboard focus to the page behind it.
+ * Moves focus into a dialog on open, traps Tab/Shift+Tab within it, and
+ * restores focus to whatever had it beforehand on close — Modal and Drawer
+ * previously did none of this, so opening one left focus (and the sighted
+ * user's keyboard tabbing) wherever it already was, behind the overlay.
  */
-export function useFocusTrap(ref: React.RefObject<HTMLElement | null>, open: boolean) {
+export function useFocusTrap(active: boolean, containerRef: React.RefObject<HTMLElement | null>) {
   useEffect(() => {
-    if (!open) return;
-    const panel = ref.current;
-    if (!panel) return;
+    if (!active) return;
+    const container = containerRef.current;
+    if (!container) return;
 
     const previouslyFocused = document.activeElement as HTMLElement | null;
-    const focusables = () => Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE));
 
-    const firstFocusTimer = window.setTimeout(() => {
-      (focusables()[0] ?? panel).focus();
-    }, 0);
+    function getFocusable(): HTMLElement[] {
+      return Array.from(container!.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
+    }
 
-    const handleTab = (e: KeyboardEvent) => {
-      if (e.key !== "Tab") return;
-      const items = focusables();
-      const first = items[0];
-      const last = items[items.length - 1];
-      if (!first || !last) return;
-      if (e.shiftKey && document.activeElement === first) {
-        e.preventDefault();
+    const initial = getFocusable()[0] ?? container;
+    initial.focus();
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Tab") return;
+      const items = getFocusable();
+      if (items.length === 0) {
+        event.preventDefault();
+        return;
+      }
+      const first = items[0]!;
+      const last = items[items.length - 1]!;
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
         last.focus();
-      } else if (!e.shiftKey && document.activeElement === last) {
-        e.preventDefault();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
         first.focus();
       }
-    };
+    }
 
-    window.addEventListener("keydown", handleTab);
+    container.addEventListener("keydown", handleKeyDown);
     return () => {
-      window.clearTimeout(firstFocusTimer);
-      window.removeEventListener("keydown", handleTab);
+      container.removeEventListener("keydown", handleKeyDown);
       previouslyFocused?.focus();
     };
-  }, [open, ref]);
+  }, [active, containerRef]);
 }

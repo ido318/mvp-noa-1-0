@@ -11,7 +11,7 @@ import { EmptyState } from "@/components/dashboard/ui/empty-state";
 import { Skeleton } from "@/components/dashboard/ui/skeleton";
 import { PersonAvatar, AnimalAvatar } from "@/components/dashboard/ui/avatar";
 import { useToast } from "@/components/dashboard/ui/toast";
-import { SearchIcon, PhoneIcon, MailIcon, PinIcon, ChevRightIcon } from "@/components/dashboard/icons";
+import { SearchIcon, PhoneIcon, MailIcon, PinIcon, ChevRightIcon, XIcon } from "@/components/dashboard/icons";
 import { NewCustomerModal } from "@/components/dashboard/new-customer-modal";
 import { NewPetModal } from "@/components/dashboard/new-pet-modal";
 import { InvoicesSection } from "@/components/dashboard/invoices-section";
@@ -48,24 +48,26 @@ function PetCard({ pet }: { pet: Pet }) {
   return (
     <Link href={`/dashboard/pets/${pet.id}`} className="block">
       <Card hover>
-        <div className="flex items-start gap-3">
-          <AnimalAvatar species={pet.species} size={36} />
-          <div className="flex-1 min-w-0">
+        <div className="flex flex-col items-start gap-2.5">
+          <AnimalAvatar species={pet.species} size={56} />
+          <div className="w-full min-w-0">
             <div className="flex items-center gap-2">
-              <p className="font-semibold text-[14px] text-[var(--text-primary)]">{pet.name}</p>
-              {pet.isNeutered && <Badge tone="neutral">מעוקר/ת</Badge>}
+              <p className="min-w-0 flex-1 truncate font-semibold text-[15px] text-[var(--text-primary)]">{pet.name}</p>
+              {pet.isNeutered && <Badge tone="neutral" className="flex-shrink-0">מעוקר/ת</Badge>}
             </div>
-            <p className="text-xs text-[var(--text-muted)]">
+            <p className="truncate text-xs text-[var(--text-muted)]">
               {pet.species}{pet.breed ? ` · ${pet.breed}` : ""}{age ? ` · ${age}` : ""}
               {pet.sex === "male" ? " · זכר" : pet.sex === "female" ? " · נקבה" : ""}
             </p>
             {pet.weight && (
-              <p className="mt-0.5 text-xs text-[var(--text-muted)]">{`${pet.weight} ק"ג`}</p>
+              <p className="mt-0.5 truncate text-xs text-[var(--text-muted)]">{`${pet.weight} ק"ג`}</p>
             )}
             {pet.chronicConditions && (
-              <p className="mt-1 text-xs text-[var(--red-700)] bg-[var(--red-50)] rounded px-1.5 py-0.5 inline-block">
-                {pet.chronicConditions}
-              </p>
+              <div className="mt-1 inline-block w-fit max-w-full rounded bg-[var(--red-50)] px-1.5 py-0.5">
+                <p className="line-clamp-2 text-xs text-[var(--red-700)]">
+                  {pet.chronicConditions}
+                </p>
+              </div>
             )}
           </div>
         </div>
@@ -102,7 +104,24 @@ function ClientProfile({
   const [address, setAddress] = useState(customer.address ?? "");
   const [preferredContactMethod, setPreferredContactMethod] = useState<PreferredContactMethod>(customer.preferredContactMethod);
   const [notes, setNotes] = useState(customer.notes ?? "");
+  const [tags, setTags] = useState<string[]>(customer.tags);
+  const [tagInput, setTagInput] = useState("");
   const [, startTransition] = useTransition();
+
+  function addTag() {
+    const value = tagInput.trim();
+    if (!value) return;
+    if (tags.length >= 10) {
+      toast("עד 10 תגיות ללקוח", "error");
+      return;
+    }
+    if (!tags.includes(value)) setTags((current) => [...current, value]);
+    setTagInput("");
+  }
+
+  function removeTag(tag: string) {
+    setTags((current) => current.filter((item) => item !== tag));
+  }
 
   const fetchPets = useCallback(async (showLoading = true) => {
     if (showLoading) setPetsLoading(true);
@@ -128,6 +147,8 @@ function ClientProfile({
     setAddress(customer.address ?? "");
     setPreferredContactMethod(customer.preferredContactMethod);
     setNotes(customer.notes ?? "");
+    setTags(customer.tags);
+    setTagInput("");
   }, [customer]);
 
   useEffect(() => {
@@ -184,6 +205,7 @@ function ClientProfile({
           address: address.trim() || null,
           preferredContactMethod,
           notes: notes.trim() || null,
+          tags,
         }),
       });
       if (!res.ok) throw new Error();
@@ -280,12 +302,86 @@ function ClientProfile({
                   rows={3}
                 />
               </Field>
+              <Field label="תגיות" htmlFor="editCustomerTagInput" hint="למשל: VIP, רגיש להרדמה — עד 10 תגיות">
+                {tags.length > 0 && (
+                  <div className="mb-2 flex flex-wrap gap-1.5">
+                    {tags.map((tag) => (
+                      <span
+                        key={tag}
+                        className="inline-flex items-center gap-1 px-2 text-[12px]"
+                        style={{
+                          height: "var(--chip-h)",
+                          borderRadius: "var(--radius-1)",
+                          background: "var(--status-neutral-wash)",
+                          color: "var(--status-neutral-text)",
+                          fontWeight: "var(--w-semibold)",
+                        }}
+                      >
+                        {tag}
+                        <button
+                          type="button"
+                          onClick={() => removeTag(tag)}
+                          aria-label={`הסר תגית ${tag}`}
+                          className="hover:opacity-70"
+                        >
+                          <XIcon size={11} />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <Input
+                    id="editCustomerTagInput"
+                    value={tagInput}
+                    onChange={(event) => setTagInput(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        addTag();
+                      }
+                    }}
+                    placeholder="הוספת תגית..."
+                  />
+                  <Btn type="button" variant="soft" size="sm" onClick={addTag}>הוסף</Btn>
+                </div>
+              </Field>
               <div className="flex justify-end gap-2">
                 <Btn type="button" variant="ghost" size="sm" onClick={() => setEditing(false)}>ביטול</Btn>
                 <Btn type="submit" size="sm" loading={saving}>שמור</Btn>
               </div>
             </form>
           )}
+
+          {!editing && customer.tags.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {customer.tags.map((tag) => (
+                <Badge key={tag} tone="neutral">{tag}</Badge>
+              ))}
+            </div>
+          )}
+
+          {/* Pets — hero */}
+          <div>
+            <div className="mb-2.5 flex items-center justify-between">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                חיות מחמד ({petsLoading ? "…" : pets.length})
+              </p>
+              <Btn size="sm" variant="ghost" onClick={() => setShowNewPet(true)}>+ הוסף חיה</Btn>
+            </div>
+            {petsLoading ? (
+              <div className="grid grid-cols-2 gap-3">
+                <Skeleton className="h-32" />
+                <Skeleton className="h-32" />
+              </div>
+            ) : pets.length === 0 ? (
+              <p className="text-sm text-[var(--text-faint)]">אין חיות מחמד רשומות</p>
+            ) : (
+              <div className="grid grid-cols-2 gap-3">
+                {pets.map(pet => <PetCard key={pet.id} pet={pet} />)}
+              </div>
+            )}
+          </div>
 
           {/* Contact info */}
           <div className="space-y-2">
@@ -317,25 +413,6 @@ function ClientProfile({
               <div className="flex items-center gap-2 text-sm text-[var(--text-primary)]">
                 <PinIcon size={14} className="text-[var(--text-muted)]" />
                 {customer.address}
-              </div>
-            )}
-          </div>
-
-          {/* Pets */}
-          <div>
-            <div className="mb-2 flex items-center justify-between">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                חיות מחמד ({petsLoading ? "…" : pets.length})
-              </p>
-              <Btn size="sm" variant="ghost" onClick={() => setShowNewPet(true)}>+ הוסף חיה</Btn>
-            </div>
-            {petsLoading ? (
-              <Skeleton className="h-24" />
-            ) : pets.length === 0 ? (
-              <p className="text-sm text-[var(--text-faint)]">אין חיות מחמד רשומות</p>
-            ) : (
-              <div className="space-y-2">
-                {pets.map(pet => <PetCard key={pet.id} pet={pet} />)}
               </div>
             )}
           </div>
@@ -463,6 +540,13 @@ function ClientCard({ customer, onClick }: { customer: Customer; onClick: () => 
         </div>
         <ChevRightIcon size={14} className="flex-shrink-0 text-[var(--text-faint)]" />
       </div>
+      {customer.tags.length > 0 && (
+        <div className="mt-2.5 flex flex-wrap gap-1">
+          {customer.tags.map((tag) => (
+            <Badge key={tag} tone="neutral">{tag}</Badge>
+          ))}
+        </div>
+      )}
     </Card>
   );
 }
@@ -522,9 +606,12 @@ export default function ClientsPage() {
     <div className="p-6 space-y-5">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-baseline gap-2">
-          <h1 className="text-xl font-semibold text-[var(--text-primary)]">לקוחות</h1>
-          <span className="text-sm text-[var(--text-muted)]">{items.length} רשומים</span>
+        <div className="flex items-baseline gap-2.5">
+          <h1 className="text-[length:var(--size-page-title-lg)] font-semibold text-[var(--text-primary)]">לקוחות</h1>
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-[length:var(--size-metric)] font-semibold text-[var(--text-primary)] tabular-nums">{items.length}</span>
+            <span className="text-xs text-[var(--text-muted)]">רשומים</span>
+          </div>
         </div>
         <Btn size="sm" onClick={() => setShowNewCustomer(true)}>לקוח חדש</Btn>
       </div>

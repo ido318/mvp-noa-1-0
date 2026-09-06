@@ -25,11 +25,6 @@ export function computeInvoiceTotal(items: InvoiceLineItem[]): number {
   return Math.round(rawTotal * 100) / 100;
 }
 
-export function formatInvoiceNumber(issuedAt: Date, sequenceInYear: number): string {
-  const year = issuedAt.getUTCFullYear();
-  return `INV-${year}-${String(sequenceInYear).padStart(3, "0")}`;
-}
-
 const VALID_TRANSITIONS: Record<InvoiceStatus, InvoiceStatus[]> = {
   draft: ["sent", "void"],
   sent: ["paid", "void"],
@@ -68,17 +63,12 @@ export class InvoiceService {
       return err(AppError.forbidden("Only owner or admin can manage invoices"));
     }
 
-    const countResult = await this.repository.countForClinic(input.clinicId);
-    if (!countResult.ok) return countResult;
-
     const total = computeInvoiceTotal(input.items);
-    const invoiceNumber = formatInvoiceNumber(new Date(), countResult.value + 1);
 
     const result = await this.repository.create({
       clinicId: input.clinicId,
       customerId: input.customerId,
       petId: input.petId ?? null,
-      invoiceNumber,
       items: input.items,
       total,
       notes: input.notes ?? null,

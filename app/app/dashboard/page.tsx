@@ -2,6 +2,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { Skeleton } from "@/components/dashboard/ui/skeleton";
 import { Alert } from "@/components/dashboard/ui/alert";
+import { Btn } from "@/components/dashboard/ui/btn";
 import { ApproveRejectModal } from "@/components/dashboard/approve-reject-modal";
 import {
   AttentionPanel,
@@ -59,6 +60,7 @@ export default function TodayPage() {
   const today = todayIso();
 
   const fetchData = useCallback(async () => {
+    setLoadErrors([]);
     try {
       const callRange = israelDayUtcRange(today);
       const [apptRes, escRes, callRes, waitlistRes] = await Promise.all([
@@ -98,6 +100,10 @@ export default function TodayPage() {
       }
 
       setLoadErrors(errors);
+    } catch {
+      // Network failure (offline, DNS, etc.) — same "incomplete data" story
+      // as a non-ok response, just before any response existed to check.
+      setLoadErrors(["טעינת נתוני היום נכשלה. בדוק/י את החיבור ונסה/י שוב."]);
     } finally {
       setLoading(false);
     }
@@ -125,6 +131,11 @@ export default function TodayPage() {
               {message}
             </React.Fragment>
           ))}
+          <div className="mt-2">
+            <Btn type="button" size="sm" variant="soft" onClick={() => void fetchData()}>
+              נסה שוב
+            </Btn>
+          </div>
         </Alert>
       )}
       <TodayPageHeading />
@@ -147,7 +158,7 @@ export default function TodayPage() {
         />
       </div>
 
-      {model.scheduleRows.length === 0 && model.attentionItems.length === 0 && model.activityItems.length === 0 && (
+      {loadErrors.length === 0 && model.scheduleRows.length === 0 && model.attentionItems.length === 0 && model.activityItems.length === 0 && (
         <TodayEmptyState />
       )}
 

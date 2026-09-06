@@ -88,6 +88,9 @@
   --rail-bg:var(--graphite-800); --rail-bg-hover:var(--graphite-600); --rail-bg-active:var(--graphite-600);
   --rail-text:var(--graphite-300); --rail-text-strong:#FFFFFF; --rail-text-muted:var(--graphite-400);
   --rail-separator:rgba(255,255,255,.07); --rail-marker:var(--teal-600);
+  /* status-critical-text is tuned for light washes and sinks into the dark
+     rail — same reasoning as the toast's lightened marks (toast.tsx). */
+  --rail-critical-text:#E9908A;
 
   /* Status — four hues, one text tone + one wash each */
   --status-done-text:var(--green-600);     --status-done-wash:var(--green-050);

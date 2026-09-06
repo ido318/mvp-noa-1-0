@@ -1,6 +1,7 @@
 import type { AppointmentType } from "@/types/domain/appointment";
+import { ISRAEL_TIMEZONE, israelDayOfWeek, israelLocalToUtcIso } from "@tomer/shared";
 
-export const CLINIC_TIMEZONE = "Asia/Jerusalem";
+export const CLINIC_TIMEZONE = ISRAEL_TIMEZONE;
 
 export type VisitTypeConfig = {
   durationMin: number;
@@ -31,7 +32,7 @@ export function isExpectedDuration(type: AppointmentType, durationMinutes: numbe
 }
 
 export function getClinicHoursForDate(date: string): { open: string; close: string } | null {
-  const weekday = dayOfWeekInIsrael(date);
+  const weekday = israelDayOfWeek(date);
   if (weekday >= 0 && weekday <= 4) return { open: "08:00", close: "20:00" };
   if (weekday === 5) return { open: "08:30", close: "13:00" };
   return null;
@@ -51,49 +52,5 @@ export function getBookableDates(fromDate: string): string[] {
 
 export function toIsraelLocalIso(date: string, hhmm: string): string {
   const [hourRaw, minuteRaw] = hhmm.split(":");
-  const hour = Number(hourRaw);
-  const minute = Number(minuteRaw);
-  return `${date}T${hhmm}:00${israelOffsetForLocalDateTime(date, hour, minute)}`;
-}
-
-function dayOfWeekInIsrael(date: string): number {
-  const weekday = new Intl.DateTimeFormat("en-US", {
-    timeZone: CLINIC_TIMEZONE,
-    weekday: "short",
-  }).format(new Date(toIsraelLocalIso(date, "12:00")));
-  const map: Record<string, number> = {
-    Sun: 0,
-    Mon: 1,
-    Tue: 2,
-    Wed: 3,
-    Thu: 4,
-    Fri: 5,
-    Sat: 6,
-  };
-  return map[weekday] ?? 0;
-}
-
-function israelOffsetForLocalDateTime(
-  date: string,
-  hour: number,
-  minute: number,
-): string {
-  const hhmm = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
-  for (const offset of ["+02:00", "+03:00"]) {
-    const candidate = new Date(`${date}T${hhmm}:00${offset}`);
-    const parts = new Intl.DateTimeFormat("en-CA", {
-      timeZone: CLINIC_TIMEZONE,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    }).formatToParts(candidate);
-    const value = (type: string) => parts.find((part) => part.type === type)?.value ?? "";
-    if (`${value("year")}-${value("month")}-${value("day")}` === date) {
-      if (`${value("hour")}:${value("minute")}` === hhmm) return offset;
-    }
-  }
-  return "+02:00";
+  return israelLocalToUtcIso(date, Number(hourRaw), Number(minuteRaw));
 }

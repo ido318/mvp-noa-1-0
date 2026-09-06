@@ -1,5 +1,6 @@
 import { matchRedFlags as _matchRedFlags, type RedFlag } from "../triage/redFlagMatcher.js";
 import { scoreUrgency as _scoreUrgency } from "../triage/urgencyScorer.js";
+import { israelDayHourMinute } from "@tomer/shared";
 
 export type { RedFlag };
 
@@ -37,33 +38,13 @@ export const ROUTINE_SCRIPT =
 
 // ── Business-hours check (Asia/Jerusalem, DST-correct via Intl) ─────────────
 
-function israelParts(d: Date): { day: number; hour: number; minute: number } {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "Asia/Jerusalem",
-    weekday: "short",
-    hour: "numeric",
-    minute: "numeric",
-    hour12: false,
-  }).formatToParts(d);
-
-  const weekdayStr = parts.find((p) => p.type === "weekday")?.value ?? "Sun";
-  const DAY_MAP: Record<string, number> = {
-    Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6,
-  };
-  const day = DAY_MAP[weekdayStr] ?? 0;
-  const hour = parseInt(parts.find((p) => p.type === "hour")?.value ?? "0", 10);
-  const minute = parseInt(parts.find((p) => p.type === "minute")?.value ?? "0", 10);
-
-  return { day, hour, minute };
-}
-
 /**
  * Returns true if `now` falls within Get A Vet business hours:
  * Sun–Thu 08:00–20:00, Fri 08:30–13:00, Sat closed.
  * All times in Asia/Jerusalem (DST-correct).
  */
 export function isWithinBusinessHours(now: Date): boolean {
-  const { day, hour, minute } = israelParts(now);
+  const { day, hour, minute } = israelDayHourMinute(now);
   const totalMin = hour * 60 + minute;
 
   if (day >= 0 && day <= 4) {  // Sun–Thu

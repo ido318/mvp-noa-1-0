@@ -9,7 +9,7 @@ function toolHeaders(): Record<string, string> {
   };
 }
 // Alias used throughout this file
-const signedHeaders = (_body: string) => toolHeaders();
+const signedHeaders = () => toolHeaders();
 
 import { toolsRoutes } from "../../../src/server/routes/tools.js";
 
@@ -28,8 +28,7 @@ import { findCustomerByPhone, normalisePhone } from "../../../src/lib/store.js";
 const mockCustomer = {
   phone: "+972541234567",
   full_name: "עידו אמסלם",
-  pets: [{ name: "בורבי", species: "כלב", age_years: 3 }],
-  last_visit: "2026-03-15",
+  pets: [{ name: "בורבי", species: "כלב", breed: "פודל" }],
   notes: "אלרגיה לעוף ידועה",
 };
 
@@ -49,7 +48,7 @@ describe("POST /tools/lookup-customer", () => {
   it("returns customer data for a known phone (E.164)", async () => {
     const res = await makeApp().request("/tools/lookup-customer", {
       method: "POST",
-      headers: signedHeaders(JSON.stringify({ phone: "+972541234567" })),
+      headers: signedHeaders(),
       body: JSON.stringify({ phone: "+972541234567" }),
     });
     expect(res.status).toBe(200);
@@ -61,7 +60,7 @@ describe("POST /tools/lookup-customer", () => {
   it("normalises 05x prefix to E.164 and finds customer", async () => {
     const res = await makeApp().request("/tools/lookup-customer", {
       method: "POST",
-      headers: signedHeaders(JSON.stringify({ phone: "0541234567" })),
+      headers: signedHeaders(),
       body: JSON.stringify({ phone: "0541234567" }),
     });
     expect(res.status).toBe(200);
@@ -72,7 +71,7 @@ describe("POST /tools/lookup-customer", () => {
   it("returns unknown customer message for an unrecognised phone", async () => {
     const res = await makeApp().request("/tools/lookup-customer", {
       method: "POST",
-      headers: signedHeaders(JSON.stringify({ phone: "+972599999999" })),
+      headers: signedHeaders(),
       body: JSON.stringify({ phone: "+972599999999" }),
     });
     expect(res.status).toBe(200);

@@ -38,13 +38,13 @@ export function VisitWorkspace({
         </div>
       </Card>
       <Card>
-        <h3 className="text-[15px] font-semibold text-[var(--text-primary)]">בדיקה גופנית</h3>
+        <h3 id="physical-exam" className="text-[15px] font-semibold text-[var(--text-primary)]">בדיקה גופנית</h3>
         <div className="mt-3">
-          <ExamForm />
+          <ExamForm visitId={visit.id} />
         </div>
       </Card>
       <Card>
-        <h3 className="text-[15px] font-bold text-[var(--text-primary)]">SOAP</h3>
+        <h3 id="soap" className="text-[15px] font-bold text-[var(--text-primary)]">SOAP</h3>
         <div className="mt-3 space-y-4">
           <VoiceSoapRecorder visitId={visit.id} />
           <SoapEditor visitId={visit.id} initialNotes={notes} />

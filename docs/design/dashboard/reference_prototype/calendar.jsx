@@ -1,5 +1,5 @@
 // ===== Screen 2: Calendar (week view) =====
-const CAL_START_H = 8, CAL_END_H = 19, CAL_HOUR_PX = 58;
+const CAL_START_H = 8, CAL_END_H = 19, CAL_HOUR_PX = 92;
 const DAYS = [
   {he:"ראשון", short:"א׳", date:"07"},
   {he:"שני",   short:"ב׳", date:"08"},
@@ -74,13 +74,17 @@ const NewApptModal = ({open, onClose, onCreate, preset})=>{
   );
 };
 
-const CalendarScreen = ({onOpenClient})=>{
+const CalendarScreen = ({onOpenClient, onOpenVisit, openSignal})=>{
   const [appts,setAppts]=useState(()=>WEEK_APPTS.map(a=>({...a})));
   const [modal,setModal]=useState(false);
   const [preset,setPreset]=useState(null);
   const [drag,setDrag]=useState(null); // {id, grabOffsetMin}
   const [hoverNew,setHoverNew]=useState(null);
+  useEffect(()=>{ if(openSignal){ setPreset(null); setModal(true); } },[openSignal]);
   const bodyRef=useRef(null);
+  const movedRef=useRef(false);
+  const downAppt=useRef(null);
+  const downPos=useRef({x:0,y:0});
   const toast=useToast();
   const hours=[]; for(let h=CAL_START_H;h<CAL_END_H;h++) hours.push(h);
   const pxPerMin=CAL_HOUR_PX/60;
@@ -94,6 +98,7 @@ const CalendarScreen = ({onOpenClient})=>{
   const onPointerDown=(e,a)=>{
     e.preventDefault();
     const g=geom(); if(!g) return;
+    movedRef.current=false; downAppt.current=a; downPos.current={x:e.clientX,y:e.clientY};
     const yMin=CAL_START_H*60 + (e.clientY - g.r.top + g.scrollTop)/pxPerMin;
     setDrag({id:a.id, grabOffsetMin: yMin - cmin(a.start)});
     window.addEventListener("pointermove",onMove);
@@ -101,6 +106,8 @@ const CalendarScreen = ({onOpenClient})=>{
   };
   const onMove=useCallback((e)=>{
     const el=bodyRef.current; if(!el) return;
+    if(Math.abs(e.clientX-downPos.current.x)>4 || Math.abs(e.clientY-downPos.current.y)>4) movedRef.current=true;
+    if(!movedRef.current) return;
     const r=el.getBoundingClientRect(); const colW=r.width/7;
     setDrag(d=>{
       if(!d) return d;
@@ -120,9 +127,13 @@ const CalendarScreen = ({onOpenClient})=>{
   const onUp=useCallback(()=>{
     window.removeEventListener("pointermove",onMove);
     window.removeEventListener("pointerup",onUp);
-    setDrag(d=>{ if(d){ const a=document.querySelector("body"); } return null; });
-    setTimeout(()=>toast("התור עודכן ✓ נשלחה הודעת אישור ללקוח",{icon:"calendar2"}),60);
-  },[onMove,toast]);
+    setDrag(null);
+    if(movedRef.current){
+      setTimeout(()=>toast("התור עודכן ✓ נשלחה הודעת אישור ללקוח",{icon:"calendar2"}),60);
+    } else if(downAppt.current && onOpenVisit){
+      onOpenVisit(downAppt.current);
+    }
+  },[onMove,toast,onOpenVisit]);
 
   const create=(form)=>{
     const id="n"+Math.random().toString(36).slice(2,6);
@@ -138,7 +149,7 @@ const CalendarScreen = ({onOpenClient})=>{
       <div style={{display:"flex",alignItems:"flex-end",justifyContent:"space-between",marginBottom:20,flexWrap:"wrap",gap:12}}>
         <div>
           <h1 style={{margin:0,fontSize:24,fontWeight:800}}>יומן</h1>
-          <div style={{fontSize:13.5,color:"var(--muted)",marginTop:4}}>7–13 ביוני 2026 · גרור תור כדי לשנות מועד</div>
+          <div style={{fontSize:13.5,color:"var(--muted)",marginTop:4}}>7–13 ביוני 2026 · לחץ על תור לצפייה · גרור לשינוי מועד</div>
         </div>
         <div style={{display:"flex",gap:10,alignItems:"center"}}>
           <div style={{display:"flex",alignItems:"center",gap:2,background:"var(--surface)",border:"1px solid var(--line)",borderRadius:10,padding:3}}>
@@ -192,22 +203,27 @@ const CalendarScreen = ({onOpenClient})=>{
                 {appts.filter(a=>a.day===di).map(a=>{
                   const pet=petById(a.petId); const client=clientById(a.clientId); const s=typeStyle(a.type);
                   const top=(cmin(a.start)-CAL_START_H*60)*pxPerMin;
-                  const height=Math.max(a.dur*pxPerMin-3,26);
+                  const height=Math.max(a.dur*pxPerMin-3,42);
                   const isDrag=drag&&drag.id===a.id;
+                  const showClient=height>=64;
                   return (
                     <div key={a.id} onPointerDown={e=>onPointerDown(e,a)} style={{
-                      position:"absolute",top,height,right:2,left:2,
-                      background:s.bg,borderRadius:8,borderInlineStart:`3px solid ${s.fg}`,
-                      padding:"4px 7px",overflow:"hidden",cursor:isDrag?"grabbing":"grab",
-                      boxShadow:isDrag?"var(--sh-lg)":"none",zIndex:isDrag?50:1,
+                      position:"absolute",top,height,right:3,left:3,
+                      background:s.bg,borderRadius:9,borderInlineStart:`4px solid ${s.fg}`,
+                      padding:"6px 9px",overflow:"hidden",cursor:isDrag?"grabbing":"grab",
+                      boxShadow:isDrag?"var(--sh-lg)":"var(--sh-sm)",zIndex:isDrag?50:1,
                       transition:isDrag?"none":"box-shadow .15s",userSelect:"none",
-                      transform:isDrag?"scale(1.02)":"none"
+                      transform:isDrag?"scale(1.02)":"none",display:"flex",flexDirection:"column",gap:2
                     }}>
-                      <div style={{display:"flex",alignItems:"center",gap:5}}>
-                        <AnimalIcon species={pet.species} size={13} sw={2}/>
-                        <span style={{fontSize:11.5,fontWeight:700,color:s.fg,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{pet.name}</span>
+                      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:5}}>
+                        <span style={{fontSize:12,fontWeight:800,color:s.fg,fontVariantNumeric:"tabular-nums",letterSpacing:"-.02em"}}>{a.start}</span>
+                        <span style={{fontSize:10,fontWeight:700,color:"#fff",background:s.fg,padding:"1.5px 7px",borderRadius:99,whiteSpace:"nowrap",flexShrink:0}}>{VISIT_TYPES[a.type].he}</span>
                       </div>
-                      {height>40 && <div style={{fontSize:10.5,color:"var(--ink-2)",marginTop:1,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{a.start} · {VISIT_TYPES[a.type].he}</div>}
+                      <div style={{display:"flex",alignItems:"center",gap:5,color:s.fg}}>
+                        <AnimalIcon species={pet.species} size={15} sw={2}/>
+                        <span style={{fontSize:13,fontWeight:700,color:"var(--ink)",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{pet.name}</span>
+                      </div>
+                      {showClient && <div style={{fontSize:11.5,color:"var(--ink-2)",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",fontWeight:500}}>{client.name}</div>}
                     </div>
                   );
                 })}

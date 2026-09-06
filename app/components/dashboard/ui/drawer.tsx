@@ -27,7 +27,7 @@ export function Drawer({ open, onClose, title, subtitle, children, width, footer
     return () => window.removeEventListener("keydown", handler);
   }, [open, onClose]);
 
-  useFocusTrap(panelRef, open);
+  useFocusTrap(open && mounted, panelRef);
 
   if (!open || !mounted) return null;
 
@@ -45,16 +45,17 @@ export function Drawer({ open, onClose, title, subtitle, children, width, footer
       {/* Panel — anchored to the inline end, opposite the navigation rail. */}
       <aside
         ref={panelRef}
-        tabIndex={-1}
-        className="absolute inset-y-0 end-0 flex flex-col drawer-enter outline-none"
+        className="absolute inset-y-0 end-0 flex flex-col drawer-enter"
         style={{
           width: width ?? "var(--drawer-w)",
           maxWidth: "94vw",
           background: "var(--surface-raised)",
           boxShadow: "var(--shadow-drawer)",
+          outline: "none",
         }}
         role="dialog"
         aria-modal="true"
+        tabIndex={-1}
       >
         <header
           className="flex items-center gap-3 flex-shrink-0 px-5"

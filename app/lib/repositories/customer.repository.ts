@@ -127,6 +127,7 @@ export class CustomerRepository {
         preferred_contact_method: input.preferredContactMethod ?? "phone",
         notes: input.notes ?? null,
         status: input.status ?? "active",
+        tags: input.tags ?? [],
       })
       .select("*")
       .single();
@@ -149,6 +150,7 @@ export class CustomerRepository {
         preferred_contact_method: input.preferredContactMethod,
         notes: input.notes,
         status: input.status,
+        tags: input.tags,
       })
       .eq("id", customerId)
       .is("deleted_at", null)

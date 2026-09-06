@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { processNotifications } from "../../../src/services/notification.processor.js";
+import { processNotifications } from "../../../src/lib/notificationProcessor.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Mocks
@@ -113,6 +113,11 @@ describe("processNotifications", () => {
     expect(result.sent).toBe(2);
     expect(result.failed).toBe(0);
     expect(result.processed).toBe(2);
+
+    // M11: guarded on status='processing', not just id — so a concurrent
+    // cancelFutureNotifications that already flipped the row to 'skipped'
+    // makes this a no-op instead of clobbering it back to 'sent'.
+    expect(sentUpdate.eq).toHaveBeenCalledWith("status", "processing");
   });
 
   it("bulk defers and tracks deferred count when in quiet hours", async () => {
@@ -144,6 +149,7 @@ describe("processNotifications", () => {
     const result = await processNotifications();
     expect(result.failed).toBe(1);
     expect(result.sent).toBe(0);
+    expect(failedUpdate.eq).toHaveBeenCalledWith("status", "processing");
   });
 
   it("logs error but still counts sent when post-send status update fails", async () => {
@@ -192,7 +198,7 @@ describe("quiet-hours deferral — deferred target comes from nextSendableTime",
         if (fields.scheduled_for) capturedScheduledFor = fields.scheduled_for;
         return chainOf({ data: [{ id: "n-1" }], error: null });
       }),
-    } as any);
+    });
 
     await processNotifications();
 
@@ -210,7 +216,7 @@ describe("quiet-hours deferral — deferred target comes from nextSendableTime",
         if (fields.scheduled_for) capturedScheduledFor = fields.scheduled_for;
         return chainOf({ data: [{ id: "n-1" }], error: null });
       }),
-    } as any);
+    });
 
     await processNotifications();
 
@@ -243,17 +249,17 @@ describe("stuck-row recovery", () => {
         b.lte    = vi.fn(self);
         b.select = vi.fn(self);
         b.returns = vi.fn(() => Promise.resolve({ data: [], error: null }));
-        (b as unknown as Promise<unknown>).then = (res: (v: unknown) => unknown) =>
+        (b as { then?: unknown }).then = (res: (v: unknown) => unknown) =>
           Promise.resolve({ data: [], error: null }).then(res);
         if (status === "pending") recoveryUpdate = fields;
         return b;
       }),
-    } as any);
+    });
 
     await processNotifications();
 
     expect(recoveryUpdate).not.toBeNull();
-    expect(recoveryUpdate?.status).toBe("pending");
+    expect((recoveryUpdate as Record<string, unknown> | null)?.status).toBe("pending");
 
     // Threshold should be now − 5 minutes = 09:55 UTC
     expect(ltByStatus["pending"]).toBe("2026-06-12T09:55:00.000Z");
@@ -278,20 +284,21 @@ describe("stuck-row recovery", () => {
         b.lte    = vi.fn(self);
         b.select = vi.fn(self);
         b.returns = vi.fn(() => Promise.resolve({ data: [], error: null }));
-        (b as unknown as Promise<unknown>).then = (res: (v: unknown) => unknown) =>
+        (b as { then?: unknown }).then = (res: (v: unknown) => unknown) =>
           Promise.resolve({ data: [], error: null }).then(res);
         if (status === "skipped") expiryUpdate = fields;
         return b;
       }),
-    } as any);
+    });
 
     const result = await processNotifications();
 
     // Marked skipped with a reason, not sent — a fortnight-old morning reminder
     // must never reach the client when the processor comes back up.
     expect(expiryUpdate).not.toBeNull();
-    expect(expiryUpdate?.status).toBe("skipped");
-    expect(String(expiryUpdate?.error)).toContain("expired");
+    const expiryFields = expiryUpdate as Record<string, unknown> | null;
+    expect(expiryFields?.status).toBe("skipped");
+    expect(String(expiryFields?.error)).toContain("expired");
     expect(result.expired).toBe(2);
     expect(sendSms).not.toHaveBeenCalled();
 

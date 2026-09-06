@@ -5,6 +5,8 @@ import {
   CLINIC_LOCATION,
   HOME_VISIT_LOCATION,
   type BookingConfirmationData,
+  type RescheduleUpdateData,
+  type VaccinationReminderData,
 } from "../../../src/services/sms.templates.js";
 
 const SAMPLE_CLINIC: Parameters<typeof smsTemplates.booking_confirmation>[0] = {
@@ -138,7 +140,7 @@ describe("requireFields runtime guard", () => {
         newDate: "19.6.2026",
         newTime: "11:00",
         location: CLINIC_LOCATION,
-      } as any),
+      } as unknown as RescheduleUpdateData),
     ).toThrow("reschedule_update: missing required fields: oldDate");
   });
 
@@ -147,7 +149,7 @@ describe("requireFields runtime guard", () => {
       smsTemplates.vaccination_reminder({
         customerName: "שרה",
         petName: "ביסלי",
-      } as any),
+      } as unknown as VaccinationReminderData),
     ).toThrow("vaccination_reminder: missing required fields: vaccineName");
   });
 });

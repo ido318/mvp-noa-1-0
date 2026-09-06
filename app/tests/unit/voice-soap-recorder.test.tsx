@@ -123,6 +123,7 @@ describe("VoiceSoapRecorder", () => {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ storagePath: "clinic-1/visit-1/rec.webm" }),
+      signal: expect.any(AbortSignal),
     });
   });
 
@@ -302,5 +303,34 @@ describe("VoiceSoapRecorder", () => {
 
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("does not call /soap-draft (and aborts the in-flight request) if the component unmounts after stop, while the upload is still in flight", async () => {
+    let resolveUpload!: (response: Response) => void;
+    const uploadPromise = new Promise<Response>((resolve) => {
+      resolveUpload = resolve;
+    });
+    vi.mocked(fetch).mockReturnValueOnce(uploadPromise);
+
+    const { unmount } = render(<VoiceSoapRecorder visitId="visit-1" />);
+    await recordAndStop();
+
+    // handleRecordingStopped is under way: the upload fetch has been
+    // issued but hasn't resolved yet. Navigate away right now — before
+    // this fix, nothing stopped the rest of handleRecordingStopped from
+    // continuing once the upload eventually resolved.
+    expect(fetch).toHaveBeenCalledTimes(1);
+    const uploadSignal = vi.mocked(fetch).mock.calls[0]![1]?.signal as AbortSignal;
+    expect(uploadSignal.aborted).toBe(false);
+
+    unmount();
+    expect(uploadSignal.aborted).toBe(true);
+
+    resolveUpload(okJsonResponse({ storagePath: "clinic-1/visit-1/rec.webm" }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // Never reached the /soap-draft call — the transcription/LLM call this
+    // component exists to avoid wasting on an abandoned visit never happens.
+    expect(fetch).toHaveBeenCalledTimes(1);
   });
 });
