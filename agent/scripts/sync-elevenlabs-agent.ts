@@ -98,6 +98,13 @@ const existingRag = currentConfig.conversation_config?.agent?.prompt?.rag ?? { e
 const existingSystemTools = (currentConfig.conversation_config?.agent?.prompt?.tools ?? [])
   .filter((t) => t.type !== "webhook");
 
+// Short Hebrew acknowledgements a caller drops in while Tomer is still talking.
+// Listed here rather than inline so the set is reviewable in one place.
+const HEBREW_BACKCHANNEL_TERMS = [
+  "אהה", "אה", "כן", "אוקיי", "או קיי", "אוקי",
+  "נכון", "בסדר", "הבנתי", "ברור", "מממ", "אמממ", "יופי",
+];
+
 // ── Payload ───────────────────────────────────────────────────────────────────
 
 const patchPayload = {
@@ -113,15 +120,28 @@ const patchPayload = {
       },
     },
     turn: {
-      turn_timeout: 3,
-      turn_eagerness: "eager",
+      // 4s + "neutral" rather than 3s + "eager": eager made Tomer jump in
+      // mid-sentence on the smallest pause, which reads as being cut off.
+      turn_timeout: 4,
+      turn_eagerness: "neutral",
+      // Hebrew backchannel — a caller saying "אהה" or "כן" while Tomer speaks is
+      // acknowledgement, not a turn, so it must not interrupt him.
+      interruption_ignore_terms: HEBREW_BACKCHANNEL_TERMS,
+      merge_with_default_ignore_terms: true,
+      // The filler ("אני איתך.") was itself one of the repeated stock phrases
+      // callers hear; silence during a tool call is less robotic than a canned line.
       soft_timeout_config: {
-        timeout_seconds: 2.5,
-        message: "אני איתך.",
+        timeout_seconds: 3,
+        message: "",
         use_llm_generated_message: false,
         randomize_fillers: false,
         max_soft_timeouts_per_generation: 1,
       },
+    },
+    // Without this, ElevenLabs counts any background voice (a TV, someone else
+    // in the room, street noise) as the caller speaking and stops Tomer.
+    vad: {
+      background_voice_detection: true,
     },
     tts: {
       model_id: "eleven_v3_conversational",
