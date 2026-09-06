@@ -538,26 +538,15 @@ export class AppointmentService {
     });
     if (!updated.ok) return updated;
 
-    let notificationsQueued = false;
-    let smsDispatched = false;
-    if (this.dashboardNotifications) {
-      const queued = await this.dashboardNotifications.enqueueRejectionNotification({
-        appointmentId,
-        scheduledAt: existing.value.scheduledAt,
-        clinicId: updated.value.clinicId,
-        customerId: updated.value.customerId,
-        phone: params.phone,
-        customerName: params.customerName,
-        petName: params.petName,
-      });
-      notificationsQueued = queued.ok;
-      if (!queued.ok) {
-        console.error("[appointment.reject] SMS enqueue failed", queued.error);
-      } else {
-        const dispatched = await this.notificationDispatcher?.dispatch({ appointmentId });
-        smsDispatched = dispatched?.dispatched ?? false;
-      }
-    }
+    // No enqueue here: the appointments_notify_dashboard_change trigger already
+    // wrote cancellation_update inside the UPDATE above (it fires on any
+    // changed_via='dashboard' transition into cancelled, and upserts on the
+    // (appointment_id, type) unique key). Inserting it again from here hit that
+    // constraint, reported the rejection as failed, and skipped the dispatch —
+    // while a perfectly good row sat in the queue. The row exists by now, so
+    // there is only one thing left to do with it.
+    const dispatched = await this.notificationDispatcher?.dispatch({ appointmentId });
+    const smsDispatched = dispatched?.dispatched ?? false;
 
     await this.auditService.logAction({
       clinicId: updated.value.clinicId,
@@ -572,7 +561,7 @@ export class AppointmentService {
 
     return ok({
       appointment: updated.value,
-      smsStatus: !notificationsQueued ? "failed" : smsDispatched ? "sent" : "queued",
+      smsStatus: smsDispatched ? "sent" : "queued",
     });
   }
 }

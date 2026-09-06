@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Btn } from "@/components/dashboard/ui/btn";
 import { Field, Input, Select, Textarea } from "@/components/dashboard/ui/field";
@@ -37,6 +37,14 @@ export function VisitForm({
   const [petId, setPetId] = useState(initialPetId ?? "");
   const [pets, setPets] = useState<Pet[]>(initialPets);
   const [petsLoading, setPetsLoading] = useState(false);
+  // Which customer the `pets` in state actually belong to. Comparing against
+  // initialCustomerId instead was wrong: switching away and back left the other
+  // customer's animals on screen, and picking one failed the server's
+  // pet/customer/clinic check.
+  const loadedForCustomerId = useRef<string>(initialCustomerId ?? "");
+  const [customerQuery, setCustomerQuery] = useState("");
+  const [customerOptions, setCustomerOptions] = useState<Customer[]>(customers);
+  const [customerSearching, setCustomerSearching] = useState(false);
   const [chiefComplaint, setChiefComplaint] = useState("");
   const [manualVisitSummary, setManualVisitSummary] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -65,14 +73,58 @@ export function VisitForm({
     }
   }, []);
 
+  // The initial list is only the first page the API returns, so an older client
+  // is unreachable by scrolling the dropdown alone. Two characters or more
+  // search server-side; fewer falls back to that first page.
   useEffect(() => {
-    // Only fetch when the customer changed away from the preloaded context.
     if (contextLocked) return;
-    if (!customerId || customerId === initialCustomerId) return;
-    void loadPets(customerId);
-  }, [customerId, initialCustomerId, contextLocked, loadPets]);
+    const query = customerQuery.trim();
+    if (query.length < 2) {
+      setCustomerOptions(customers);
+      setCustomerSearching(false);
+      return;
+    }
 
-  const selectedCustomer = customers.find((c) => c.id === customerId) ?? null;
+    let cancelled = false;
+    setCustomerSearching(true);
+    const timer = setTimeout(() => {
+      void (async () => {
+        try {
+          const response = await fetch(`/api/customers?q=${encodeURIComponent(query)}&limit=50`);
+          if (!response.ok) throw new Error();
+          const payload = (await response.json()) as { data: { items: Customer[] } };
+          if (!cancelled) setCustomerOptions(payload.data.items ?? []);
+        } catch {
+          if (!cancelled) setCustomerOptions([]);
+        } finally {
+          if (!cancelled) setCustomerSearching(false);
+        }
+      })();
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [customerQuery, customers, contextLocked]);
+
+  useEffect(() => {
+    if (contextLocked) return;
+    if (!customerId) {
+      setPets([]);
+      setPetId("");
+      loadedForCustomerId.current = "";
+      return;
+    }
+    if (customerId === loadedForCustomerId.current) return;
+    loadedForCustomerId.current = customerId;
+    void loadPets(customerId);
+  }, [customerId, contextLocked, loadPets]);
+
+  const selectedCustomer =
+    customerOptions.find((c) => c.id === customerId) ??
+    customers.find((c) => c.id === customerId) ??
+    null;
   const selectedPet = pets.find((p) => p.id === petId) ?? null;
   const canSubmit = Boolean(customerId && petId) && !loading;
 
@@ -127,7 +179,25 @@ export function VisitForm({
         </div>
       ) : (
         <>
-          <Field label="לקוח" htmlFor="visitCustomer" required>
+          <Field
+            label="לקוח"
+            htmlFor="visitCustomer"
+            required
+            hint={
+              customerSearching
+                ? "מחפש…"
+                : customerQuery.trim().length >= 2 && customerOptions.length === 0
+                  ? "לא נמצאו לקוחות מתאימים"
+                  : "אפשר לחפש לפי שם, טלפון או אימייל"
+            }
+          >
+            <Input
+              id="visitCustomerSearch"
+              value={customerQuery}
+              placeholder="חיפוש לקוח…"
+              onChange={(event) => setCustomerQuery(event.target.value)}
+              className="mb-2"
+            />
             <Select
               id="visitCustomer"
               value={customerId}
@@ -138,7 +208,7 @@ export function VisitForm({
               }}
             >
               <option value="">בחר לקוח…</option>
-              {customers.map((customer) => (
+              {customerOptions.map((customer) => (
                 <option key={customer.id} value={customer.id}>
                   {customer.fullName}
                   {customer.phone ? ` · ${customer.phone}` : ""}

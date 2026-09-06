@@ -128,16 +128,34 @@ describe("approve/reject SMS status", () => {
     expect(appointmentRepository.updateVersioned).toHaveBeenCalled();
   });
 
-  it("reports the same three outcomes when rejecting", async () => {
-    const { service } = buildService({
-      enqueue: vi.fn().mockResolvedValue(ok(undefined)),
-      dispatch: vi.fn().mockResolvedValue({ dispatched: true }),
-    });
+  it("dispatches the row the DB trigger wrote when rejecting, and does not enqueue its own", async () => {
+    // appointments_notify_dashboard_change already inserts cancellation_update
+    // inside the same UPDATE. Enqueueing it again here violated the
+    // (appointment_id, type) unique key, reported the rejection as failed, and
+    // skipped the dispatch — while a valid row sat in the queue.
+    const enqueue = vi.fn();
+    const dispatch = vi.fn().mockResolvedValue({ dispatched: true });
+    const { service } = buildService({ enqueue, dispatch });
 
     const result = await service.rejectPendingAppointment(owner, "appt-1", params);
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.smsStatus).toBe("sent");
+    expect(enqueue).not.toHaveBeenCalled();
+    expect(dispatch).toHaveBeenCalledWith({ appointmentId: "appt-1" });
+  });
+
+  it("reports the rejection SMS as queued when the agent could not be reached", async () => {
+    const { service } = buildService({
+      enqueue: vi.fn(),
+      dispatch: vi.fn().mockResolvedValue({ dispatched: false, reason: "offline" }),
+    });
+
+    const result = await service.rejectPendingAppointment(owner, "appt-1", params);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.smsStatus).toBe("queued");
   });
 });

@@ -16,6 +16,17 @@
 -- analysis never ran. Only the booking confirmation worked, because the agent
 -- sends that one in-process rather than through the queue.
 --
+-- ON A BACKLOG: the processor now closes out any pending row whose scheduled_for
+-- passed more than 12 hours ago, marking it 'skipped' rather than sending it (see
+-- EXPIRY_MS in agent/src/services/notification.processor.ts). That guard exists
+-- precisely for this script: enabling the jobs on a project that accumulated a
+-- backlog while they were broken must not blast clients with morning reminders
+-- for appointments that are already in the past. To see what would be closed out
+-- before enabling:
+--   select type, count(*) from public.notifications_log
+--   where status = 'pending' and scheduled_for < now() - interval '12 hours'
+--   group by type;
+--
 -- Check the jobs are actually working, rather than merely scheduled:
 --   select jobid, status, return_message, start_time
 --   from cron.job_run_details order by start_time desc limit 10;

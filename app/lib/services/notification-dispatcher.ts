@@ -14,6 +14,14 @@
 export type DispatchTarget = { appointmentId?: string; clinicId?: string };
 export type DispatchResult = { dispatched: boolean; reason?: string };
 
+/** What POST /jobs/process-notifications reports back. */
+type ProcessResult = {
+  processed?: number;
+  sent?: number;
+  failed?: number;
+  deferred?: number;
+};
+
 const DISPATCH_TIMEOUT_MS = 8_000;
 
 export function getAgentJobsConfig(): { baseUrl: string; token: string } | null {
@@ -47,7 +55,24 @@ export class NotificationDispatcher {
       if (!response.ok) {
         return { dispatched: false, reason: `agent returned ${response.status}` };
       }
-      return { dispatched: true };
+
+      // A 200 only means the processor ran. It also answers 200 when Twilio
+      // rejected the number, when quiet hours deferred the row, and when it
+      // claimed nothing at all — reporting "sent" on any of those would put the
+      // same false claim back in front of the vet that this whole change exists
+      // to remove. Only an actual send counts.
+      const result = (await response.json().catch(() => null)) as ProcessResult | null;
+      if (!result || typeof result.sent !== "number") {
+        return { dispatched: false, reason: "agent response was not readable" };
+      }
+      if (result.sent > 0) return { dispatched: true };
+      if ((result.deferred ?? 0) > 0) {
+        return { dispatched: false, reason: "deferred to after quiet hours" };
+      }
+      if ((result.failed ?? 0) > 0) {
+        return { dispatched: false, reason: "the SMS provider rejected the message" };
+      }
+      return { dispatched: false, reason: "no matching message was queued" };
     } catch (error) {
       return {
         dispatched: false,

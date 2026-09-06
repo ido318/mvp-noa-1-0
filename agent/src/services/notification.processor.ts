@@ -8,6 +8,8 @@ export type ProcessResult = {
   sent: number;
   failed: number;
   deferred: number;
+  /** Rows whose moment has passed; marked 'skipped' rather than sent late. */
+  expired: number;
 };
 
 type ProcessOptions = {
@@ -27,8 +29,16 @@ type NotificationRow = {
 // Rows stuck in 'processing' for longer than this are considered crashed and reset.
 const PROCESSING_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
 
+// A reminder is only useful near the moment it describes. If the processor was
+// down — as it was for weeks while every cron run failed on a missing function —
+// the backlog must not be delivered on recovery: nobody wants a "your
+// appointment is today at 09:00" for an appointment two weeks past, and a
+// post-visit follow-up that arrives a fortnight late reads as neglect. Anything
+// overdue by more than this is closed out as 'skipped'.
+const EXPIRY_MS = 12 * 60 * 60 * 1000; // 12 hours
+
 export async function processNotifications(opts: ProcessOptions = {}): Promise<ProcessResult> {
-  const result: ProcessResult = { processed: 0, sent: 0, failed: 0, deferred: 0 };
+  const result: ProcessResult = { processed: 0, sent: 0, failed: 0, deferred: 0, expired: 0 };
   const now = new Date();
   const nowIso = now.toISOString();
 
@@ -41,6 +51,26 @@ export async function processNotifications(opts: ProcessOptions = {}): Promise<P
     .lt("updated_at", staleThreshold);
   if (recoveryErr) {
     logger.error({ error: recoveryErr.message }, "Stuck-row recovery failed — processing rows may remain stuck");
+  }
+
+  // ── Expiry: close out rows whose moment has passed ─────────────────────
+  const expiryThreshold = new Date(now.getTime() - EXPIRY_MS).toISOString();
+  let expireQuery = getSupabase()
+    .from("notifications_log")
+    .update({ status: "skipped", error: "expired: scheduled_for passed by more than 12h", updated_at: nowIso })
+    .eq("status", "pending")
+    .lt("scheduled_for", expiryThreshold)
+    .select("id");
+
+  if (opts.appointmentId) expireQuery = expireQuery.eq("appointment_id", opts.appointmentId);
+  if (opts.clinicId)      expireQuery = expireQuery.eq("clinic_id", opts.clinicId);
+
+  const { data: expired, error: expireErr } = await expireQuery;
+  if (expireErr) {
+    logger.error({ error: expireErr.message }, "Expiry sweep failed — stale rows may be sent late");
+  } else if (expired && expired.length > 0) {
+    result.expired = expired.length;
+    logger.warn({ expired: expired.length }, "Skipped notifications whose scheduled time had passed");
   }
 
   // ── Quiet hours: bulk defer all pending rows ───────────────────────────

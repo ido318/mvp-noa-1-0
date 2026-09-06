@@ -43,6 +43,15 @@ function makeRow(overrides: Partial<{
   };
 }
 
+/**
+ * The processor makes one extra call between the stuck-row recovery pass and the
+ * claim: the expiry sweep that closes out rows whose scheduled_for has long
+ * passed. Tests that queue calls in order have to account for it.
+ */
+function expirySweep(rows: unknown[] = []) {
+  return chainOf({ data: rows, error: null });
+}
+
 // A chainable mock that ends with .select().returns() or just resolves via .then()
 function chainOf(resolveValue: unknown = { error: null }) {
   const chain: Record<string, unknown> = {};
@@ -79,10 +88,10 @@ describe("processNotifications", () => {
     // recovery call + claim call both succeed with no data
     const recovery = chainOf({ error: null });
     const claim    = chainOf({ data: [], error: null });
-    mockFrom.mockReturnValueOnce(recovery).mockReturnValueOnce(claim);
+    mockFrom.mockReturnValueOnce(recovery).mockReturnValueOnce(expirySweep()).mockReturnValueOnce(claim);
 
     const result = await processNotifications();
-    expect(result).toEqual({ processed: 0, sent: 0, failed: 0, deferred: 0 });
+    expect(result).toEqual({ processed: 0, sent: 0, failed: 0, deferred: 0, expired: 0 });
     expect(sendSms).not.toHaveBeenCalled();
   });
 
@@ -94,6 +103,7 @@ describe("processNotifications", () => {
     const sentUpdate = chainOf({ error: null });
     mockFrom
       .mockReturnValueOnce(recovery)
+      .mockReturnValueOnce(expirySweep())
       .mockReturnValueOnce(claim)
       .mockReturnValue(sentUpdate);
 
@@ -110,7 +120,7 @@ describe("processNotifications", () => {
 
     const recovery   = chainOf({ error: null });
     const deferChain = chainOf({ data: [{ id: "n-1" }, { id: "n-2" }], error: null });
-    mockFrom.mockReturnValueOnce(recovery).mockReturnValueOnce(deferChain);
+    mockFrom.mockReturnValueOnce(recovery).mockReturnValueOnce(expirySweep()).mockReturnValueOnce(deferChain);
 
     const result = await processNotifications();
     expect(sendSms).not.toHaveBeenCalled();
@@ -127,6 +137,7 @@ describe("processNotifications", () => {
     const failedUpdate = chainOf({ error: null });
     mockFrom
       .mockReturnValueOnce(recovery)
+      .mockReturnValueOnce(expirySweep())
       .mockReturnValueOnce(claim)
       .mockReturnValue(failedUpdate);
 
@@ -142,6 +153,7 @@ describe("processNotifications", () => {
     const failUpdate = chainOf({ error: { message: "DB error" } });
     mockFrom
       .mockReturnValueOnce(recovery)
+      .mockReturnValueOnce(expirySweep())
       .mockReturnValueOnce(claim)
       .mockReturnValue(failUpdate);
 
@@ -155,7 +167,7 @@ describe("processNotifications", () => {
     // Simulates a second concurrent processor run: claim returns empty
     const recovery = chainOf({ error: null });
     const claim    = chainOf({ data: [], error: null });
-    mockFrom.mockReturnValueOnce(recovery).mockReturnValueOnce(claim);
+    mockFrom.mockReturnValueOnce(recovery).mockReturnValueOnce(expirySweep()).mockReturnValueOnce(claim);
 
     const result = await processNotifications();
     expect(sendSms).not.toHaveBeenCalled();
@@ -213,23 +225,27 @@ describe("stuck-row recovery", () => {
     vi.useFakeTimers({ now: new Date("2026-06-12T10:00:00Z") });
 
     let recoveryUpdate: Record<string, unknown> | null = null;
-    let recoveryLtThreshold: string | null = null;
+    // Both the recovery pass and the expiry sweep filter with .lt(), so the
+    // threshold is recorded per update kind rather than into one variable that
+    // the later call would overwrite.
+    const ltByStatus: Record<string, string> = {};
 
     mockFrom.mockReturnValue({
       update: vi.fn((fields: Record<string, unknown>) => {
+        const status = String(fields.status ?? "");
         const b: Record<string, unknown> = {};
         const self = () => b;
         b.eq = vi.fn(self);
         b.lt = vi.fn((_col: string, val: string) => {
-          recoveryLtThreshold = val;
-          return chainOf({ error: null });
+          ltByStatus[status] = val;
+          return chainOf({ data: [], error: null });
         });
         b.lte    = vi.fn(self);
         b.select = vi.fn(self);
         b.returns = vi.fn(() => Promise.resolve({ data: [], error: null }));
         (b as unknown as Promise<unknown>).then = (res: (v: unknown) => unknown) =>
           Promise.resolve({ data: [], error: null }).then(res);
-        if (fields.status === "pending") recoveryUpdate = fields;
+        if (status === "pending") recoveryUpdate = fields;
         return b;
       }),
     } as any);
@@ -240,7 +256,47 @@ describe("stuck-row recovery", () => {
     expect(recoveryUpdate?.status).toBe("pending");
 
     // Threshold should be now − 5 minutes = 09:55 UTC
-    expect(recoveryLtThreshold).toBe("2026-06-12T09:55:00.000Z");
+    expect(ltByStatus["pending"]).toBe("2026-06-12T09:55:00.000Z");
+  });
+
+  it("closes out pending rows overdue by more than 12 hours instead of sending them late", async () => {
+    vi.useFakeTimers({ now: new Date("2026-06-12T10:00:00Z") });
+
+    let expiryUpdate: Record<string, unknown> | null = null;
+    const ltByStatus: Record<string, string> = {};
+
+    mockFrom.mockReturnValue({
+      update: vi.fn((fields: Record<string, unknown>) => {
+        const status = String(fields.status ?? "");
+        const b: Record<string, unknown> = {};
+        const self = () => b;
+        b.eq = vi.fn(self);
+        b.lt = vi.fn((_col: string, val: string) => {
+          ltByStatus[status] = val;
+          return chainOf({ data: [{ id: "stale-1" }, { id: "stale-2" }], error: null });
+        });
+        b.lte    = vi.fn(self);
+        b.select = vi.fn(self);
+        b.returns = vi.fn(() => Promise.resolve({ data: [], error: null }));
+        (b as unknown as Promise<unknown>).then = (res: (v: unknown) => unknown) =>
+          Promise.resolve({ data: [], error: null }).then(res);
+        if (status === "skipped") expiryUpdate = fields;
+        return b;
+      }),
+    } as any);
+
+    const result = await processNotifications();
+
+    // Marked skipped with a reason, not sent — a fortnight-old morning reminder
+    // must never reach the client when the processor comes back up.
+    expect(expiryUpdate).not.toBeNull();
+    expect(expiryUpdate?.status).toBe("skipped");
+    expect(String(expiryUpdate?.error)).toContain("expired");
+    expect(result.expired).toBe(2);
+    expect(sendSms).not.toHaveBeenCalled();
+
+    // Threshold is now − 12 hours = 22:00 the previous day.
+    expect(ltByStatus["skipped"]).toBe("2026-06-11T22:00:00.000Z");
   });
 });
 

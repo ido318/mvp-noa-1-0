@@ -439,7 +439,10 @@ function ClientProfile({
           customerId={messageTarget.id}
           customerName={messageTarget.fullName}
           phone={messageTarget.phone}
-          petName={pets[0]?.name}
+          // Only when there is no ambiguity. With several animals this used to
+          // put the first one's name into "reminder" and "follow-up" templates,
+          // which is how a client gets a message about the wrong pet.
+          petName={pets.length === 1 ? pets[0]!.name : undefined}
           onClose={() => setMessageTarget(null)}
         />
       )}
