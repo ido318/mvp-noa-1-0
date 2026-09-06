@@ -51,16 +51,21 @@ const VISIT_LABELS: Record<string, string> = {
   other: "ביקור",
 };
 
+// Whole segment, not just a number. Neutering has no fixed price — it depends on
+// species, weight, age and medical state, and only Dr. Noa quotes it — so the
+// approval SMS must not name one. Mirrors agent/src/lib/notifications.ts.
+const NO_FIXED_PRICE_TEXT = 'המחיר יימסר על ידי ד"ר נועה';
+
 const VISIT_PRICES: Record<string, string> = {
-  checkup: "150",
-  vaccination: "150",
-  vaccine: "150",
-  neutering: "350",
-  home_visit: "300",
-  phone_consultation: "200",
-  followup: "150",
-  surgery: "350",
-  other: "150",
+  checkup: "150 ₪",
+  vaccination: "150 ₪",
+  vaccine: "150 ₪",
+  neutering: NO_FIXED_PRICE_TEXT,
+  home_visit: "300 ₪",
+  phone_consultation: "200 ₪",
+  followup: "150 ₪",
+  surgery: NO_FIXED_PRICE_TEXT,
+  other: "150 ₪",
 };
 
 const CLINIC_LOCATION = 'הקליניקה, גרציאני 6 ת"א';
@@ -75,7 +80,7 @@ function buildBookingConfirmationBody(p: {
     `שלום ${p.customerName}, כאן תומר ממרפאת Get A Vet של ד"ר נועה כבשני.\n` +
     `התור של ${p.petName} נקבע בהצלחה ✅\n` +
     `📅 ${p.dayName}, ${p.date} | 🕒 ${p.time} | 📍 ${p.location}\n` +
-    `🩺 ${p.visitType} | 💳 ${p.price} ₪\n` +
+    `🩺 ${p.visitType} | 💳 ${p.price}\n` +
     `לשינוי או ביטול (חינם עד 4 שעות לפני התור) — חייגו אלינו.\n` +
     `מאחלים ל${p.petName} בריאות שלמה 🐾`
   );
@@ -166,7 +171,7 @@ export class DashboardNotificationsService {
     const isHome = p.visitType === "home_visit";
     const location = isHome ? HOME_LOCATION : CLINIC_LOCATION;
     const visitTypeLabel = VISIT_LABELS[p.visitType] ?? p.visitType;
-    const price = VISIT_PRICES[p.visitType] ?? "150";
+    const price = VISIT_PRICES[p.visitType] ?? "150 ₪";
 
     const shared = {
       clinic_id:      p.clinicId,

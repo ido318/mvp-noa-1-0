@@ -6,7 +6,8 @@ export interface SmsTemplateData {
   time?: string;         // "16:30"
   location?: string;     // "הקליניקה, גרציאני 6 ת"א" / "ביקור בית בכתובתכם"
   visitType?: string;    // "בדיקה" / "חיסונים" / "ביקור בית"
-  price?: string;        // "150"
+  price?: string;        // "150 ₪" — a full segment, so a service with no
+                         // fixed price can say so instead of naming a number
   oldDate?: string;
   newDate?: string;
   newTime?: string;
@@ -82,7 +83,7 @@ export const smsTemplates = {
       `שלום ${d.customerName}, כאן תומר ממרפאת Get A Vet של ד"ר נועה כבשני.\n` +
       `התור של ${d.petName} נקבע בהצלחה ✅\n` +
       `📅 ${d.dayName}, ${d.date} | 🕒 ${d.time} | 📍 ${d.location}\n` +
-      `🩺 ${d.visitType} | 💳 ${d.price} ₪\n` +
+      `🩺 ${d.visitType} | 💳 ${d.price}\n` +
       `לשינוי או ביטול (חינם עד 4 שעות לפני התור) — חייגו אלינו.\n` +
       `מאחלים ל${d.petName} בריאות שלמה 🐾`
     );

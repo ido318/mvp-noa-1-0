@@ -55,6 +55,8 @@ import { WaitlistService } from "@/lib/services/waitlist.service";
 import { VoiceCallRepository } from "@/lib/repositories/voice-call.repository";
 import { EscalationService } from "@/lib/services/escalation.service";
 import { DashboardNotificationsService } from "@/lib/services/dashboard-notifications.service";
+import { NotificationDispatcher } from "@/lib/services/notification-dispatcher";
+import { CustomerMessageService } from "@/lib/services/customer-message.service";
 
 export async function createServices() {
   const supabase = await createSupabaseServerClient();
@@ -88,7 +90,10 @@ export async function createServices() {
   const aiEventRepository = new AIEventRepository(admin);
   const aiSummaryRepository = new AiSummaryRepository(supabase);
   const auditService = new AuditService(auditLogRepository);
-  const dashboardNotificationsService = new DashboardNotificationsService(supabase);
+  // Admin, not the session client: notifications_log has RLS enabled with only a
+  // SELECT policy for members, so an INSERT through the user session is rejected
+  // and the approve/reject flow queues nothing at all.
+  const dashboardNotificationsService = new DashboardNotificationsService(admin);
   const taskService = new TaskService(taskRepository);
   const followUpService = new FollowUpService(followUpRepository, taskService);
   const invoiceService = new InvoiceService(invoiceRepository, auditService);
@@ -125,7 +130,9 @@ export async function createServices() {
       dashboardNotificationsService,
       visitRepository,
       medicalRecordService,
+      new NotificationDispatcher(),
     ),
+    customerMessage: new CustomerMessageService(customerRepository, admin, auditService),
     calendar: new CalendarService(appointmentRepository, calendarBlockRepository),
     calendarBlock: new CalendarBlockService(calendarBlockRepository),
     waitlist: new WaitlistService(waitlistRepository),

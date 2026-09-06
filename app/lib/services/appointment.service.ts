@@ -7,6 +7,7 @@ import type { VisitRepository } from "@/lib/repositories/visit.repository";
 import type { AuditService } from "@/lib/services/audit.service";
 import type { DashboardNotificationsService } from "@/lib/services/dashboard-notifications.service";
 import type { MedicalRecordService } from "@/lib/services/medical-record.service";
+import type { NotificationDispatcher } from "@/lib/services/notification-dispatcher";
 import type { ServiceActor } from "@/lib/services/service-context";
 import type {
   Appointment,
@@ -17,6 +18,20 @@ import type {
   UpdateAppointmentInput,
 } from "@/types/domain/appointment";
 import type { Visit } from "@/types/domain/visit";
+
+/**
+ * What actually happened to the client's SMS, so the dashboard can say it rather
+ * than assert "נשלח SMS" unconditionally the way it used to.
+ *   sent   — queued and the agent confirmed it processed the queue
+ *   queued — queued, will go out on the next cron tick
+ *   failed — not queued at all
+ */
+export type AppointmentSmsStatus = "sent" | "queued" | "failed";
+
+export type AppointmentDecisionResult = {
+  appointment: Appointment;
+  smsStatus: AppointmentSmsStatus;
+};
 
 const ALLOWED_STATUS_TRANSITIONS: Record<AppointmentStatus, AppointmentStatus[]> = {
   scheduled:        ["confirmed", "checked_in", "cancelled", "no_show"],
@@ -76,6 +91,7 @@ export class AppointmentService {
     private readonly dashboardNotifications?: DashboardNotificationsService,
     private readonly visitRepository?: VisitRepository,
     private readonly medicalRecordService?: Pick<MedicalRecordService, "ensureRecordForPet">,
+    private readonly notificationDispatcher?: Pick<NotificationDispatcher, "dispatch">,
   ) {}
 
   async listAppointments(
@@ -433,7 +449,7 @@ export class AppointmentService {
     actor: ServiceActor,
     appointmentId: string,
     params: { phone: string; customerName: string; petName: string },
-  ): Promise<Result<Appointment>> {
+  ): Promise<Result<AppointmentDecisionResult>> {
     const existing = await this.getAppointmentById(actor, appointmentId);
     if (!existing.ok) return existing;
     if (!hasPrivilegedClinicRole(actor, existing.value.clinicId)) {
@@ -449,8 +465,13 @@ export class AppointmentService {
     });
     if (!updated.ok) return updated;
 
+    // The appointment is already approved, so a queueing failure must not roll it
+    // back — but it must not pass silently either: the dashboard told the vet an
+    // SMS was on its way, and for months an RLS rejection here was discarded.
+    let notificationsQueued = false;
+    let smsDispatched = false;
     if (this.dashboardNotifications) {
-      await this.dashboardNotifications.enqueueApprovalNotifications({
+      const queued = await this.dashboardNotifications.enqueueApprovalNotifications({
         appointmentId,
         scheduledAt: updated.value.scheduledAt,
         durationMinutes: updated.value.durationMinutes,
@@ -461,6 +482,13 @@ export class AppointmentService {
         customerName: params.customerName,
         petName: params.petName,
       });
+      notificationsQueued = queued.ok;
+      if (!queued.ok) {
+        console.error("[appointment.approve] SMS enqueue failed", queued.error);
+      } else {
+        const dispatched = await this.notificationDispatcher?.dispatch({ appointmentId });
+        smsDispatched = dispatched?.dispatched ?? false;
+      }
     }
 
     await this.auditService.logAction({
@@ -474,7 +502,10 @@ export class AppointmentService {
       afterPayload: updated.value,
     });
 
-    return updated;
+    return ok({
+      appointment: updated.value,
+      smsStatus: !notificationsQueued ? "failed" : smsDispatched ? "sent" : "queued",
+    });
   }
 
   /**
@@ -485,7 +516,7 @@ export class AppointmentService {
     actor: ServiceActor,
     appointmentId: string,
     params: { phone: string; customerName: string; petName: string },
-  ): Promise<Result<Appointment>> {
+  ): Promise<Result<AppointmentDecisionResult>> {
     const existing = await this.getAppointmentById(actor, appointmentId);
     if (!existing.ok) return existing;
     if (!hasPrivilegedClinicRole(actor, existing.value.clinicId)) {
@@ -507,8 +538,10 @@ export class AppointmentService {
     });
     if (!updated.ok) return updated;
 
+    let notificationsQueued = false;
+    let smsDispatched = false;
     if (this.dashboardNotifications) {
-      await this.dashboardNotifications.enqueueRejectionNotification({
+      const queued = await this.dashboardNotifications.enqueueRejectionNotification({
         appointmentId,
         scheduledAt: existing.value.scheduledAt,
         clinicId: updated.value.clinicId,
@@ -517,6 +550,13 @@ export class AppointmentService {
         customerName: params.customerName,
         petName: params.petName,
       });
+      notificationsQueued = queued.ok;
+      if (!queued.ok) {
+        console.error("[appointment.reject] SMS enqueue failed", queued.error);
+      } else {
+        const dispatched = await this.notificationDispatcher?.dispatch({ appointmentId });
+        smsDispatched = dispatched?.dispatched ?? false;
+      }
     }
 
     await this.auditService.logAction({
@@ -530,6 +570,9 @@ export class AppointmentService {
       afterPayload: updated.value,
     });
 
-    return updated;
+    return ok({
+      appointment: updated.value,
+      smsStatus: !notificationsQueued ? "failed" : smsDispatched ? "sent" : "queued",
+    });
   }
 }

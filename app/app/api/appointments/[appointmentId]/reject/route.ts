@@ -31,7 +31,13 @@ export async function POST(
     const body = parseOrThrow(rejectSchema, await request.json());
     const result = await appointment.rejectPendingAppointment(actor, appointmentId, body);
     if (!result.ok) return handleRouteError(result.error, requestId);
-    return jsonSuccess(result.value, 200, requestId);
+    // Appointment fields stay at the top level (unchanged contract); smsStatus is
+    // added so the dashboard can report what actually happened to the client SMS.
+    return jsonSuccess(
+      { ...result.value.appointment, smsStatus: result.value.smsStatus },
+      200,
+      requestId,
+    );
   } catch (error) {
     return handleRouteError(error, requestId);
   }
