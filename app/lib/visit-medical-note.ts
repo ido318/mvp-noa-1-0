@@ -13,5 +13,6 @@ export function selectVisitMedicalNote(notes: MedicalNote[]): MedicalNote | null
   );
 
   const newestApproved = byNewestFirst.find((n) => n.status === "approved");
-  return newestApproved ?? byNewestFirst[0];
+  // byNewestFirst is provably non-empty: guaranteed by the early `notes.length === 0` return above
+  return newestApproved ?? byNewestFirst[0]!;
 }
