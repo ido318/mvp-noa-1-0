@@ -152,16 +152,23 @@ export class InvoiceService {
       invoice.notes,
     );
 
+    // Send before persisting: if the SMS fails, nothing gets written, so the
+    // invoice never ends up with a populated payment_link_sent_at for a link
+    // the customer never actually received.
+    try {
+      await sendSms(
+        customer.phone,
+        `שלום ${customer.fullName}, מצורף קישור לתשלום עבור חשבונית ${invoice.invoiceNumber} על סך ${invoice.total} ₪:\n${document.paymentUrl}`,
+      );
+    } catch (error) {
+      return err(AppError.externalProvider("שליחת קישור התשלום נכשלה", error));
+    }
+
     const updated = await this.repository.attachPaymentLink(invoiceId, {
       paymentLinkUrl: document.paymentUrl,
       greenInvoiceDocumentId: document.documentId,
     });
     if (!updated.ok) return updated;
-
-    await sendSms(
-      customer.phone,
-      `שלום ${customer.fullName}, מצורף קישור לתשלום עבור חשבונית ${invoice.invoiceNumber} על סך ${invoice.total} ₪:\n${document.paymentUrl}`,
-    );
 
     await this.auditService.logAction({
       clinicId: invoice.clinicId,

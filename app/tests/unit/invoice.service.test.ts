@@ -120,6 +120,16 @@ describe("InvoiceService.sendPaymentLink", () => {
     expect(auditService.logAction).toHaveBeenCalledOnce();
   });
 
+  it("does not persist a payment link when the SMS send fails", async () => {
+    const { service, repository } = buildInvoiceService(makeInvoice());
+    sendSmsMock.mockRejectedValueOnce(new Error("twilio down"));
+
+    const result = await service.sendPaymentLink(actor, "invoice-1");
+
+    expect(result.ok).toBe(false);
+    expect(repository.attachPaymentLink).not.toHaveBeenCalled();
+  });
+
   it("rejects when the invoice is not yet issued (status !== sent)", async () => {
     const { service, greenInvoiceService } = buildInvoiceService(makeInvoice({ status: "draft" }));
 

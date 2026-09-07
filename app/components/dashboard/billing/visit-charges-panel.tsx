@@ -25,6 +25,7 @@ export function VisitChargesPanel({
   const [unitPrice, setUnitPrice] = useState("");
   const [saveToPriceList, setSaveToPriceList] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     void (async () => {
@@ -53,7 +54,9 @@ export function VisitChargesPanel({
 
   async function addCharge() {
     setLoading(true);
-    await fetch(`/api/visits/${visitId}/charges`, {
+    setError(null);
+
+    const chargeRes = await fetch(`/api/visits/${visitId}/charges`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -63,13 +66,27 @@ export function VisitChargesPanel({
         sourceType: "manual",
       }),
     });
+    if (!chargeRes.ok) {
+      setLoading(false);
+      setError("הוספת החיוב נכשלה");
+      return;
+    }
 
     if (selectedItemId === CUSTOM_ITEM_VALUE && saveToPriceList && description.trim()) {
-      await fetch("/api/price-list", {
+      const priceListRes = await fetch("/api/price-list", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ clinicId, name: description, defaultPrice: Number(unitPrice) }),
       });
+      if (!priceListRes.ok) {
+        // The charge itself was already created successfully — only the
+        // catalog save failed (e.g. requires owner/admin) — surface that
+        // distinctly so the user doesn't think it silently succeeded.
+        setLoading(false);
+        setError("החיוב נוסף, אך שמירתו במחירון נכשלה (נדרשת הרשאת בעלים/מנהל)");
+        router.refresh();
+        return;
+      }
     }
 
     setSelectedItemId(CUSTOM_ITEM_VALUE);
@@ -161,6 +178,7 @@ export function VisitChargesPanel({
             שמור פריט זה במחירון לפעמים הבאות (אחרת זה חיוב חד-פעמי ללקוח הזה בלבד)
           </label>
         ) : null}
+        {error ? <p className="text-xs text-[var(--red-600)]">{error}</p> : null}
       </div>
       {charges.some((charge) => charge.status === "reviewed") ? (
         <Btn type="button" size="sm" onClick={() => void createInvoice()}>
