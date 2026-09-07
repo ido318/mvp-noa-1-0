@@ -17,7 +17,7 @@ const SAMPLE_CLINIC: Parameters<typeof smsTemplates.booking_confirmation>[0] = {
   time: "16:30",
   location: CLINIC_LOCATION,
   visitType: "בדיקה",
-  price: "150",
+  price: "150 ₪",
 };
 
 const SAMPLE_HOME: Parameters<typeof smsTemplates.morning_reminder>[0] = {

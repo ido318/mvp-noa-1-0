@@ -177,20 +177,21 @@ Shared (same Supabase project): `SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_URL`, `SU
 
 ## הפעלת cron (אחרי Vercel deploy)
 
-לאחר ש-`PUBLIC_BASE_URL` ו-`JOBS_BEARER_TOKEN` ידועים, הרץ ב-SQL editor של Supabase:
+**הרץ את `supabase/scripts/cron-jobs.sql`** ב-SQL editor של Supabase, אחרי החלפת
+שני ה-placeholders (`<AGENT_PUBLIC_URL>`, `<JOBS_BEARER_TOKEN>`). הסקריפט מגדיר
+את שלושת ה-jobs ובטוח להרצה חוזרת.
+
+⚠️ **`net.http_post`, לא `extensions.http_post`.** הגרסה הקודמת של הקטע הזה קראה
+ל-`extensions.http_post` — פונקציה שלא קיימת בפרויקט (pg_net מתקין ל-schema בשם
+`net`). כל שלושת ה-jobs נכשלו בכל הרצה מאז שהוגדרו, בזמן שהם נראו `active`, וכל
+ה-SMS המתוזמנים נערמו ב-`notifications_log` בסטטוס `pending`. אל תיצור job מהזיכרון
+או מקטע ישן — השתמש בסקריפט.
+
+**בדיקה שה-job באמת עובד** (לא מספיק ש-`active=true`):
 
 ```sql
-SELECT cron.schedule(
-  'process-sms-notifications',
-  '*/15 * * * *',
-  $$
-  SELECT extensions.http_post(
-    url     := 'https://<AGENT_PUBLIC_URL>/jobs/process-notifications',
-    headers := jsonb_build_object('Authorization', 'Bearer <JOBS_BEARER_TOKEN>'),
-    body    := '{}'
-  );
-  $$
-);
+select jobid, status, return_message, start_time
+from cron.job_run_details order by start_time desc limit 10;
 ```
 
 לביטול: `SELECT cron.unschedule('process-sms-notifications');`

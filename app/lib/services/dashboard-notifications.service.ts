@@ -34,16 +34,21 @@ const VISIT_LABELS: Record<string, string> = {
   other: "ביקור",
 };
 
+// Whole segment, not just a number. Neutering has no fixed price — it depends on
+// species, weight, age and medical state, and only Dr. Noa quotes it — so the
+// approval SMS must not name one. Mirrors agent/src/lib/notifications.ts.
+const NO_FIXED_PRICE_TEXT = 'המחיר יימסר על ידי ד"ר נועה';
+
 const VISIT_PRICES: Record<string, string> = {
-  checkup: "150",
-  vaccination: "150",
-  vaccine: "150",
-  neutering: "350",
-  home_visit: "300",
-  phone_consultation: "200",
-  followup: "150",
-  surgery: "350",
-  other: "150",
+  checkup: "150 ₪",
+  vaccination: "150 ₪",
+  vaccine: "150 ₪",
+  neutering: NO_FIXED_PRICE_TEXT,
+  home_visit: "300 ₪",
+  phone_consultation: "200 ₪",
+  followup: "150 ₪",
+  surgery: NO_FIXED_PRICE_TEXT,
+  other: "150 ₪",
 };
 
 export interface ApproveNotificationParams {
@@ -89,7 +94,7 @@ export class DashboardNotificationsService {
     const isHome = p.visitType === "home_visit";
     const location = isHome ? HOME_VISIT_LOCATION : CLINIC_LOCATION;
     const visitTypeLabel = VISIT_LABELS[p.visitType] ?? p.visitType;
-    const price = VISIT_PRICES[p.visitType] ?? "150";
+    const price = VISIT_PRICES[p.visitType] ?? "150 ₪";
 
     const shared = {
       clinic_id:      p.clinicId,

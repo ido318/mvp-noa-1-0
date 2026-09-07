@@ -189,15 +189,25 @@ Shared (same Supabase project): `SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_URL`, `SU
 
 ## cron (pg_cron)
 
-**סטטוס נוכחי (עודכן 2026-08-29):** 3 jobs פעילים ב-`cron.job` על הפרויקט בענן, כולם מול `https://voxly-agent.fly.dev`:
+**⚠️ סטטוס (עודכן 2026-09-05):** שלושת ה-jobs רשומים ו-`active=true`, אבל **נכשלו בכל הרצה מאז שהוגדרו** — הם קראו ל-`extensions.http_post`, פונקציה שלא קיימת בפרויקט (pg_net מתקין ל-schema בשם `net`). pg_cron רושם את השגיאה ב-`cron.job_run_details` וממשיך, ולכן הם נראו תקינים בזמן ששום דבר לא רץ: כל ה-SMS המתוזמנים נערמו ב-`notifications_log` בסטטוס `pending`, תזכורות חיסון לא נשלחו, וניתוח השיחות השבועי לא רץ. רק `booking_confirmation` עבד — הסוכן שולח אותו ישירות, לא דרך התור.
+
+**התיקון:** `supabase/scripts/cron-jobs.sql` (רץ ב-SQL editor, עם `net.http_post`). ה-SQL למטה עודכן בהתאם.
+
+**לא מספיק לבדוק ש-job "פעיל" — צריך לבדוק שהוא מצליח:**
+```sql
+select jobid, status, return_message, start_time
+from cron.job_run_details order by start_time desc limit 10;
+```
+
+שלושת ה-jobs, כולם מול `https://voxly-agent.fly.dev`:
 
 | jobid | jobname | schedule | סטטוס |
 |---|---|---|---|
-| 1 | `process-sms-notifications` | `*/15 * * * *` | ✅ active |
-| 3 | `send-vaccination-reminders` | `0 6 * * *` | ✅ active |
-| 4 | `analyze-tomer-conversations` | `0 6 * * 0` | ✅ active |
+| 1 | `process-sms-notifications` | `*/15 * * * *` | ⚠️ רשום — דורש הרצה מחדש של `cron-jobs.sql` |
+| 3 | `send-vaccination-reminders` | `0 6 * * *` | ⚠️ רשום — דורש הרצה מחדש של `cron-jobs.sql` |
+| 4 | `analyze-tomer-conversations` | `0 6 * * 0` | ⚠️ רשום — דורש הרצה מחדש של `cron-jobs.sql` |
 
-אין צורך להריץ שוב את ה-SQL למטה — הוא נשמר כאן לתיעוד/שחזור בלבד. `ANTHROPIC_API_KEY` מוגדר ב-Fly secrets.
+`ANTHROPIC_API_KEY` מוגדר ב-Fly secrets.
 
 **⚠️ תקלה שתוקנה 2026-08-29 בדרך:** טבלת `call_reviews` בענן הייתה קיימת עם סכמה שונה לגמרי ממה שהמיגרציה המקורית (`20260828000022_prompt_learning_loop.sql`) וה-agent code ציפו לו — מישהו יצר/שינה אותה ישירות ב-SQL editor בלי מיגרציה, וה-`create table if not exists` פשוט no-op-ה. זה שבר בשקט את `logConversation.ts` (0 שורות ב-`call_reviews` מאז 28.8) וגרם ל-`analyzeConversations.ts` (וממילא ל-job הזה) לזרוק שגיאת עמודה חסרה. תוקן: `agent/src/lib/learning/logConversation.ts` + `analyzeConversations.ts` עודכנו להתאים לסכמה האמיתית בענן (`conversation_id`, `agent_id`, `version_id`, `call_successful`, `evaluation_criteria_results`, `data_collection_results`, `flagged_reasons` וכו'), ומיגרציה `20260829002217_call_reviews_clinic_id.sql` הוסיפה את `clinic_id` שהיה חסר. אם משהו דומה קורה שוב (עמודה/טבלה "לא קיימת" למרות שהמיגרציה "רצה בהצלחה") — תמיד לבדוק את הסכמה בפועל בענן מול קובץ המיגרציה, לא להניח שהם זהים.
 
@@ -206,10 +216,13 @@ SELECT cron.schedule(
   'process-sms-notifications',
   '*/15 * * * *',
   $$
-  SELECT extensions.http_post(
+  SELECT net.http_post(
     url     := 'https://<AGENT_PUBLIC_URL>/jobs/process-notifications',
-    headers := jsonb_build_object('Authorization', 'Bearer <JOBS_BEARER_TOKEN>'),
-    body    := '{}'
+    headers := jsonb_build_object(
+      'Authorization', 'Bearer <JOBS_BEARER_TOKEN>',
+      'Content-Type', 'application/json'
+    ),
+    body    := '{}'::jsonb
   );
   $$
 );
@@ -217,20 +230,20 @@ SELECT cron.schedule(
 
 לביטול: `SELECT cron.unschedule('process-sms-notifications');`
 
-**cron שני — לולאת שיפור פרומפט (prompt learning loop), שבועי — פעיל (jobid 4, ראה הטבלה למעלה). ה-SQL למטה נשמר לתיעוד/שחזור בלבד, בדיוק כמו הראשון:**
+**cron שני — לולאת שיפור פרומפט (prompt learning loop), שבועי — רשום כ-jobid 4 (ראה הטבלה למעלה), אך כמו השניים האחרים דורש הרצה מחדש של `cron-jobs.sql`. ה-SQL למטה לתיעוד/שחזור:**
 
 ```sql
 SELECT cron.schedule(
   'analyze-tomer-conversations',
   '0 6 * * 0',
   $$
-  SELECT extensions.http_post(
+  SELECT net.http_post(
     url     := 'https://<AGENT_PUBLIC_URL>/jobs/analyze-conversations',
     headers := jsonb_build_object(
       'Authorization', 'Bearer <JOBS_BEARER_TOKEN>',
       'Content-Type', 'application/json'
     ),
-    body    := '{}'
+    body    := '{}'::jsonb
   );
   $$
 );

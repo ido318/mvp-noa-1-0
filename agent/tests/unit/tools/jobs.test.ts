@@ -30,7 +30,7 @@ function makeApp() {
 beforeEach(() => {
   resetJobSecurityCaches();
   vi.clearAllMocks();
-  vi.mocked(processNotifications).mockResolvedValue({ processed: 1, sent: 1, failed: 0, deferred: 0 });
+  vi.mocked(processNotifications).mockResolvedValue({ processed: 1, sent: 1, failed: 0, deferred: 0, expired: 0 });
   vi.mocked(analyzeConversations).mockResolvedValue({ ranAnalysis: false, flaggedCallCount: 0, groupsConsidered: 0, suggestionIds: [] });
 });
 

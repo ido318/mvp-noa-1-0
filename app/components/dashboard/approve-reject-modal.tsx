@@ -33,7 +33,26 @@ export function ApproveRejectModal({
         body: JSON.stringify({ phone, customerName, petName }),
       });
       if (!res.ok) throw new Error();
-      toast(mode === "approve" ? "התור אושר ונשלח SMS ללקוח" : "התור נדחה ונשלח SMS ללקוח", "success");
+
+      // Say what actually happened. This used to claim the SMS was sent even
+      // when nothing was queued at all.
+      const payload = (await res.json().catch(() => ({}))) as {
+        data?: { smsStatus?: "sent" | "queued" | "failed" };
+      };
+      const decision = mode === "approve" ? "התור אושר" : "התור נדחה";
+      switch (payload.data?.smsStatus) {
+        case "sent":
+          toast(`${decision} · ה-SMS נשלח ללקוח`, "success");
+          break;
+        case "queued":
+          toast(`${decision} · ה-SMS ממתין בתור וישלח בקרוב`, "success");
+          break;
+        case "failed":
+          toast(`${decision}, אבל שליחת ה-SMS ללקוח נכשלה — צריך ליידע אותו ידנית`, "error");
+          break;
+        default:
+          toast(decision, "success");
+      }
       onConfirm();
     } catch {
       toast("שגיאה בעדכון התור", "error");
@@ -51,7 +70,7 @@ export function ApproveRejectModal({
     >
       <p className="text-[13.5px]" style={{ color: "var(--text-secondary)" }}>
         {mode === "approve"
-          ? `האם לאשר את תורו של ${petName}? לאחר האישור ישלח SMS ל-${customerName}.`
+          ? `האם לאשר את תורו של ${petName}? לאחר האישור תישלח הודעת SMS ל-${customerName}.`
           : `האם לדחות את תורו של ${petName}? לאחר הדחייה ישלח SMS ביטול ל-${customerName}.`}
       </p>
       <div className="mt-5 flex justify-end gap-2">

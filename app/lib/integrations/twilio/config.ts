@@ -36,3 +36,44 @@ export function voiceWebhookUrl(path: string): string {
   if (!config) return path;
   return `${config.baseUrl}${path.startsWith("/") ? path : `/${path}`}`;
 }
+
+export type TwilioSmsConfig = {
+  accountSid: string;
+  authToken: string;
+  fromNumber: string;
+};
+
+/**
+ * Credentials for sending an SMS. Deliberately separate from the voice config:
+ * sending a message needs no webhook URL, so requiring APP_BASE_URL (as the voice
+ * config must) would disable SMS on any deployment that only sets VERCEL_URL.
+ *
+ * The from-number is accepted under either name. app/ introduced
+ * TWILIO_CLINIC_PHONE_NUMBER while agent/ has always used TWILIO_PHONE_NUMBER for
+ * the same Twilio number, and an environment configured from the agent's list
+ * would otherwise leave SMS silently unavailable here.
+ */
+export function getTwilioSmsConfig(): TwilioSmsConfig | null {
+  const accountSid = process.env.TWILIO_ACCOUNT_SID?.trim();
+  const authToken = process.env.TWILIO_AUTH_TOKEN?.trim();
+  const fromNumber =
+    process.env.TWILIO_CLINIC_PHONE_NUMBER?.trim() || process.env.TWILIO_PHONE_NUMBER?.trim();
+
+  if (!accountSid || !authToken || !fromNumber) return null;
+
+  return { accountSid, authToken, fromNumber };
+}
+
+/** Names the variables that are missing, so the UI can say what to set. */
+export function missingTwilioSmsEnvVars(): string[] {
+  const missing: string[] = [];
+  if (!process.env.TWILIO_ACCOUNT_SID?.trim()) missing.push("TWILIO_ACCOUNT_SID");
+  if (!process.env.TWILIO_AUTH_TOKEN?.trim()) missing.push("TWILIO_AUTH_TOKEN");
+  if (
+    !process.env.TWILIO_CLINIC_PHONE_NUMBER?.trim() &&
+    !process.env.TWILIO_PHONE_NUMBER?.trim()
+  ) {
+    missing.push("TWILIO_CLINIC_PHONE_NUMBER (או TWILIO_PHONE_NUMBER)");
+  }
+  return missing;
+}

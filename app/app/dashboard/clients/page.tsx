@@ -15,6 +15,7 @@ import { SearchIcon, PhoneIcon, MailIcon, PinIcon, ChevRightIcon, XIcon } from "
 import { NewCustomerModal } from "@/components/dashboard/new-customer-modal";
 import { NewPetModal } from "@/components/dashboard/new-pet-modal";
 import { InvoicesSection } from "@/components/dashboard/invoices-section";
+import { SendMessageModal } from "@/components/dashboard/send-message-modal";
 import type { Customer, PreferredContactMethod } from "@/types/domain/customer";
 import type { Pet } from "@/types/domain/pet";
 import type { Appointment } from "@/types/domain/appointment";
@@ -25,11 +26,6 @@ import type { Visit } from "@/types/domain/visit";
 const TZ = "Asia/Jerusalem";
 function fmtDate(iso: string) {
   return new Intl.DateTimeFormat("he-IL", { timeZone: TZ, day: "numeric", month: "short", year: "numeric" }).format(new Date(iso));
-}
-
-function waPhone(phone: string): string {
-  const digits = phone.replace(/\D/g, "");
-  return digits.startsWith("0") ? `972${digits.slice(1)}` : digits;
 }
 
 function petAge(birthDate: string | null): string | null {
@@ -99,6 +95,7 @@ function ClientProfile({
   const [visits, setVisits] = useState<Visit[]>([]);
   const [visitsLoading, setVisitsLoading] = useState(true);
   const [showNewPet, setShowNewPet] = useState(false);
+  const [messageTarget, setMessageTarget] = useState<Customer | null>(null);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [fullName, setFullName] = useState(customer.fullName);
@@ -396,15 +393,13 @@ function ClientProfile({
                   <a href={`tel:${customer.phone}`} className="hover:text-[var(--accent)]">{customer.phone}</a>
                 </div>
                 <div className="flex items-center gap-2">
-                  <a href={`sms:${customer.phone}`} className="text-xs font-semibold text-[var(--accent)] hover:underline">שלח SMS</a>
-                  <a
-                    href={`https://wa.me/${waPhone(customer.phone)}`}
-                    target="_blank"
-                    rel="noreferrer"
+                  <button
+                    type="button"
+                    onClick={() => setMessageTarget(customer)}
                     className="text-xs font-semibold text-[var(--accent)] hover:underline"
                   >
-                    WhatsApp
-                  </a>
+                    שלח הודעה
+                  </button>
                 </div>
               </>
             )}
@@ -515,6 +510,19 @@ function ClientProfile({
         customerId={customer.id}
         onCreated={() => { void fetchPets(false); }}
       />
+
+      {messageTarget?.phone && (
+        <SendMessageModal
+          customerId={messageTarget.id}
+          customerName={messageTarget.fullName}
+          phone={messageTarget.phone}
+          // Only when there is no ambiguity. With several animals this used to
+          // put the first one's name into "reminder" and "follow-up" templates,
+          // which is how a client gets a message about the wrong pet.
+          petName={pets.length === 1 ? pets[0]!.name : undefined}
+          onClose={() => setMessageTarget(null)}
+        />
+      )}
     </>
   );
 }

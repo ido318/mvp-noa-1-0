@@ -1,5 +1,5 @@
 import { AppError } from "@/lib/errors/app-error";
-import { getTwilioVoiceConfig } from "@/lib/integrations/twilio/config";
+import { getTwilioSmsConfig, missingTwilioSmsEnvVars } from "@/lib/integrations/twilio/config";
 
 /** Convert an Israeli or raw phone string to E.164 (+972...). */
 export function toE164Israel(raw: string): string {
@@ -17,19 +17,23 @@ export type SendSmsResult = { sid: string | null };
 
 /**
  * Send an SMS via the Twilio REST API using the clinic's configured credentials.
- * Reuses the same env-backed config as the voice integration; throws an AppError
- * when Twilio is not configured or the request fails.
+ * Throws an AppError naming the missing variables when SMS is not configured, or
+ * wrapping Twilio's own error when the request fails.
  */
 export async function sendSms(to: string, body: string): Promise<SendSmsResult> {
-  const config = getTwilioVoiceConfig();
+  const config = getTwilioSmsConfig();
   if (!config) {
-    throw AppError.serviceUnavailable("Twilio is not configured (missing SMS credentials)");
+    // Name the missing variables: "not configured" alone sent us looking at
+    // Twilio itself when the cause was an unset env var on the deployment.
+    throw AppError.serviceUnavailable(
+      `שליחת SMS אינה מוגדרת — חסרים משתני סביבה: ${missingTwilioSmsEnvVars().join(", ")}`,
+    );
   }
 
   const auth = Buffer.from(`${config.accountSid}:${config.authToken}`).toString("base64");
   const params = new URLSearchParams({
     To: toE164Israel(to),
-    From: config.clinicPhoneNumber,
+    From: config.fromNumber,
     Body: body,
   });
 

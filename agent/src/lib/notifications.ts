@@ -25,17 +25,22 @@ export type NotificationType =
   | "cancellation_update"
   | "client_cancellation_confirmation";
 
-// Price per visit type (displayed in booking_confirmation SMS)
+// Price per visit type (displayed in booking_confirmation SMS). Whole segment,
+// not just a number — neutering has no fixed price (it depends on species,
+// weight, age and medical state, and only Dr. Noa quotes it), so the SMS must
+// not name one either. Kept in sync with knowledge/kb/pricing_and_visits.md.
+export const NO_FIXED_PRICE_TEXT = 'המחיר יימסר על ידי ד"ר נועה';
+
 const VISIT_PRICE: Record<VisitType, string> = {
-  checkup:            "150",
-  home_visit:         "300",
-  vaccination:        "150",
-  phone_consultation: "200",
-  neutering:          "350",
-  consultation:       "150",
-  urgent:             "200",
-  follow_up:          "150",
-  other:              "150",
+  checkup:            "150 ₪",
+  home_visit:         "300 ₪",
+  vaccination:        "150 ₪",
+  phone_consultation: "200 ₪",
+  neutering:          NO_FIXED_PRICE_TEXT,
+  consultation:       "150 ₪",
+  urgent:             "200 ₪",
+  follow_up:          "150 ₪",
+  other:              "150 ₪",
 };
 
 // ─────────────────────────────────────────────────────────────────────────────

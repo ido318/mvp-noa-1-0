@@ -56,7 +56,10 @@ describe("SMS template parity: app vs. agent (frozen wording)", () => {
         time: booking!.body.match(/🕒 (\d{2}:\d{2}) \|/)![1]!,
         location: 'הקליניקה, גרציאני 6 ת"א',
         visitType: "בדיקה",
-        price: "150",
+        // Whole segment now, not a bare number: a service with no fixed price
+        // (neutering) carries a sentence here instead, so the template no longer
+        // appends "₪" itself.
+        price: "150 ₪",
       }),
     );
   });
