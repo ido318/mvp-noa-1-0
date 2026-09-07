@@ -13,6 +13,6 @@ describe("Next.js proxy convention", () => {
 
     const source = readFileSync(proxyPath, "utf8");
     expect(source).toContain("export async function proxy");
-    expect(source).toContain("matcher: [\"/dashboard/:path*\", \"/provider-admin/:path*\", \"/login\"]");
+    expect(source).toContain("matcher: [\"/dashboard/:path*\", \"/login\"]");
   });
 });
