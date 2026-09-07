@@ -115,4 +115,23 @@ export class InvoiceRepository {
     }
     return ok(mapInvoiceRow(data));
   }
+
+  async attachPaymentLink(
+    invoiceId: string,
+    input: { paymentLinkUrl: string; greenInvoiceDocumentId: string },
+  ): Promise<Result<Invoice>> {
+    const { data, error } = await this.client
+      .from("invoices")
+      .update({
+        payment_link_url: input.paymentLinkUrl,
+        green_invoice_document_id: input.greenInvoiceDocumentId,
+        payment_link_sent_at: new Date().toISOString(),
+      })
+      .eq("id", invoiceId)
+      .select(SELECT_WITH_JOINS)
+      .single();
+
+    if (error) return err(AppError.externalProvider("Failed to attach payment link", error));
+    return ok(mapInvoiceRow(data));
+  }
 }

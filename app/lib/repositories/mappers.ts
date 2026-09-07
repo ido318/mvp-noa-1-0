@@ -26,6 +26,7 @@ import type { Profile } from "@/types/domain/profile";
 import type { Task, TaskPriority, TaskStatus } from "@/types/domain/task";
 import type { FollowUp } from "@/types/domain/follow-up";
 import type { Payment } from "@/types/domain/payment";
+import type { PriceListItem } from "@/types/domain/price-list-item";
 import type { Vaccination } from "@/types/domain/vaccination";
 import type { Visit, VisitStatus } from "@/types/domain/visit";
 import type { VisitCharge } from "@/types/domain/visit-charge";
@@ -637,6 +638,9 @@ export function mapInvoiceRow(row: {
   items: unknown;
   total: number | string;
   notes: string | null;
+  payment_link_url?: string | null;
+  green_invoice_document_id?: string | null;
+  payment_link_sent_at?: string | null;
   created_by_user_id: string | null;
   version: number;
   created_at: string;
@@ -660,6 +664,9 @@ export function mapInvoiceRow(row: {
     items,
     total: typeof row.total === "string" ? parseFloat(row.total) : row.total,
     notes: row.notes,
+    paymentLinkUrl: row.payment_link_url ?? null,
+    greenInvoiceDocumentId: row.green_invoice_document_id ?? null,
+    paymentLinkSentAt: row.payment_link_sent_at ?? null,
     createdByUserId: row.created_by_user_id,
     version: row.version,
     createdAt: row.created_at,
@@ -895,6 +902,22 @@ export function mapVisitChargeRow(row: Record<string, unknown>): VisitCharge {
     createdByUserId: (row["created_by_user_id"] as string | null) ?? null,
     reviewedByUserId: (row["reviewed_by_user_id"] as string | null) ?? null,
     reviewedAt: (row["reviewed_at"] as string | null) ?? null,
+    version: row["version"] as number,
+    createdAt: row["created_at"] as string,
+    updatedAt: row["updated_at"] as string,
+    deletedAt: (row["deleted_at"] as string | null) ?? null,
+  };
+}
+
+export function mapPriceListItemRow(row: Record<string, unknown>): PriceListItem {
+  return {
+    id: row["id"] as string,
+    clinicId: row["clinic_id"] as string,
+    name: row["name"] as string,
+    defaultPrice: Number(row["default_price"]),
+    visitType: (row["visit_type"] as string | null) ?? null,
+    active: row["active"] as boolean,
+    createdByUserId: (row["created_by_user_id"] as string | null) ?? null,
     version: row["version"] as number,
     createdAt: row["created_at"] as string,
     updatedAt: row["updated_at"] as string,

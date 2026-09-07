@@ -11,6 +11,7 @@ import { InvoiceRepository } from "@/lib/repositories/invoice.repository";
 import { InventoryRepository } from "@/lib/repositories/inventory.repository";
 import { FollowUpRepository } from "@/lib/repositories/follow-up.repository";
 import { PaymentRepository } from "@/lib/repositories/payment.repository";
+import { PriceListItemRepository } from "@/lib/repositories/price-list-item.repository";
 import { VisitChargeRepository } from "@/lib/repositories/visit-charge.repository";
 import { LabOrderRepository } from "@/lib/repositories/lab-order.repository";
 import { MedicalNoteRepository } from "@/lib/repositories/medical-note.repository";
@@ -40,6 +41,8 @@ import { InvoiceService } from "@/lib/services/invoice.service";
 import { InventoryService } from "@/lib/services/inventory.service";
 import { FollowUpService } from "@/lib/services/follow-up.service";
 import { PaymentService } from "@/lib/services/payment.service";
+import { PriceListItemService } from "@/lib/services/price-list-item.service";
+import { GreenInvoiceService } from "@/lib/services/green-invoice.service";
 import { VisitChargeService } from "@/lib/services/visit-charge.service";
 import { LabOrderService } from "@/lib/services/lab-order.service";
 import { MedicalRecordService } from "@/lib/services/medical-record.service";
@@ -80,6 +83,7 @@ export async function createServices() {
   const followUpRepository = new FollowUpRepository(supabase);
   const paymentRepository = new PaymentRepository(supabase);
   const visitChargeRepository = new VisitChargeRepository(supabase);
+  const priceListItemRepository = new PriceListItemRepository(supabase);
   const taskRepository = new TaskRepository(supabase);
   const labOrderRepository = new LabOrderRepository(supabase);
   const vitalRepository = new VitalRepository(supabase);
@@ -96,7 +100,13 @@ export async function createServices() {
   const dashboardNotificationsService = new DashboardNotificationsService(admin);
   const taskService = new TaskService(taskRepository);
   const followUpService = new FollowUpService(followUpRepository, taskService);
-  const invoiceService = new InvoiceService(invoiceRepository, auditService);
+  const greenInvoiceService = new GreenInvoiceService();
+  const invoiceService = new InvoiceService(
+    invoiceRepository,
+    auditService,
+    customerRepository,
+    greenInvoiceService,
+  );
 
   const medicalRecordService = new MedicalRecordService(
     visitRepository,
@@ -140,6 +150,7 @@ export async function createServices() {
     inventory: new InventoryService(inventoryRepository),
     payment: new PaymentService(paymentRepository),
     visitCharge: new VisitChargeService(visitChargeRepository, visitRepository, invoiceService),
+    priceListItem: new PriceListItemService(priceListItemRepository),
     task: taskService,
     followUp: followUpService,
     labOrder: new LabOrderService(labOrderRepository),

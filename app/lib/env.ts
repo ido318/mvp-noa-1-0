@@ -6,6 +6,9 @@ const serverSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
   HEALTH_CHECK_TOKEN: z.string().min(16).optional(),
   HEALTH_CHECK_ALLOWED_IPS: z.string().optional(),
+  GREEN_INVOICE_API_KEY_ID: z.string().min(1).optional(),
+  GREEN_INVOICE_API_KEY_SECRET: z.string().min(1).optional(),
+  GREEN_INVOICE_ENV: z.enum(["sandbox", "live"]).default("sandbox"),
 });
 
 const clientSchema = z.object({
@@ -51,6 +54,9 @@ function parseEnv() {
     SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
     HEALTH_CHECK_TOKEN: process.env.HEALTH_CHECK_TOKEN || undefined,
     HEALTH_CHECK_ALLOWED_IPS: process.env.HEALTH_CHECK_ALLOWED_IPS || undefined,
+    GREEN_INVOICE_API_KEY_ID: process.env.GREEN_INVOICE_API_KEY_ID || undefined,
+    GREEN_INVOICE_API_KEY_SECRET: process.env.GREEN_INVOICE_API_KEY_SECRET || undefined,
+    GREEN_INVOICE_ENV: process.env.GREEN_INVOICE_ENV || undefined,
   });
 
   if (!server.success) {
