@@ -65,6 +65,7 @@ export class AuthService {
         fullName: profile?.fullName ?? null,
         phone: profile?.phone ?? null,
         defaultClinicId: profile?.defaultClinicId ?? null,
+        role: profile?.role ?? "clinic_user",
       },
       memberships: membershipsResult.value.map((membership) => ({
         clinicId: membership.clinicId,
