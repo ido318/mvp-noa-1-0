@@ -3,7 +3,8 @@ export type PromptSuggestionStatus =
   | "approved"
   | "rejected"
   | "published"
-  | "failed_regression";
+  | "failed_regression"
+  | "merged";
 
 export type PromptSuggestionCategory =
   | "prompt"
@@ -30,6 +31,7 @@ export interface PromptSuggestion {
   reviewedAt: string | null;
   publishedAt: string | null;
   createdAt: string;
+  mergedFromIds: string[] | null;
 }
 
 export interface RegressionOutcome {

@@ -37,6 +37,7 @@ function suggestion(overrides: Partial<PromptSuggestion> = {}): PromptSuggestion
     reviewedAt: null,
     publishedAt: null,
     createdAt: "2026-08-20T09:00:00.000Z",
+    mergedFromIds: null,
     ...overrides,
   };
 }

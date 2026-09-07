@@ -77,6 +77,33 @@ describe("PromptSuggestionRepository read mapping (mapPromptSuggestionRow via fi
     if (!result.ok) return;
     expect(result.value?.category).toBe("knowledge_base");
   });
+
+  it("maps merged_from_ids when present", async () => {
+    const query = buildFindByIdQuery({
+      data: { ...suggestionRow, merged_from_ids: ["a", "b"] },
+      error: null,
+    });
+    const client = { from: vi.fn().mockReturnValue(query) };
+    const repo = new PromptSuggestionRepository(client as never);
+
+    const result = await repo.findById("sugg-1");
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value?.mergedFromIds).toEqual(["a", "b"]);
+  });
+
+  it("defaults mergedFromIds to null when the column is absent (row predates the migration)", async () => {
+    const query = buildFindByIdQuery({ data: suggestionRow, error: null });
+    const client = { from: vi.fn().mockReturnValue(query) };
+    const repo = new PromptSuggestionRepository(client as never);
+
+    const result = await repo.findById("sugg-1");
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value?.mergedFromIds).toBeNull();
+  });
 });
 
 describe("PromptSuggestionRepository write guards", () => {

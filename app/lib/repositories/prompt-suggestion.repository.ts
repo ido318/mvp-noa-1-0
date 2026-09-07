@@ -43,6 +43,7 @@ function mapPromptSuggestionRow(row: Record<string, unknown>): PromptSuggestion 
     reviewedAt: (row.reviewed_at as string | null) ?? null,
     publishedAt: (row.published_at as string | null) ?? null,
     createdAt: row.created_at as string,
+    mergedFromIds: (row.merged_from_ids as string[] | null) ?? null,
   };
 }
 
