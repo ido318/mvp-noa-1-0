@@ -19,6 +19,9 @@ export type Invoice = {
   items: InvoiceLineItem[];
   total: number;
   notes: string | null;
+  paymentLinkUrl: string | null;
+  greenInvoiceDocumentId: string | null;
+  paymentLinkSentAt: string | null;
   createdByUserId: string | null;
   version: number;
   createdAt: string;

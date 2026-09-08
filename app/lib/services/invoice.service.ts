@@ -1,6 +1,9 @@
 import { AppError, err, ok, type Result } from "@/lib/errors/app-error";
+import { sendSms } from "@/lib/integrations/twilio/sms";
+import type { CustomerRepository } from "@/lib/repositories/customer.repository";
 import type { InvoiceRepository } from "@/lib/repositories/invoice.repository";
 import type { AuditService } from "@/lib/services/audit.service";
+import type { GreenInvoiceService } from "@/lib/services/green-invoice.service";
 import type { ServiceActor } from "@/lib/services/service-context";
 import type {
   CreateInvoiceInput,
@@ -36,6 +39,8 @@ export class InvoiceService {
   constructor(
     private readonly repository: InvoiceRepository,
     private readonly auditService: AuditService,
+    private readonly customerRepository?: CustomerRepository,
+    private readonly greenInvoiceService?: GreenInvoiceService,
   ) {}
 
   async listInvoices(
@@ -110,5 +115,71 @@ export class InvoiceService {
     }
 
     return this.repository.updateStatusVersioned(invoiceId, expectedVersion, status);
+  }
+
+  // Creates a Green Invoice payment document for an issued invoice and texts
+  // the customer the payment link. Manual, dashboard-triggered action only —
+  // no live-call or automatic trigger (see CLAUDE.md payments decision log).
+  async sendPaymentLink(actor: ServiceActor, invoiceId: string): Promise<Result<Invoice>> {
+    if (!this.customerRepository || !this.greenInvoiceService) {
+      return err(AppError.serviceUnavailable("Payment link sending is not configured"));
+    }
+
+    const existing = await this.getInvoiceById(actor, invoiceId);
+    if (!existing.ok) return existing;
+    const invoice = existing.value;
+
+    if (!canManageInvoices(actor, invoice.clinicId)) {
+      return err(AppError.forbidden("Only owner or admin can manage invoices"));
+    }
+    if (invoice.status !== "sent") {
+      return err(
+        AppError.validation("ניתן לשלוח קישור תשלום רק לחשבונית שהונפקה (סטטוס 'נשלחה')"),
+      );
+    }
+
+    const customerResult = await this.customerRepository.findById(invoice.customerId);
+    if (!customerResult.ok) return customerResult;
+    const customer = customerResult.value;
+    if (!customer) return err(AppError.notFound("הלקוח לא נמצא"));
+    if (!customer.phone) {
+      return err(AppError.validation("ללקוח אין מספר טלפון לשליחת קישור התשלום"));
+    }
+
+    const document = await this.greenInvoiceService.createPaymentDocument(
+      customer,
+      invoice.items,
+      invoice.notes,
+    );
+
+    // Send before persisting: if the SMS fails, nothing gets written, so the
+    // invoice never ends up with a populated payment_link_sent_at for a link
+    // the customer never actually received.
+    try {
+      await sendSms(
+        customer.phone,
+        `שלום ${customer.fullName}, מצורף קישור לתשלום עבור חשבונית ${invoice.invoiceNumber} על סך ${invoice.total} ₪:\n${document.paymentUrl}`,
+      );
+    } catch (error) {
+      return err(AppError.externalProvider("שליחת קישור התשלום נכשלה", error));
+    }
+
+    const updated = await this.repository.attachPaymentLink(invoiceId, {
+      paymentLinkUrl: document.paymentUrl,
+      greenInvoiceDocumentId: document.documentId,
+    });
+    if (!updated.ok) return updated;
+
+    await this.auditService.logAction({
+      clinicId: invoice.clinicId,
+      actorType: "user",
+      actorId: actor.userId,
+      action: "invoice.payment_link_sent",
+      entityType: "invoice",
+      entityId: invoiceId,
+      afterPayload: updated.value,
+    });
+
+    return updated;
   }
 }

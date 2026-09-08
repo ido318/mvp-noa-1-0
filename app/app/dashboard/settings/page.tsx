@@ -7,6 +7,7 @@ import { Skeleton } from "@/components/dashboard/ui/skeleton";
 import { Field, Input } from "@/components/dashboard/ui/field";
 import { useToast } from "@/components/dashboard/ui/toast";
 import { LogoutButton } from "@/app/dashboard/logout-button";
+import { PriceListSettings } from "@/components/dashboard/settings/price-list-settings";
 import type { MeResponse } from "@/types/api/me";
 import type { ClinicSettings } from "@/types/domain/clinic";
 import { MAX_BUSINESS_HOURS_ROWS, MAX_VISIT_PRICE_ROWS } from "@/lib/validators/clinic-settings";
@@ -403,6 +404,14 @@ export default function SettingsPage() {
             </div>
           )}
         </Card>
+
+        {/* Price list — real numeric pricing, editable, used when billing a visit */}
+        {membership ? (
+          <Card>
+            <SectionTitle hint="המחירים בפועל המוצעים בעת חיוב ביקור">מחירון</SectionTitle>
+            {loading ? <Skeleton className="h-32" /> : <PriceListSettings clinicId={membership.clinicId} />}
+          </Card>
+        ) : null}
 
         {/* Client SMS — informational only, not backed by an API */}
         <Card style={{ background: "var(--surface-sunken)" }}>

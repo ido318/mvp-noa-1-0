@@ -180,7 +180,7 @@ export default async function VisitDetailPage({ params }: Params) {
       <Card>
         <h3 className="text-[15px] font-semibold text-[var(--text-primary)]">חיובי ביקור</h3>
         <div className="mt-3">
-          <VisitChargesPanel visitId={visit.id} charges={chargesData?.items ?? []} />
+          <VisitChargesPanel visitId={visit.id} clinicId={visit.clinicId} charges={chargesData?.items ?? []} />
         </div>
       </Card>
 
