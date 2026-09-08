@@ -1,4 +1,5 @@
 import { AppError, err, type Result } from "@/lib/errors/app-error";
+import { consolidatePromptSuggestions } from "@/lib/ai/prompt-consolidation/provider";
 import { getLiveAgentConfig, publishPrompt, runRegressionTests } from "@/lib/learning/elevenlabsTesting";
 import type { PromptSuggestionRepository } from "@/lib/repositories/prompt-suggestion.repository";
 import type { PromptSuggestion } from "@/types/domain/prompt-suggestion";
@@ -88,5 +89,83 @@ export class PromptSuggestionService {
       publishResult,
       reviewedByUserId,
     });
+  }
+
+  /**
+   * Consolidates every pending category='prompt' suggestion into one new
+   * meta-suggestion (via an LLM call over the live prompt + all candidates'
+   * full content), then marks the originals 'merged'. The new suggestion is
+   * a normal pending suggestion afterwards — approving it runs the exact
+   * same regression+publish pipeline as any other, no new code path there.
+   */
+  async consolidatePending(): Promise<Result<PromptSuggestion>> {
+    const pendingResult = await this.repo.listByStatus("pending");
+    if (!pendingResult.ok) return pendingResult;
+
+    const candidates = pendingResult.value.filter((s) => s.category === "prompt");
+    if (candidates.length < 2) {
+      return err(AppError.conflict("At least 2 pending 'prompt' suggestions are required to consolidate"));
+    }
+
+    let livePrompt: string;
+    try {
+      const config = await getLiveAgentConfig();
+      const agent = config as { agent?: { prompt?: { prompt?: string } } };
+      livePrompt = agent.agent?.prompt?.prompt ?? "";
+    } catch (error) {
+      return err(
+        AppError.externalProvider(
+          "Failed to fetch the live agent prompt",
+          error instanceof Error ? error.message : error,
+        ),
+      );
+    }
+
+    let result: { mergedPrompt: string; summary: string };
+    try {
+      result = await consolidatePromptSuggestions({
+        livePrompt,
+        suggestions: candidates.map((s) => ({
+          patternSummary: s.patternSummary,
+          proposedChange: s.proposedChange,
+          rootCause: s.rootCause,
+          suggestedPrompt: s.suggestedPrompt,
+        })),
+      });
+    } catch (error) {
+      return err(
+        AppError.externalProvider(
+          "Failed to consolidate prompt suggestions",
+          error instanceof Error ? error.message : error,
+        ),
+      );
+    }
+
+    const created = await this.repo.createFromMerge({
+      // Safe: candidates.length >= 2 was checked above.
+      clinicId: candidates[0]!.clinicId,
+      patternSummary: `איחוד ${candidates.length} הצעות תיקון פתוחות`,
+      proposedChange: result.summary,
+      suggestedPrompt: result.mergedPrompt,
+      supportingCallReviewIds: [...new Set(candidates.flatMap((s) => s.supportingCallReviewIds))],
+      mergedFromIds: candidates.map((s) => s.id),
+    });
+    if (!created.ok) return created;
+
+    // Best-effort: the new suggestion already exists and is what the caller
+    // needs — if marking the originals 'merged' fails, surface the new
+    // suggestion anyway rather than erroring out a successful creation. A
+    // stray still-pending original is a cosmetic annoyance (visible in the
+    // list once more), not a correctness or data-loss problem.
+    const markMergedResult = await this.repo.markMerged(candidates.map((s) => s.id));
+    if (!markMergedResult.ok) {
+      console.error("[PromptSuggestionService.consolidatePending] markMerged failed after successful createFromMerge", {
+        mergedSuggestionId: created.value.id,
+        sourceIds: candidates.map((s) => s.id),
+        error: markMergedResult.error,
+      });
+    }
+
+    return created;
   }
 }

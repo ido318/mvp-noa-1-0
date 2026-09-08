@@ -77,6 +77,33 @@ describe("PromptSuggestionRepository read mapping (mapPromptSuggestionRow via fi
     if (!result.ok) return;
     expect(result.value?.category).toBe("knowledge_base");
   });
+
+  it("maps merged_from_ids when present", async () => {
+    const query = buildFindByIdQuery({
+      data: { ...suggestionRow, merged_from_ids: ["a", "b"] },
+      error: null,
+    });
+    const client = { from: vi.fn().mockReturnValue(query) };
+    const repo = new PromptSuggestionRepository(client as never);
+
+    const result = await repo.findById("sugg-1");
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value?.mergedFromIds).toEqual(["a", "b"]);
+  });
+
+  it("defaults mergedFromIds to null when the column is absent (row predates the migration)", async () => {
+    const query = buildFindByIdQuery({ data: suggestionRow, error: null });
+    const client = { from: vi.fn().mockReturnValue(query) };
+    const repo = new PromptSuggestionRepository(client as never);
+
+    const result = await repo.findById("sugg-1");
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value?.mergedFromIds).toBeNull();
+  });
 });
 
 describe("PromptSuggestionRepository write guards", () => {
@@ -207,5 +234,102 @@ describe("PromptSuggestionRepository write guards", () => {
     const result = await repo.findBySupportingCallReviewId("cr-none");
 
     expect(result).toEqual({ ok: true, value: null });
+  });
+
+  it("createFromMerge inserts a category='prompt', status='pending' row with merged_from_ids", async () => {
+    const insertedRow = {
+      ...suggestionRow,
+      id: "sugg-merged-1",
+      status: "pending",
+      category: "prompt",
+      merged_from_ids: ["a", "b"],
+    };
+    const query = {
+      insert: vi.fn().mockReturnThis(),
+      select: vi.fn().mockReturnThis(),
+      single: vi.fn().mockResolvedValue({ data: insertedRow, error: null }),
+    };
+    const client = { from: vi.fn().mockReturnValue(query) };
+    const repo = new PromptSuggestionRepository(client as never);
+
+    const result = await repo.createFromMerge({
+      clinicId: "clinic-1",
+      patternSummary: "איחוד 2 הצעות תיקון פתוחות",
+      proposedChange: "תקציר",
+      suggestedPrompt: "פרומפט מאוחד",
+      supportingCallReviewIds: ["r1", "r2"],
+      mergedFromIds: ["a", "b"],
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.id).toBe("sugg-merged-1");
+    expect(result.value.mergedFromIds).toEqual(["a", "b"]);
+    expect(query.insert).toHaveBeenCalledWith({
+      clinic_id: "clinic-1",
+      status: "pending",
+      category: "prompt",
+      pattern_summary: "איחוד 2 הצעות תיקון פתוחות",
+      proposed_change: "תקציר",
+      suggested_prompt: "פרומפט מאוחד",
+      supporting_call_review_ids: ["r1", "r2"],
+      merged_from_ids: ["a", "b"],
+    });
+  });
+
+  it("createFromMerge returns an externalProvider error when the insert fails", async () => {
+    const query = {
+      insert: vi.fn().mockReturnThis(),
+      select: vi.fn().mockReturnThis(),
+      single: vi.fn().mockResolvedValue({ data: null, error: { message: "db down" } }),
+    };
+    const client = { from: vi.fn().mockReturnValue(query) };
+    const repo = new PromptSuggestionRepository(client as never);
+
+    const result = await repo.createFromMerge({
+      clinicId: "clinic-1",
+      patternSummary: "x",
+      proposedChange: "y",
+      suggestedPrompt: "z",
+      supportingCallReviewIds: [],
+      mergedFromIds: [],
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.status).toBe(502);
+  });
+
+  it("markMerged updates the given ids scoped to status='pending'", async () => {
+    const query = {
+      update: vi.fn().mockReturnThis(),
+      in: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockResolvedValue({ error: null }),
+    };
+    const client = { from: vi.fn().mockReturnValue(query) };
+    const repo = new PromptSuggestionRepository(client as never);
+
+    const result = await repo.markMerged(["a", "b"]);
+
+    expect(result.ok).toBe(true);
+    expect(query.update).toHaveBeenCalledWith({ status: "merged" });
+    expect(query.in).toHaveBeenCalledWith("id", ["a", "b"]);
+    expect(query.eq).toHaveBeenCalledWith("status", "pending");
+  });
+
+  it("markMerged returns an externalProvider error when the update fails", async () => {
+    const query = {
+      update: vi.fn().mockReturnThis(),
+      in: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockResolvedValue({ error: { message: "db down" } }),
+    };
+    const client = { from: vi.fn().mockReturnValue(query) };
+    const repo = new PromptSuggestionRepository(client as never);
+
+    const result = await repo.markMerged(["a"]);
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.status).toBe(502);
   });
 });

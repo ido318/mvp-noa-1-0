@@ -18,11 +18,12 @@ const CATEGORY_LABEL: Record<string, string> = {
   conversation_flow: "זרימת שיחה",
 };
 
-export default function ProviderAdminImprovementsPage() {
+export function ImprovementsPageClient() {
   const [items, setItems] = useState<PromptSuggestion[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [consolidating, setConsolidating] = useState(false);
   const { toast } = useToast();
 
   const fetchData = useCallback(async () => {
@@ -75,9 +76,36 @@ export default function ProviderAdminImprovementsPage() {
     }
   }
 
+  async function consolidateAll() {
+    setConsolidating(true);
+    try {
+      const res = await fetch("/api/prompt-suggestions/consolidate", { method: "POST" });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
+        toast(body?.error?.message || "האיחוד נכשל", "error");
+        return;
+      }
+      toast("ההצעות אוחדו לפרומפט אחד — ממתין לאישור", "success");
+      await fetchData();
+    } catch {
+      toast("התוצאה לא ידועה — הרענן את הדף כדי לבדוק את הסטטוס בפועל.", "error");
+    } finally {
+      setConsolidating(false);
+    }
+  }
+
+  const promptCandidateCount = items.filter((s) => s.category === "prompt").length;
+
   return (
     <div className="p-6 space-y-5 max-w-3xl">
-      <h1 style={{ font: "var(--type-page-title)", color: "var(--text-primary)" }}>הצעות תיקון</h1>
+      <div className="flex items-center justify-between">
+        <h1 style={{ font: "var(--type-page-title)", color: "var(--text-primary)" }}>הצעות תיקון</h1>
+        {promptCandidateCount >= 2 && (
+          <Btn variant="soft" size="sm" loading={consolidating} onClick={() => void consolidateAll()}>
+            אחד הכל
+          </Btn>
+        )}
+      </div>
 
       {loading ? null : error ? (
         <EmptyState title="שגיאה" subtitle={error} />

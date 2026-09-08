@@ -37,7 +37,7 @@ function fmtDate(iso: string) {
   return new Date(iso).toLocaleString("he-IL", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 }
 
-export default function ProviderAdminCallsPage() {
+export function QaCallsPageClient() {
   const router = useRouter();
   const [items, setItems] = useState<CallReview[]>([]);
   const [loading, setLoading] = useState(true);
@@ -85,7 +85,7 @@ export default function ProviderAdminCallsPage() {
         <Table
           rows={items}
           rowKey={(item) => item.id}
-          onRowClick={(item) => router.push(`/provider-admin/calls/${item.id}`)}
+          onRowClick={(item) => router.push(`/dashboard/qa-calls/${item.id}`)}
           columns={[
             {
               key: "caller",

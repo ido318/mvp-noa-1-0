@@ -43,6 +43,7 @@ function mapPromptSuggestionRow(row: Record<string, unknown>): PromptSuggestion 
     reviewedAt: (row.reviewed_at as string | null) ?? null,
     publishedAt: (row.published_at as string | null) ?? null,
     createdAt: row.created_at as string,
+    mergedFromIds: (row.merged_from_ids as string[] | null) ?? null,
   };
 }
 
@@ -197,5 +198,48 @@ export class PromptSuggestionRepository {
       return err(AppError.externalProvider("Failed to mark prompt suggestion published", error));
     }
     return ok(mapPromptSuggestionRow(data));
+  }
+
+  /** Creates the meta-suggestion produced by "consolidate all pending". Always category='prompt', status='pending'. */
+  async createFromMerge(input: {
+    clinicId: string;
+    patternSummary: string;
+    proposedChange: string;
+    suggestedPrompt: string;
+    supportingCallReviewIds: string[];
+    mergedFromIds: string[];
+  }): Promise<Result<PromptSuggestion>> {
+    const { data, error } = await this.client
+      .from("tomer_prompt_suggestions")
+      .insert({
+        clinic_id: input.clinicId,
+        status: "pending",
+        category: "prompt",
+        pattern_summary: input.patternSummary,
+        proposed_change: input.proposedChange,
+        suggested_prompt: input.suggestedPrompt,
+        supporting_call_review_ids: input.supportingCallReviewIds,
+        merged_from_ids: input.mergedFromIds,
+      })
+      .select("*")
+      .single();
+    if (error) return err(AppError.externalProvider("Failed to create merged prompt suggestion", error));
+    return ok(mapPromptSuggestionRow(data));
+  }
+
+  /**
+   * Bulk-marks the source suggestions consumed by a merge. Guarded by
+   * status='pending' per row, same race-safety as markApproved/markRejected —
+   * a row already reviewed elsewhere between the merge's read and this write
+   * is simply skipped rather than clobbered.
+   */
+  async markMerged(ids: string[]): Promise<Result<void>> {
+    const { error } = await this.client
+      .from("tomer_prompt_suggestions")
+      .update({ status: "merged" })
+      .in("id", ids)
+      .eq("status", "pending");
+    if (error) return err(AppError.externalProvider("Failed to mark suggestions merged", error));
+    return ok(undefined);
   }
 }

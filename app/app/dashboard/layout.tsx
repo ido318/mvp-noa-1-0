@@ -36,7 +36,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           the first flex child sits at the inline-start edge, which is the right side under dir="rtl". */}
       <div className="flex h-screen overflow-hidden" style={{ background: "var(--surface-canvas)" }}>
         {/* Sidebar (right in RTL) */}
-        <Sidebar openEscalations={openEscalations} />
+        <Sidebar openEscalations={openEscalations} isProviderAdmin={me?.profile.role === "provider_admin"} />
 
         {/* Main content (flex-1, scroll here) */}
         <div className="flex flex-1 flex-col min-w-0 overflow-hidden">
