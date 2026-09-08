@@ -34,12 +34,26 @@ export function createOpenAiPromptConsolidationProvider(): PromptConsolidationPr
       const modelName = getPromptConsolidationModelName();
       const openai = createOpenAI({ apiKey });
 
-      const { text } = await generateText({
+      const userPrompt = getUserPrompt(input.livePrompt, input.suggestions);
+      const MAX_PROMPT_CHARS = 60_000; // ~15k tokens at a conservative 4 chars/token — well under gpt-4o-mini's context window, generous for a voice-agent system prompt + several suggestions
+      if (userPrompt.length > MAX_PROMPT_CHARS) {
+        throw new Error(
+          `Consolidation input is too large (${userPrompt.length} chars, limit ${MAX_PROMPT_CHARS}) — reduce the number of open suggestions before consolidating`,
+        );
+      }
+
+      const { text, finishReason } = await generateText({
         model: openai(modelName),
         system: getSystemPrompt(),
-        prompt: getUserPrompt(input.livePrompt, input.suggestions),
+        prompt: userPrompt,
         maxOutputTokens: 4000,
       });
+
+      if (finishReason === "length") {
+        throw new Error(
+          "Consolidation response was truncated (hit the output token limit) — the merged prompt may be incomplete and was discarded",
+        );
+      }
 
       return {
         mergedPrompt: extractTag(text, "merged_prompt"),
