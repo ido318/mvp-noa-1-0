@@ -1,19 +1,25 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { ok } from "@/lib/errors/app-error";
+import { ok, err, AppError } from "@/lib/errors/app-error";
 import { PromptSuggestionService } from "@/lib/services/prompt-suggestion.service";
 import type { PromptSuggestionRepository } from "@/lib/repositories/prompt-suggestion.repository";
 import type { PromptSuggestion } from "@/types/domain/prompt-suggestion";
 
-const { mockRunRegressionTests, mockGetLiveAgentConfig, mockPublishPrompt } = vi.hoisted(() => ({
-  mockRunRegressionTests: vi.fn(),
-  mockGetLiveAgentConfig: vi.fn(),
-  mockPublishPrompt: vi.fn(),
-}));
+const { mockRunRegressionTests, mockGetLiveAgentConfig, mockPublishPrompt, mockConsolidatePromptSuggestions } =
+  vi.hoisted(() => ({
+    mockRunRegressionTests: vi.fn(),
+    mockGetLiveAgentConfig: vi.fn(),
+    mockPublishPrompt: vi.fn(),
+    mockConsolidatePromptSuggestions: vi.fn(),
+  }));
 
 vi.mock("@/lib/learning/elevenlabsTesting", () => ({
   runRegressionTests: mockRunRegressionTests,
   getLiveAgentConfig: mockGetLiveAgentConfig,
   publishPrompt: mockPublishPrompt,
+}));
+
+vi.mock("@/lib/ai/prompt-consolidation/provider", () => ({
+  consolidatePromptSuggestions: mockConsolidatePromptSuggestions,
 }));
 
 const REVIEWER_ID = "user-2";
@@ -69,6 +75,8 @@ function baseRepo() {
         ),
       ),
     ),
+    createFromMerge: vi.fn().mockResolvedValue(ok(suggestion({ id: "merged-1", category: "prompt" }))),
+    markMerged: vi.fn().mockResolvedValue(ok(undefined)),
   };
 }
 
@@ -76,6 +84,7 @@ beforeEach(() => {
   mockRunRegressionTests.mockReset();
   mockGetLiveAgentConfig.mockReset();
   mockPublishPrompt.mockReset();
+  mockConsolidatePromptSuggestions.mockReset();
 });
 
 describe("PromptSuggestionService.reject", () => {
@@ -212,5 +221,130 @@ describe("PromptSuggestionService.approve", () => {
     if (result.ok) return;
     expect(result.error.status).toBe(502);
     expect(repo.markPublished).not.toHaveBeenCalled();
+  });
+});
+
+describe("PromptSuggestionService.consolidatePending", () => {
+  it("returns a conflict when fewer than 2 pending 'prompt' suggestions exist", async () => {
+    const { service } = buildService({
+      listByStatus: vi.fn().mockResolvedValue(ok([suggestion({ category: "prompt" })])),
+    });
+
+    const result = await service.consolidatePending();
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.status).toBe(409);
+    expect(mockConsolidatePromptSuggestions).not.toHaveBeenCalled();
+  });
+
+  it("ignores non-'prompt' categories when counting candidates", async () => {
+    const { service } = buildService({
+      listByStatus: vi.fn().mockResolvedValue(
+        ok([
+          suggestion({ id: "s1", category: "prompt" }),
+          suggestion({ id: "s2", category: "knowledge_base" }),
+        ]),
+      ),
+    });
+
+    const result = await service.consolidatePending();
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.status).toBe(409);
+  });
+
+  it("merges 2+ pending prompt suggestions into one new suggestion and marks the originals merged", async () => {
+    const s1 = suggestion({ id: "s1", category: "prompt", supportingCallReviewIds: ["r1", "r2"] });
+    const s2 = suggestion({ id: "s2", category: "prompt", supportingCallReviewIds: ["r2", "r3"] });
+    mockGetLiveAgentConfig.mockResolvedValue({ agent: { prompt: { prompt: "live prompt text" } } });
+    mockConsolidatePromptSuggestions.mockResolvedValue({ mergedPrompt: "merged text", summary: "summary text" });
+
+    const createFromMerge = vi.fn().mockResolvedValue(
+      ok(suggestion({ id: "merged-1", category: "prompt", suggestedPrompt: "merged text", mergedFromIds: ["s1", "s2"] })),
+    );
+    const markMerged = vi.fn().mockResolvedValue(ok(undefined));
+    const { service } = buildService({
+      listByStatus: vi.fn().mockResolvedValue(ok([s1, s2])),
+      createFromMerge,
+      markMerged,
+    });
+
+    const result = await service.consolidatePending();
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.id).toBe("merged-1");
+    expect(mockConsolidatePromptSuggestions).toHaveBeenCalledWith({
+      livePrompt: "live prompt text",
+      suggestions: [
+        { patternSummary: s1.patternSummary, proposedChange: s1.proposedChange, rootCause: s1.rootCause, suggestedPrompt: s1.suggestedPrompt },
+        { patternSummary: s2.patternSummary, proposedChange: s2.proposedChange, rootCause: s2.rootCause, suggestedPrompt: s2.suggestedPrompt },
+      ],
+    });
+    expect(createFromMerge).toHaveBeenCalledWith({
+      clinicId: s1.clinicId,
+      patternSummary: "איחוד 2 הצעות תיקון פתוחות",
+      proposedChange: "summary text",
+      suggestedPrompt: "merged text",
+      supportingCallReviewIds: ["r1", "r2", "r3"],
+      mergedFromIds: ["s1", "s2"],
+    });
+    expect(markMerged).toHaveBeenCalledWith(["s1", "s2"]);
+  });
+
+  it("returns externalProvider when fetching the live prompt fails, without calling the LLM", async () => {
+    mockGetLiveAgentConfig.mockRejectedValue(new Error("ElevenLabs down"));
+    const { service } = buildService({
+      listByStatus: vi.fn().mockResolvedValue(
+        ok([suggestion({ id: "s1", category: "prompt" }), suggestion({ id: "s2", category: "prompt" })]),
+      ),
+    });
+
+    const result = await service.consolidatePending();
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.status).toBe(502);
+    expect(mockConsolidatePromptSuggestions).not.toHaveBeenCalled();
+  });
+
+  it("returns externalProvider when the LLM call fails, without creating a row", async () => {
+    mockGetLiveAgentConfig.mockResolvedValue({ agent: { prompt: { prompt: "live" } } });
+    mockConsolidatePromptSuggestions.mockRejectedValue(new Error("OpenAI down"));
+    const createFromMerge = vi.fn();
+    const { service } = buildService({
+      listByStatus: vi.fn().mockResolvedValue(
+        ok([suggestion({ id: "s1", category: "prompt" }), suggestion({ id: "s2", category: "prompt" })]),
+      ),
+      createFromMerge,
+    });
+
+    const result = await service.consolidatePending();
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.status).toBe(502);
+    expect(createFromMerge).not.toHaveBeenCalled();
+  });
+
+  it("still returns ok with the new suggestion when markMerged fails (best-effort)", async () => {
+    mockGetLiveAgentConfig.mockResolvedValue({ agent: { prompt: { prompt: "live" } } });
+    mockConsolidatePromptSuggestions.mockResolvedValue({ mergedPrompt: "merged", summary: "summary" });
+    const created = suggestion({ id: "merged-1", category: "prompt" });
+    const { service } = buildService({
+      listByStatus: vi.fn().mockResolvedValue(
+        ok([suggestion({ id: "s1", category: "prompt" }), suggestion({ id: "s2", category: "prompt" })]),
+      ),
+      createFromMerge: vi.fn().mockResolvedValue(ok(created)),
+      markMerged: vi.fn().mockResolvedValue(err(AppError.externalProvider("db down"))),
+    });
+
+    const result = await service.consolidatePending();
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.id).toBe("merged-1");
   });
 });
