@@ -3,6 +3,7 @@ import { AppError, ok } from "@/lib/errors/app-error";
 import { GET } from "@/app/api/prompt-suggestions/route";
 import { POST as rejectRoute } from "@/app/api/prompt-suggestions/[id]/reject/route";
 import { POST as approveRoute } from "@/app/api/prompt-suggestions/[id]/approve/route";
+import { POST as consolidateRoute } from "@/app/api/prompt-suggestions/consolidate/route";
 
 const { mockRequireProviderAdmin, mockCreateServices } = vi.hoisted(() => ({
   mockRequireProviderAdmin: vi.fn(),
@@ -120,5 +121,47 @@ describe("prompt-suggestions API routes", () => {
     expect(response.status).toBe(200);
     expect(body.data.published).toBe(false);
     expect(body.data.message).not.toBe("");
+  });
+});
+
+describe("POST /api/prompt-suggestions/consolidate", () => {
+  beforeEach(() => {
+    mockRequireProviderAdmin.mockReset();
+    mockCreateServices.mockReset();
+    mockCreateServices.mockResolvedValue({ auth: {} });
+  });
+
+  it("returns 401 when unauthenticated", async () => {
+    mockRequireProviderAdmin.mockRejectedValue(AppError.unauthorized());
+    const response = await consolidateRoute();
+    expect(response.status).toBe(401);
+  });
+
+  it("returns 403 for a non-provider-admin", async () => {
+    mockRequireProviderAdmin.mockRejectedValue(AppError.forbidden());
+    const response = await consolidateRoute();
+    expect(response.status).toBe(403);
+  });
+
+  it("returns 409 when the service reports too few candidates", async () => {
+    mockRequireProviderAdmin.mockResolvedValue({ user: adminUser });
+    const consolidatePending = vi.fn().mockResolvedValue(
+      { ok: false, error: AppError.conflict("At least 2 pending 'prompt' suggestions are required to consolidate") },
+    );
+    mockServices({ consolidatePending });
+    const response = await consolidateRoute();
+    expect(response.status).toBe(409);
+  });
+
+  it("delegates to the service and returns the merged suggestion on success", async () => {
+    mockRequireProviderAdmin.mockResolvedValue({ user: adminUser });
+    const merged = { id: "merged-1", status: "pending", category: "prompt" };
+    const consolidatePending = vi.fn().mockResolvedValue(ok(merged));
+    mockServices({ consolidatePending });
+    const response = await consolidateRoute();
+    const body = (await response.json()) as { data: typeof merged };
+    expect(response.status).toBe(200);
+    expect(body.data).toEqual(merged);
+    expect(consolidatePending).toHaveBeenCalledWith();
   });
 });
