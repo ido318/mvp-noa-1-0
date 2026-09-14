@@ -11,7 +11,6 @@ type InsertInvoiceInput = {
   clinicId: string;
   customerId: string;
   petId: string | null;
-  invoiceNumber: string;
   items: InvoiceLineItem[];
   total: number;
   notes: string | null;
@@ -55,34 +54,39 @@ export class InvoiceRepository {
     return ok(data ? mapInvoiceRow(data) : null);
   }
 
-  async countForClinic(clinicId: string): Promise<Result<number>> {
-    const { count, error } = await this.client
-      .from("invoices")
-      .select("id", { count: "exact", head: true })
-      .eq("clinic_id", clinicId);
-
-    if (error) return err(AppError.externalProvider("Failed to count invoices", error));
-    return ok(count ?? 0);
-  }
-
+  /**
+   * Invoice numbering and the insert happen atomically in one DB transaction
+   * (the create_invoice RPC, 20260903020000) — a plain app-level "count + 1
+   * then insert" let two concurrent calls for the same clinic compute the
+   * same invoice_number and collide on invoices_clinic_number_unique.
+   */
   async create(input: InsertInvoiceInput): Promise<Result<Invoice>> {
-    const { data, error } = await this.client
-      .from("invoices")
-      .insert({
-        clinic_id: input.clinicId,
-        customer_id: input.customerId,
-        pet_id: input.petId,
-        invoice_number: input.invoiceNumber,
-        items: input.items,
-        total: input.total,
-        notes: input.notes,
-        created_by_user_id: input.createdByUserId,
-      })
-      .select(SELECT_WITH_JOINS)
-      .single();
+    const { data: created, error } = await this.client.rpc("create_invoice", {
+      p_clinic_id: input.clinicId,
+      p_customer_id: input.customerId,
+      p_pet_id: input.petId,
+      p_items: input.items,
+      p_total: input.total,
+      p_notes: input.notes,
+      p_created_by_user_id: input.createdByUserId,
+    });
 
-    if (error) return err(AppError.externalProvider("Failed to create invoice", error));
-    return ok(mapInvoiceRow(data));
+    if (error) {
+      if ((error as { code?: string }).code === "23505") {
+        return err(AppError.conflict("Invoice number was just taken — retry", error));
+      }
+      return err(AppError.externalProvider("Failed to create invoice", error));
+    }
+
+    // The RPC returns the bare row; re-fetch with the customer/pet name joins
+    // the rest of the API surface expects.
+    const invoiceId = (created as { id: string }).id;
+    const withJoins = await this.findById(invoiceId);
+    if (!withJoins.ok) return withJoins;
+    if (!withJoins.value) {
+      return err(AppError.externalProvider("Invoice created but could not be re-fetched", { invoiceId }));
+    }
+    return ok(withJoins.value);
   }
 
   async updateStatusVersioned(
@@ -109,6 +113,25 @@ export class InvoiceRepository {
       }
       return err(AppError.externalProvider("Failed to update invoice status", error));
     }
+    return ok(mapInvoiceRow(data));
+  }
+
+  async attachPaymentLink(
+    invoiceId: string,
+    input: { paymentLinkUrl: string; greenInvoiceDocumentId: string },
+  ): Promise<Result<Invoice>> {
+    const { data, error } = await this.client
+      .from("invoices")
+      .update({
+        payment_link_url: input.paymentLinkUrl,
+        green_invoice_document_id: input.greenInvoiceDocumentId,
+        payment_link_sent_at: new Date().toISOString(),
+      })
+      .eq("id", invoiceId)
+      .select(SELECT_WITH_JOINS)
+      .single();
+
+    if (error) return err(AppError.externalProvider("Failed to attach payment link", error));
     return ok(mapInvoiceRow(data));
   }
 }

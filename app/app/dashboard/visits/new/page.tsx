@@ -42,21 +42,29 @@ export default async function NewVisitPage({
     customerId = pet?.customerId ?? null;
   }
 
-  if (!customerId || !petId) {
-    const customersData = await dashboardApiFetch<{ items: Customer[] }>("/api/customers");
-    const firstCustomer = customersData?.items[0] ?? null;
-    const petsData = firstCustomer
-      ? await dashboardApiFetch<{ items: Pet[] }>(`/api/customers/${firstCustomer.id}/pets`)
-      : null;
-    customerId = customerId ?? firstCustomer?.id ?? null;
-    petId = petId ?? petsData?.items[0]?.id ?? null;
+  // Deliberately no fallback to "the clinic's first customer and their first
+  // pet": that silently opened the visit on an arbitrary animal, with nothing on
+  // screen saying whose it was. Without context the vet picks, explicitly.
+  const customersData = await dashboardApiFetch<{ items: Customer[] }>("/api/customers");
+  const customers = customersData?.items ?? [];
+
+  const petsData = customerId
+    ? await dashboardApiFetch<{ items: Pet[] }>(`/api/customers/${customerId}/pets`)
+    : null;
+  const pets = petsData?.items ?? [];
+
+  if (!clinicId) {
+    return (
+      <section className="rounded-[var(--radius-3)] border border-[var(--amber-500)] bg-[var(--amber-50)] p-6 text-sm text-[var(--amber-600)]">
+        לא נמצאה מרפאה למשתמש הזה.
+      </section>
+    );
   }
 
-  if (!clinicId || !customerId || !petId) {
+  if (customers.length === 0) {
     return (
-      <section className="rounded-[var(--r-lg)] border border-[var(--amber-500)] bg-[var(--amber-50)] p-6 text-sm text-[var(--amber-600)]">
-        כדי ליצור ביקור, צריך לוודא שקיימים לפחות לקוח אחד וחיה אחת במרפאה
-        שנבחרה.
+      <section className="rounded-[var(--radius-3)] border border-[var(--amber-500)] bg-[var(--amber-50)] p-6 text-sm text-[var(--amber-600)]">
+        כדי ליצור ביקור, צריך שיהיה לפחות לקוח אחד עם חיה רשומה במרפאה.
       </section>
     );
   }
@@ -64,18 +72,21 @@ export default async function NewVisitPage({
   return (
     <section className="mx-auto w-full max-w-[640px] space-y-4 p-6">
       <div>
-        <Link href="/dashboard/visits" className="text-sm font-semibold text-[var(--brand-600)] hover:underline">
+        <Link href="/dashboard/visits" className="text-sm font-semibold text-[var(--accent)] hover:underline">
           ← חזרה לביקורים
         </Link>
-        <h2 className="mt-2 text-[22px] font-semibold text-[var(--ink)]">ביקור חדש</h2>
+        <h2 className="mt-2 text-[22px] font-semibold text-[var(--text-primary)]">ביקור חדש</h2>
       </div>
 
-      <div className="rounded-[var(--r-lg)] border border-[var(--line)] bg-[var(--surface)] p-6">
+      <div className="rounded-[var(--radius-3)] border border-[var(--border-hairline)] bg-[var(--surface-raised)] p-6">
         <VisitForm
           clinicId={clinicId}
-          customerId={customerId}
-          petId={petId}
+          customers={customers}
+          initialCustomerId={customerId}
+          initialPetId={petId}
+          initialPets={pets}
           appointmentId={appointmentId}
+          contextLocked={Boolean(appointmentId && customerId && petId)}
         />
       </div>
     </section>

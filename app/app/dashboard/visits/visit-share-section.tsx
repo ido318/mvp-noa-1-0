@@ -53,7 +53,7 @@ export function VisitShareSection({ visitId, hasSummary, hasPrescriptions }: Pro
 
   return (
     <div className="space-y-3">
-      <p className="text-sm text-[var(--ink-2)]">
+      <p className="text-sm text-[var(--text-secondary)]">
         שליחת קישור מאובטח ללקוח ב-SMS עם סיכום הביקור והמרשמים.
       </p>
 
@@ -66,8 +66,8 @@ export function VisitShareSection({ visitId, hasSummary, hasPrescriptions }: Pro
       {error ? <p className="text-sm font-semibold text-[var(--red-700)]">{error}</p> : null}
 
       {result ? (
-        <div className="rounded-[var(--r-lg)] border border-[var(--brand-200)] bg-[var(--brand-50)] p-3 text-sm">
-          <p className="font-semibold text-[var(--brand-700)]">
+        <div className="rounded-[var(--radius-3)] border border-[var(--brand-200)] bg-[var(--brand-50)] p-3 text-sm">
+          <p className="font-semibold text-[var(--accent-hover)]">
             נשלח ל-{result.recipientPhone}
           </p>
           <div className="mt-2 flex items-center gap-2">
@@ -75,7 +75,7 @@ export function VisitShareSection({ visitId, hasSummary, hasPrescriptions }: Pro
               href={result.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="truncate text-[var(--brand-600)] underline"
+              className="truncate text-[var(--accent)] underline"
             >
               {result.url}
             </a>

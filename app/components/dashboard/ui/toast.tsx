@@ -1,6 +1,6 @@
 "use client";
 import React, { createContext, useContext, useCallback, useState } from "react";
-import { XIcon } from "@/components/dashboard/icons";
+import { XIcon, CheckCircleIcon, XCircleIcon, AlertTriangleIcon, InfoCircleIcon } from "@/components/dashboard/icons";
 
 type ToastVariant = "success" | "error" | "warning" | "info";
 
@@ -33,6 +33,14 @@ const VARIANT_MARK: Record<ToastVariant, string> = {
   info:    "var(--steel-100)",
 };
 
+// Severity is never colour-alone — each variant also gets a distinct shape.
+const VARIANT_ICON: Record<ToastVariant, React.ComponentType<{ size?: number; className?: string }>> = {
+  success: CheckCircleIcon,
+  error:   XCircleIcon,
+  warning: AlertTriangleIcon,
+  info:    InfoCircleIcon,
+};
+
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
@@ -48,7 +56,12 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     <ToastContext.Provider value={{ toast }}>
       {children}
       {/* Toast container — bottom-start (left in RTL) */}
-      <div className="fixed bottom-6 start-6 z-50 flex flex-col gap-2 pointer-events-none">
+      <div
+        className="fixed bottom-6 start-6 z-50 flex flex-col gap-2 pointer-events-none"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      >
         {toasts.map((t) => (
           <ToastItem key={t.id} toast={t} onDismiss={(id) => setToasts((p) => p.filter((x) => x.id !== id))} />
         ))}
@@ -59,6 +72,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
 function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: (id: string) => void }) {
   const variant = toast.variant ?? "success";
+  const VariantIcon = VARIANT_ICON[variant];
 
   return (
     <div
@@ -70,16 +84,9 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: (id: string)
         boxShadow: "var(--shadow-modal)",
       }}
     >
-      <span
-        aria-hidden="true"
-        className="flex-shrink-0"
-        style={{
-          width: "var(--mark-size)",
-          height: "var(--mark-size)",
-          borderRadius: "1px",
-          background: VARIANT_MARK[variant],
-        }}
-      />
+      <span className="flex-shrink-0" style={{ color: VARIANT_MARK[variant] }}>
+        <VariantIcon size={18} />
+      </span>
       <p className="flex-1 text-[13px]" style={{ fontWeight: "var(--w-medium)" }}>{toast.message}</p>
       <button
         onClick={() => onDismiss(toast.id)}

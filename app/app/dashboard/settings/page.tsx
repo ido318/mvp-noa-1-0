@@ -4,8 +4,10 @@ import { useEffect, useState } from "react";
 import { Card } from "@/components/dashboard/ui/card";
 import { Badge } from "@/components/dashboard/ui/badge";
 import { Skeleton } from "@/components/dashboard/ui/skeleton";
+import { Field, Input } from "@/components/dashboard/ui/field";
 import { useToast } from "@/components/dashboard/ui/toast";
 import { LogoutButton } from "@/app/dashboard/logout-button";
+import { PriceListSettings } from "@/components/dashboard/settings/price-list-settings";
 import type { MeResponse } from "@/types/api/me";
 import type { ClinicSettings } from "@/types/domain/clinic";
 import { MAX_BUSINESS_HOURS_ROWS, MAX_VISIT_PRICE_ROWS } from "@/lib/validators/clinic-settings";
@@ -27,9 +29,12 @@ const CLIENT_SMS: Array<{ label: string; when: string }> = [
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="flex items-center justify-between gap-3 border-b border-[var(--line)] py-2.5 last:border-0">
-      <span className="text-sm text-[var(--muted)]">{label}</span>
-      <span className="text-sm font-semibold text-[var(--ink)]">{value}</span>
+    <div
+      className="flex items-center justify-between gap-3 py-2.5 last:border-0"
+      style={{ borderBottom: "var(--rule)" }}
+    >
+      <span className="text-sm" style={{ color: "var(--text-secondary)" }}>{label}</span>
+      <span className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>{value}</span>
     </div>
   );
 }
@@ -38,58 +43,73 @@ function SectionTitle({
   children,
   hint,
   action,
+  readOnly,
 }: {
   children: React.ReactNode;
   hint?: string;
   action?: React.ReactNode;
+  readOnly?: boolean;
 }) {
   return (
     <div className="mb-3 flex items-start justify-between gap-3">
       <div>
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--muted)]">{children}</h2>
-        {hint ? <p className="mt-0.5 text-xs text-[var(--faint)]">{hint}</p> : null}
+        <div className="flex items-center gap-2">
+          <h2
+            className="text-sm font-semibold uppercase tracking-wide"
+            style={{ color: "var(--text-muted)" }}
+          >
+            {children}
+          </h2>
+          {readOnly ? <Badge tone="neutral" plain>לקריאה בלבד</Badge> : null}
+        </div>
+        {hint ? <p className="mt-0.5 text-xs" style={{ color: "var(--text-faint)" }}>{hint}</p> : null}
       </div>
       {action}
     </div>
   );
 }
 
-const inputClass =
-  "w-full rounded-[var(--r-sm)] border border-[var(--line)] bg-white px-2.5 py-1.5 text-sm font-semibold text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--brand-500)]";
-
 function EditRow({
   value,
   onChange,
   onRemove,
   canRemove,
-  placeholders,
+  labels,
+  idPrefix,
 }: {
   value: { a: string; b: string };
   onChange: (next: { a: string; b: string }) => void;
   onRemove: () => void;
   canRemove: boolean;
-  placeholders: [string, string];
+  labels: [string, string];
+  idPrefix: string;
 }) {
   return (
-    <div className="flex items-center gap-2 border-b border-[var(--line)] py-2 last:border-0">
-      <input
-        className={inputClass}
-        value={value.a}
-        placeholder={placeholders[0]}
-        onChange={(e) => onChange({ ...value, a: e.target.value })}
-      />
-      <input
-        className={inputClass}
-        value={value.b}
-        placeholder={placeholders[1]}
-        onChange={(e) => onChange({ ...value, b: e.target.value })}
-      />
+    <div
+      className="flex items-end gap-2 py-2 last:border-0"
+      style={{ borderBottom: "var(--rule)" }}
+    >
+      <Field label={labels[0]} htmlFor={`${idPrefix}-a`} className="flex-1 min-w-0">
+        <Input
+          id={`${idPrefix}-a`}
+          value={value.a}
+          onChange={(e) => onChange({ ...value, a: e.target.value })}
+        />
+      </Field>
+      <Field label={labels[1]} htmlFor={`${idPrefix}-b`} className="flex-1 min-w-0">
+        <Input
+          id={`${idPrefix}-b`}
+          value={value.b}
+          onChange={(e) => onChange({ ...value, b: e.target.value })}
+        />
+      </Field>
       <button
         type="button"
         onClick={onRemove}
         disabled={!canRemove}
         title={canRemove ? undefined : "חייבת להישאר לפחות שורה אחת"}
-        className="flex-shrink-0 text-xs font-semibold text-[var(--red-600)] hover:underline disabled:opacity-40 disabled:no-underline"
+        className="flex-shrink-0 whitespace-nowrap text-xs font-semibold hover:underline disabled:opacity-40 disabled:no-underline"
+        style={{ color: "var(--red-600)", height: "var(--field-h)", display: "flex", alignItems: "center" }}
       >
         הסר
       </button>
@@ -184,7 +204,8 @@ export default function SettingsPage() {
           type="button"
           onClick={cancelEditing}
           disabled={saving}
-          className="rounded-[var(--r-sm)] border border-[var(--line)] px-3 py-1.5 text-xs font-semibold text-[var(--muted)]"
+          className="rounded-[var(--radius-1)] border px-3 py-1.5 text-xs font-semibold"
+          style={{ borderColor: "var(--border-hairline)", color: "var(--text-secondary)" }}
         >
           ביטול
         </button>
@@ -192,7 +213,8 @@ export default function SettingsPage() {
           type="button"
           onClick={save}
           disabled={saving}
-          className="rounded-[var(--r-sm)] bg-[var(--brand-600)] px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+          className="rounded-[var(--radius-1)] px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+          style={{ background: "var(--accent)" }}
         >
           {saving ? "שומר..." : "שמור"}
         </button>
@@ -201,7 +223,8 @@ export default function SettingsPage() {
       <button
         type="button"
         onClick={startEditing}
-        className="rounded-[var(--r-sm)] border border-[var(--line)] px-3 py-1.5 text-xs font-semibold text-[var(--ink)]"
+        className="rounded-[var(--radius-1)] border px-3 py-1.5 text-xs font-semibold"
+        style={{ borderColor: "var(--border-hairline)", color: "var(--text-primary)" }}
       >
         ערוך
       </button>
@@ -209,12 +232,12 @@ export default function SettingsPage() {
   ) : null;
 
   return (
-    <div className="min-h-full bg-[var(--bg)] p-6">
+    <div className="min-h-full p-6" style={{ background: "var(--surface-canvas)" }}>
       <div className="mx-auto max-w-[880px] space-y-5">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h1 className="text-[28px] font-semibold leading-tight text-[var(--ink)]">הגדרות</h1>
-            <p className="mt-1 text-sm font-semibold text-[var(--muted)]">
+            <h1 className="text-[28px] font-semibold leading-tight" style={{ color: "var(--text-primary)" }}>הגדרות</h1>
+            <p className="mt-1 text-sm font-semibold" style={{ color: "var(--text-secondary)" }}>
               סקירת התצורה של המרפאה והחשבון שלך
             </p>
           </div>
@@ -222,7 +245,7 @@ export default function SettingsPage() {
         </div>
 
         {settingsLoadFailed ? (
-          <div className="rounded-[var(--r-md)] border border-[var(--red-100)] bg-[var(--red-50)] px-4 py-3 text-sm font-semibold text-[var(--red-700)]">
+          <div className="rounded-[var(--radius-2)] border border-[var(--red-100)] bg-[var(--red-050)] px-4 py-3 text-sm font-semibold text-[var(--red-700)]">
             טעינת הגדרות המרפאה נכשלה. רענן/י את הדף כדי לנסות שוב.
           </div>
         ) : null}
@@ -233,37 +256,36 @@ export default function SettingsPage() {
           {loading ? (
             <Skeleton className="h-24" />
           ) : editing && draft ? (
-            <div className="space-y-2">
-              <label className="flex items-center justify-between gap-3 py-1 text-sm">
-                <span className="text-[var(--muted)]">שם</span>
-                <span className="font-semibold text-[var(--ink)]">{membership?.clinicName ?? "Get A Vet"}</span>
-              </label>
-              <label className="flex items-center justify-between gap-3 py-1 text-sm">
-                <span className="flex-shrink-0 text-[var(--muted)]">כתובת</span>
-                <input
-                  className={inputClass}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-3 py-1 text-sm">
+                <span style={{ color: "var(--text-secondary)" }}>שם</span>
+                <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{membership?.clinicName ?? "Get A Vet"}</span>
+              </div>
+              <Field label="כתובת" htmlFor="settingsAddress">
+                <Input
+                  id="settingsAddress"
                   value={draft.contact.address}
                   onChange={(e) => setDraft({ ...draft, contact: { ...draft.contact, address: e.target.value } })}
                 />
-              </label>
-              <label className="flex items-center justify-between gap-3 py-1 text-sm">
-                <span className="flex-shrink-0 text-[var(--muted)]">וואטסאפ</span>
-                <input
-                  dir="ltr"
-                  className={inputClass}
-                  value={draft.contact.whatsapp}
-                  onChange={(e) => setDraft({ ...draft, contact: { ...draft.contact, whatsapp: e.target.value } })}
-                />
-              </label>
-              <label className="flex items-center justify-between gap-3 py-1 text-sm">
-                <span className="flex-shrink-0 text-[var(--muted)]">אימייל</span>
-                <input
-                  dir="ltr"
-                  className={inputClass}
-                  value={draft.contact.email}
-                  onChange={(e) => setDraft({ ...draft, contact: { ...draft.contact, email: e.target.value } })}
-                />
-              </label>
+              </Field>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <Field label="וואטסאפ" htmlFor="settingsWhatsapp">
+                  <Input
+                    id="settingsWhatsapp"
+                    dir="ltr"
+                    value={draft.contact.whatsapp}
+                    onChange={(e) => setDraft({ ...draft, contact: { ...draft.contact, whatsapp: e.target.value } })}
+                  />
+                </Field>
+                <Field label="אימייל" htmlFor="settingsEmail">
+                  <Input
+                    id="settingsEmail"
+                    dir="ltr"
+                    value={draft.contact.email}
+                    onChange={(e) => setDraft({ ...draft, contact: { ...draft.contact, email: e.target.value } })}
+                  />
+                </Field>
+              </div>
               <Row label="אזור זמן" value="ישראל (Asia/Jerusalem)" />
             </div>
           ) : (
@@ -288,7 +310,8 @@ export default function SettingsPage() {
                 <EditRow
                   key={i}
                   value={{ a: b.day, b: b.hours }}
-                  placeholders={["יום", "שעות"]}
+                  labels={["יום", "שעות"]}
+                  idPrefix={`business-hours-${i}`}
                   canRemove={draft.businessHours.length > 1}
                   onChange={(next) =>
                     setDraft({
@@ -312,7 +335,8 @@ export default function SettingsPage() {
                 onClick={() =>
                   setDraft({ ...draft, businessHours: [...draft.businessHours, { day: "", hours: "" }] })
                 }
-                className="mt-2 text-xs font-semibold text-[var(--brand-600)] hover:underline disabled:opacity-40 disabled:no-underline"
+                className="mt-2 text-xs font-semibold hover:underline disabled:opacity-40 disabled:no-underline"
+                style={{ color: "var(--accent)" }}
               >
                 {draft.businessHours.length >= MAX_BUSINESS_HOURS_ROWS
                   ? `הגעת למספר השורות המרבי (${MAX_BUSINESS_HOURS_ROWS})`
@@ -339,7 +363,8 @@ export default function SettingsPage() {
                 <EditRow
                   key={i}
                   value={{ a: v.label, b: v.detail }}
-                  placeholders={["סוג ביקור", "מחיר / פרטים"]}
+                  labels={["סוג ביקור", "מחיר / פרטים"]}
+                  idPrefix={`visit-price-${i}`}
                   canRemove={draft.visitPrices.length > 1}
                   onChange={(next) =>
                     setDraft({
@@ -363,7 +388,8 @@ export default function SettingsPage() {
                 onClick={() =>
                   setDraft({ ...draft, visitPrices: [...draft.visitPrices, { label: "", detail: "" }] })
                 }
-                className="mt-2 text-xs font-semibold text-[var(--brand-600)] hover:underline disabled:opacity-40 disabled:no-underline"
+                className="mt-2 text-xs font-semibold hover:underline disabled:opacity-40 disabled:no-underline"
+                style={{ color: "var(--accent)" }}
               >
                 {draft.visitPrices.length >= MAX_VISIT_PRICE_ROWS
                   ? `הגעת למספר השורות המרבי (${MAX_VISIT_PRICE_ROWS})`
@@ -379,9 +405,17 @@ export default function SettingsPage() {
           )}
         </Card>
 
-        {/* Client SMS */}
-        <Card>
-          <SectionTitle hint="הודעות שנשלחות אוטומטית ללקוחות">התראות SMS ללקוחות</SectionTitle>
+        {/* Price list — real numeric pricing, editable, used when billing a visit */}
+        {membership ? (
+          <Card>
+            <SectionTitle hint="המחירים בפועל המוצעים בעת חיוב ביקור">מחירון</SectionTitle>
+            {loading ? <Skeleton className="h-32" /> : <PriceListSettings clinicId={membership.clinicId} />}
+          </Card>
+        ) : null}
+
+        {/* Client SMS — informational only, not backed by an API */}
+        <Card style={{ background: "var(--surface-sunken)" }}>
+          <SectionTitle hint="הודעות שנשלחות אוטומטית ללקוחות" readOnly>התראות SMS ללקוחות</SectionTitle>
           <div>
             {CLIENT_SMS.map((s) => (
               <Row key={s.label} label={s.label} value={s.when} />
@@ -389,15 +423,15 @@ export default function SettingsPage() {
           </div>
         </Card>
 
-        {/* Tomer agent */}
-        <Card>
-          <SectionTitle hint="מנוהל בתצורת הסוכן (ElevenLabs)">תומר — הסוכן הקולי</SectionTitle>
+        {/* Tomer agent — informational only, managed in ElevenLabs, not fetched here */}
+        <Card style={{ background: "var(--surface-sunken)" }}>
+          <SectionTitle hint="מנוהל בתצורת הסוכן (ElevenLabs)" readOnly>תומר — הסוכן הקולי</SectionTitle>
           <div>
             <Row label="מספר נכנס" value={<span dir="ltr">+972 53-564-8742</span>} />
             <Row label="שפה" value="עברית" />
             <Row
               label="ניתוב תורים"
-              value={<Badge color="green">בזמן אמת ליומן</Badge>}
+              value={<Badge tone="done">בזמן אמת ליומן</Badge>}
             />
             <Row
               label="העברה לנציג אנושי"

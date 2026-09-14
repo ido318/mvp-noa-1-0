@@ -70,6 +70,7 @@ function makeNote(id: string, content: string): MedicalNote {
     objective: null,
     assessment: null,
     plan: null,
+    parentNoteId: null,
     status: "draft",
     approvedByUserId: null,
     approvedAt: null,

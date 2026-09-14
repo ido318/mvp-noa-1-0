@@ -22,7 +22,7 @@ import {
   cancelFutureNotifications,
   enqueueClientCancellationConfirmation,
 } from "./notifications.js";
-import { processNotifications } from "../services/notification.processor.js";
+import { processNotifications } from "./notificationProcessor.js";
 import { VALID_CALL_CATEGORIES } from "./callClassifier.js";
 
 export type Pet = { name: string; species: string; breed: string | null };
@@ -33,6 +33,16 @@ export type Customer = {
   pets: Pet[];
   // last_visit will be derived from the appointments table in a future phase
   notes: string | null;
+};
+
+// Pet summary including id — used by listCustomerPets, which (unlike
+// findCustomerByPhone above) must let the calling LLM reference a specific
+// pet by id in a later tool call (getPatientReminders, etc.).
+export type PetSummary = { id: string; name: string; species: string };
+
+export type ListCustomerPetsResult = {
+  result: string;
+  pets: PetSummary[];
 };
 
 export type EscalationEntry = {
@@ -58,7 +68,7 @@ export async function findCustomerByPhone(
 
   const { data, error } = await getSupabase()
     .from("customers")
-    .select("phone, full_name, notes, pets(name, species, breed)")
+    .select("id, phone, full_name, notes")
     .eq("clinic_id", env.AGENT_CLINIC_ID)
     .eq("phone", normalised)
     .is("deleted_at", null)
@@ -69,17 +79,31 @@ export async function findCustomerByPhone(
   if (!data) return null;
 
   const row = data as {
+    id: string;
     phone: string;
     full_name: string;
     notes: string | null;
-    pets: Array<{ name: string; species: string; breed: string | null }> | null;
   };
+
+  // Queried separately (rather than via a `pets(...)` embed on the customers
+  // query above) so deleted_at can actually be filtered on the pets side —
+  // PostgREST embeds don't apply the parent query's filters to child rows.
+  // Same fix as listCustomerPets below; this function predates that one and
+  // was missed when the bug was first found and fixed there.
+  const { data: petsData, error: petsErr } = await getSupabase()
+    .from("pets")
+    .select("name, species, breed")
+    .eq("clinic_id", env.AGENT_CLINIC_ID)
+    .eq("customer_id", row.id)
+    .is("deleted_at", null);
+
+  if (petsErr) throw new Error(`supabase lookup failed: ${petsErr.message}`);
 
   return {
     phone: row.phone,
     full_name: row.full_name,
     notes: row.notes,
-    pets: row.pets ?? [],
+    pets: (petsData ?? []) as Pet[],
   };
 }
 
@@ -225,7 +249,10 @@ export async function checkAvailability(
     .from("appointments")
     .select("scheduled_at, end_at")
     .eq("clinic_id", env.AGENT_CLINIC_ID)
-    .in("status", ["scheduled", "confirmed", "pending_approval"])
+    // Must match appointments_no_active_overlap's WHERE clause exactly
+    // (20260831102335_phase1_database_core_alignment.sql) — otherwise Tomer
+    // can offer a slot the DB exclusion constraint will then reject.
+    .in("status", ["scheduled", "confirmed", "pending_approval", "checked_in", "in_visit"])
     .is("deleted_at", null)
     .gte("scheduled_at", dayStart)
     .lte("scheduled_at", dayEnd);
@@ -581,6 +608,256 @@ export async function joinWaitlist(params: JoinWaitlistParams): Promise<string> 
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Patient lookup (Voice SOAP Generator support)
+//
+// These four tools let Tomer answer follow-up questions about a specific
+// pet during a call (vaccination reminders, chronic conditions, last visit's
+// plan). Every one of the three pet-scoped lookups below (all but
+// listCustomerPets) MUST go through verifyPetOwnership first — see the
+// "Private helpers" section — so a confused/hallucinating LLM can never use
+// a stale or wrong pet_id from an earlier turn or a different call to read
+// another customer's pet data.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const REMINDER_WINDOW_DAYS = 60;
+
+export async function listCustomerPets(phone: string): Promise<ListCustomerPetsResult> {
+  const normalised = normalisePhone(phone);
+  const env = getEnv();
+
+  const { data: customerRow, error: customerErr } = await getSupabase()
+    .from("customers")
+    .select("id, full_name")
+    .eq("clinic_id", env.AGENT_CLINIC_ID)
+    .eq("phone", normalised)
+    .is("deleted_at", null)
+    .eq("status", "active")
+    .maybeSingle();
+
+  if (customerErr) throw new Error(`listCustomerPets customer query failed: ${customerErr.message}`);
+
+  if (!customerRow) {
+    return {
+      result: "לקוח לא מוכר במערכת. לא נמצאו חיות רשומות למספר הטלפון הזה.",
+      pets: [],
+    };
+  }
+
+  const customerId = extractId(customerRow);
+  const fullName = extractString(customerRow, "full_name") ?? "";
+
+  // customers.id is a NOT NULL primary key, so this should be unreachable in
+  // practice — but fail safely (no pets) rather than issuing a pets query
+  // filtered on a null customer_id.
+  if (!customerId) {
+    return { result: `לא נמצאו חיות רשומות עבור ${fullName}.`, pets: [] };
+  }
+
+  // Queried separately (rather than via a `pets(...)` embed on the customers
+  // query above) so deleted_at can actually be filtered on the pets side —
+  // PostgREST embeds don't apply the parent query's filters to child rows.
+  const { data: petsData, error: petsErr } = await getSupabase()
+    .from("pets")
+    .select("id, name, species")
+    .eq("clinic_id", env.AGENT_CLINIC_ID)
+    .eq("customer_id", customerId)
+    .is("deleted_at", null)
+    .order("created_at", { ascending: true });
+
+  if (petsErr) throw new Error(`listCustomerPets pets query failed: ${petsErr.message}`);
+
+  const pets = (petsData ?? []) as PetSummary[];
+
+  if (pets.length === 0) {
+    return { result: `לא נמצאו חיות רשומות עבור ${fullName}.`, pets: [] };
+  }
+
+  if (pets.length === 1) {
+    const p = pets[0]!;
+    return {
+      result: `החיה הרשומה עבור ${fullName} היא ${p.name} (${p.species}), מזהה pet_id: ${p.id}.`,
+      pets,
+    };
+  }
+
+  const listHe = pets.map((p) => `${p.name} (${p.species}, pet_id: ${p.id})`).join(", ");
+  return {
+    result:
+      `ל${fullName} יש כמה חיות רשומות: ${listHe}. ` +
+      "יש לשאול לאיזו חיה מתייחסת הפנייה, ולהשתמש ב-pet_id המתאים בקריאות הבאות.",
+    pets,
+  };
+}
+
+export async function getPatientReminders(phone: string, petId: string): Promise<string> {
+  const pet = await verifyPetOwnership(phone, petId);
+  if (!pet) return PET_NOT_FOUND_HE;
+
+  const env = getEnv();
+  const { data, error } = await getSupabase()
+    .from("vaccinations")
+    .select("vaccine_name, next_due_at")
+    .eq("clinic_id", env.AGENT_CLINIC_ID)
+    .eq("pet_id", pet.id)
+    .is("deleted_at", null)
+    .not("next_due_at", "is", null)
+    .order("next_due_at", { ascending: true });
+
+  if (error) throw new Error(`getPatientReminders failed: ${error.message}`);
+
+  const rows = (data ?? []) as Array<{ vaccine_name: string; next_due_at: string }>;
+  if (rows.length === 0) {
+    return `אין תזכורות חיסון ממתינות עבור ${pet.name}.`;
+  }
+
+  // next_due_at is a plain `date` column (no time/timezone component), so
+  // "YYYY-MM-DD" string comparison against today's Israel-local date is both
+  // correct and simpler than round-tripping through Date/ms.
+  const todayIso = toIsraelDateIso(new Date());
+  const windowEndMs =
+    new Date(toIso(todayIso, 0, 0)).getTime() + REMINDER_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+
+  const overdue: string[] = [];
+  const upcoming: string[] = [];
+
+  for (const row of rows) {
+    if (!row.next_due_at) continue;
+    const dueDateIso = row.next_due_at.slice(0, 10);
+    const dateLabel = formatDateHe(dueDateIso);
+
+    if (dueDateIso < todayIso) {
+      overdue.push(`${row.vaccine_name} (${dateLabel})`);
+    } else if (new Date(toIso(dueDateIso, 0, 0)).getTime() <= windowEndMs) {
+      upcoming.push(`${row.vaccine_name} (${dateLabel})`);
+    }
+  }
+
+  if (overdue.length === 0 && upcoming.length === 0) {
+    return `אין תזכורות חיסון קרובות עבור ${pet.name} בטווח הקרוב.`;
+  }
+
+  const parts: string[] = [];
+  if (overdue.length > 0) {
+    parts.push(`חיסונים באיחור עבור ${pet.name}: ${overdue.join(", ")}.`);
+  }
+  if (upcoming.length > 0) {
+    parts.push(`חיסונים קרובים עבור ${pet.name}: ${upcoming.join(", ")}.`);
+  }
+
+  return parts.join(" ");
+}
+
+export async function getPatientChronicConditions(phone: string, petId: string): Promise<string> {
+  const pet = await verifyPetOwnership(phone, petId);
+  if (!pet) return PET_NOT_FOUND_HE;
+
+  const env = getEnv();
+
+  const { data: petRow, error: petErr } = await getSupabase()
+    .from("pets")
+    .select("chronic_conditions")
+    .eq("id", pet.id)
+    .eq("clinic_id", env.AGENT_CLINIC_ID)
+    .maybeSingle();
+  if (petErr) throw new Error(`getPatientChronicConditions pet query failed: ${petErr.message}`);
+
+  const chronicText = extractString(petRow, "chronic_conditions");
+
+  const { data: recordRow, error: recordErr } = await getSupabase()
+    .from("medical_records")
+    .select("active_problem_list")
+    .eq("clinic_id", env.AGENT_CLINIC_ID)
+    .eq("pet_id", pet.id)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (recordErr) {
+    throw new Error(`getPatientChronicConditions medical_records query failed: ${recordErr.message}`);
+  }
+
+  const conditionNames = extractProblemList(recordRow)
+    .map((entry) => entry.condition)
+    .filter((c): c is string => typeof c === "string" && c.trim().length > 0);
+
+  const hasChronicText = !!chronicText?.trim();
+  const hasProblems = conditionNames.length > 0;
+
+  if (!hasChronicText && !hasProblems) {
+    return `אין רשומות של מצבים כרוניים עבור ${pet.name}.`;
+  }
+
+  const parts: string[] = [];
+  if (hasChronicText) {
+    parts.push(`מצבים כרוניים ידועים עבור ${pet.name}: ${chronicText!.trim()}.`);
+  }
+  if (hasProblems) {
+    parts.push(`רשימת בעיות פעילה: ${conditionNames.join(", ")}.`);
+  }
+  parts.push(
+    "אם בעל החיה מדווח כרגע על החמרה במצב — יש להתייחס לכך כדגל אזהרה ולהמשיך בבירור הרפואי הרגיל, שכולל בתוכו זיהוי מקרים שדורשים העברה דחופה; מעבר לכך, יש להציע את התור המוקדם ביותר האפשרי.",
+  );
+
+  return parts.join(" ");
+}
+
+export async function getLastVisitPlan(phone: string, petId: string): Promise<string> {
+  const pet = await verifyPetOwnership(phone, petId);
+  if (!pet) return PET_NOT_FOUND_HE;
+
+  const env = getEnv();
+  const visitIds = await findPetVisitIds(env.AGENT_CLINIC_ID, pet.id);
+
+  if (visitIds.length > 0) {
+    const { data, error } = await getSupabase()
+      .from("medical_notes")
+      .select("plan, created_at")
+      .eq("clinic_id", env.AGENT_CLINIC_ID)
+      .in("visit_id", visitIds)
+      .eq("note_type", "soap_full")
+      .eq("status", "approved")
+      .is("deleted_at", null)
+      .not("plan", "is", null)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) throw new Error(`getLastVisitPlan notes query failed: ${error.message}`);
+
+    const plan = extractString(data, "plan");
+    if (plan && plan.trim()) {
+      const createdAt = extractString(data, "created_at");
+      const dateLabel = createdAt ? formatDateHe(toIsraelDateIso(new Date(createdAt))) : null;
+      return dateLabel
+        ? `בביקור האחרון, בתאריך ${dateLabel}, ד"ר נועה קבעה את התוכנית הבאה עבור ${pet.name}: ${plan.trim()}`
+        : `בביקור האחרון ד"ר נועה קבעה את התוכנית הבאה עבור ${pet.name}: ${plan.trim()}`;
+    }
+  }
+
+  // Fallback: no approved soap_full plan on record — try the most recent
+  // visit's manual/AI summary instead. Never fall back to a draft note's
+  // plan — an unapproved plan may still change before Noa signs off on it.
+  const { data: visitRow, error: visitErr } = await getSupabase()
+    .from("visits")
+    .select("manual_visit_summary, ai_visit_summary")
+    .eq("clinic_id", env.AGENT_CLINIC_ID)
+    .eq("pet_id", pet.id)
+    .is("deleted_at", null)
+    .order("started_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (visitErr) throw new Error(`getLastVisitPlan visit fallback query failed: ${visitErr.message}`);
+
+  const summary =
+    extractString(visitRow, "manual_visit_summary") ?? extractString(visitRow, "ai_visit_summary");
+
+  if (summary && summary.trim()) {
+    return `לא נמצאה תוכנית טיפול מאושרת מהביקור האחרון עבור ${pet.name}. תקציר הביקור האחרון: ${summary.trim()}`;
+  }
+
+  return `לא נמצאה תוכנית המשך רשומה עבור ${pet.name}.`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Voice calls
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -698,6 +975,88 @@ export async function saveVoiceCall(
 // Private helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Generic, non-leaking message for every failure mode of verifyPetOwnership:
+// unknown phone, malformed pet_id, non-existent pet, or a pet that exists
+// but belongs to a different customer/clinic. Never hint at which case it was.
+const PET_NOT_FOUND_HE = "לא מצאתי חיה כזו ברשומות שלך.";
+
+type ProblemListEntry = {
+  condition: string;
+  onsetDate?: string | null;
+  severity?: string | null;
+  notes?: string | null;
+};
+
+function extractProblemList(row: unknown): ProblemListEntry[] {
+  if (row === null || typeof row !== "object") return [];
+  const val = (row as Record<string, unknown>)["active_problem_list"];
+  if (!Array.isArray(val)) return [];
+  return val.filter(
+    (item): item is ProblemListEntry =>
+      item !== null &&
+      typeof item === "object" &&
+      typeof (item as Record<string, unknown>)["condition"] === "string",
+  );
+}
+
+/**
+ * Mandatory cross-check reused by every pet-scoped lookup (getPatientReminders,
+ * getPatientChronicConditions, getLastVisitPlan): confirms petId is a
+ * syntactically valid UUID AND actually belongs to a pet owned by the
+ * customer identified by phone, within AGENT_CLINIC_ID. Returns null for
+ * every failure mode (malformed UUID, unknown phone, non-existent pet, or a
+ * pet belonging to a different customer/clinic) — callers must map a null
+ * result to the single generic PET_NOT_FOUND_HE message and must never leak
+ * which failure mode occurred (e.g. never reveal that the pet_id belongs to
+ * someone else). This defends against a confused/hallucinating LLM reusing a
+ * stale or wrong pet_id from an earlier turn or a different call.
+ */
+async function verifyPetOwnership(phone: string, petId: string): Promise<PetSummary | null> {
+  if (!UUID_RE.test(petId)) return null;
+
+  const normalised = normalisePhone(phone);
+  const customerId = await findCustomerIdByPhone(normalised);
+  if (!customerId) return null;
+
+  const env = getEnv();
+  const { data, error } = await getSupabase()
+    .from("pets")
+    .select("id, name, species")
+    .eq("id", petId)
+    .eq("clinic_id", env.AGENT_CLINIC_ID)
+    .eq("customer_id", customerId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (error) throw new Error(`verifyPetOwnership failed: ${error.message}`);
+  if (!data) return null;
+
+  const id = extractId(data);
+  const name = extractString(data, "name");
+  const species = extractString(data, "species");
+  if (!id || !name || !species) return null;
+
+  return { id, name, species };
+}
+
+async function findPetVisitIds(clinicId: string, petId: string): Promise<string[]> {
+  const { data, error } = await getSupabase()
+    .from("visits")
+    .select("id")
+    .eq("clinic_id", clinicId)
+    .eq("pet_id", petId)
+    .is("deleted_at", null);
+
+  if (error) throw new Error(`findPetVisitIds failed: ${error.message}`);
+
+  return (data ?? []).flatMap((row) => {
+    const id = extractId(row);
+    return id ? [id] : [];
+  });
+}
+
 async function findActiveAppointmentNear(
   clinicId: string,
   customerId: string,
@@ -714,7 +1073,7 @@ async function findActiveAppointmentNear(
     .select("id, customer_id, scheduled_at, appointment_type, duration_minutes, customers(full_name), pets(name)")
     .eq("clinic_id", clinicId)
     .eq("customer_id", customerId)
-    .in("status", ["scheduled", "confirmed", "pending_approval"])
+    .in("status", ["scheduled", "confirmed", "pending_approval", "checked_in", "in_visit"])
     .is("deleted_at", null)
     .gte("scheduled_at", rangeStart)
     .lte("scheduled_at", rangeEnd)
@@ -795,10 +1154,38 @@ async function createOrFindCustomer(
     .select("id")
     .single();
 
-  if (error) throw new Error(`createOrFindCustomer failed: ${error.message}`);
+  if (error) {
+    // Two near-simultaneous calls for the same new phone number can both
+    // pass the find-step above before either inserts; customers_clinic_phone_unique_idx
+    // then rejects the loser here. Re-fetch instead of surfacing a spurious
+    // "internal error" — the winner's row already has what the caller needs.
+    if (error.code === "23505") {
+      const raceId = await findCustomerIdByPhone(phone);
+      if (raceId) return { customerId: raceId };
+    }
+    throw new Error(`createOrFindCustomer failed: ${error.message}`);
+  }
   const id = extractId(inserted);
   if (!id) throw new Error("createOrFindCustomer: no id returned");
   return { customerId: id };
+}
+
+async function findPetIdByName(
+  customerId: string,
+  petName: string,
+): Promise<string | null> {
+  const env = getEnv();
+  const { data, error } = await getSupabase()
+    .from("pets")
+    .select("id")
+    .eq("clinic_id", env.AGENT_CLINIC_ID)
+    .eq("customer_id", customerId)
+    .ilike("name", petName)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (error) throw new Error(`findPetIdByName failed: ${error.message}`);
+  return extractId(data);
 }
 
 async function createOrFindPet(
@@ -809,18 +1196,7 @@ async function createOrFindPet(
 ): Promise<{ petId: string }> {
   const env = getEnv();
 
-  const { data: existing, error: findErr } = await getSupabase()
-    .from("pets")
-    .select("id")
-    .eq("clinic_id", env.AGENT_CLINIC_ID)
-    .eq("customer_id", customerId)
-    .ilike("name", petName)
-    .is("deleted_at", null)
-    .maybeSingle();
-
-  if (findErr) throw new Error(`createOrFindPet lookup failed: ${findErr.message}`);
-
-  const existingId = extractId(existing);
+  const existingId = await findPetIdByName(customerId, petName);
   if (existingId) return { petId: existingId };
 
   const { data: inserted, error: insertErr } = await getSupabase()
@@ -836,7 +1212,15 @@ async function createOrFindPet(
     .select("id")
     .single();
 
-  if (insertErr) throw new Error(`createOrFindPet insert failed: ${insertErr.message}`);
+  if (insertErr) {
+    // Same race as createOrFindCustomer above, guarded here by
+    // pets_clinic_customer_name_unique_idx.
+    if (insertErr.code === "23505") {
+      const raceId = await findPetIdByName(customerId, petName);
+      if (raceId) return { petId: raceId };
+    }
+    throw new Error(`createOrFindPet insert failed: ${insertErr.message}`);
+  }
   const id = extractId(inserted);
   if (!id) throw new Error("createOrFindPet: no id returned");
   return { petId: id };

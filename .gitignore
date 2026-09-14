@@ -31,7 +31,13 @@ supabase/.branches/
 # Editor
 .cursor/
 .idea/
+.vscode/
 *.code-workspace
+
+# Claude Code skills — installed content, reproducible from skills-lock.json
+.agents/
+.claude/skills/
+.claude/agents/
 
 # Vercel CLI project link
 .vercel/

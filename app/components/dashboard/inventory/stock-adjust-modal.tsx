@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Btn } from "@/components/dashboard/ui/btn";
+import { Field, Input } from "@/components/dashboard/ui/field";
 import type { InventoryItem } from "@/types/domain/inventory";
 
 export function StockAdjustModal({
@@ -34,20 +35,22 @@ export function StockAdjustModal({
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <input
-        type="number"
-        value={quantity}
-        onChange={(event) => setQuantity(event.target.value)}
-        placeholder="שינוי"
-        className="h-8 w-20 rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--bg)] px-2 text-xs text-[var(--ink)] outline-none focus:border-[var(--brand-400)]"
-      />
-      <input
-        value={reason}
-        onChange={(event) => setReason(event.target.value)}
-        placeholder="סיבה"
-        className="h-8 w-32 rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--bg)] px-2 text-xs text-[var(--ink)] outline-none focus:border-[var(--brand-400)]"
-      />
+    <div className="flex flex-wrap items-end gap-2">
+      <Field label="שינוי" htmlFor={`stock-qty-${item.id}`} className="w-24">
+        <Input
+          id={`stock-qty-${item.id}`}
+          type="number"
+          value={quantity}
+          onChange={(event) => setQuantity(event.target.value)}
+        />
+      </Field>
+      <Field label="סיבה (אופציונלי)" htmlFor={`stock-reason-${item.id}`} className="w-40">
+        <Input
+          id={`stock-reason-${item.id}`}
+          value={reason}
+          onChange={(event) => setReason(event.target.value)}
+        />
+      </Field>
       <Btn type="button" size="sm" variant="soft" loading={loading} disabled={!quantity} onClick={() => void adjust("adjustment")}>
         עדכן
       </Btn>

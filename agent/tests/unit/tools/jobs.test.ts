@@ -12,7 +12,7 @@ vi.mock("../../../src/services/notification.processor.js", () => ({
 }));
 
 vi.mock("../../../src/lib/learning/analyzeConversations.js", () => ({
-  analyzeConversations: vi.fn().mockResolvedValue({ ranAnalysis: false, flaggedCallCount: 0 }),
+  analyzeConversations: vi.fn().mockResolvedValue({ ranAnalysis: false, flaggedCallCount: 0, groupsConsidered: 0, suggestionIds: [] }),
 }));
 
 import { processNotifications } from "../../../src/services/notification.processor.js";
@@ -30,8 +30,8 @@ function makeApp() {
 beforeEach(() => {
   resetJobSecurityCaches();
   vi.clearAllMocks();
-  vi.mocked(processNotifications).mockResolvedValue({ processed: 1, sent: 1, failed: 0, deferred: 0 });
-  vi.mocked(analyzeConversations).mockResolvedValue({ ranAnalysis: false, flaggedCallCount: 0 });
+  vi.mocked(processNotifications).mockResolvedValue({ processed: 1, sent: 1, failed: 0, deferred: 0, expired: 0 });
+  vi.mocked(analyzeConversations).mockResolvedValue({ ranAnalysis: false, flaggedCallCount: 0, groupsConsidered: 0, suggestionIds: [] });
 });
 
 describe("POST /jobs/process-notifications", () => {

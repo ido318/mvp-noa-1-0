@@ -4,7 +4,13 @@ import { PrescriptionRepository } from "@/lib/repositories/prescription.reposito
 import { PetRepository } from "@/lib/repositories/pet.repository";
 import { CustomerRepository } from "@/lib/repositories/customer.repository";
 import { VisitShareRepository } from "@/lib/repositories/visit-share.repository";
+import { ClinicRepository } from "@/lib/repositories/clinic.repository";
+import { MedicalNoteRepository } from "@/lib/repositories/medical-note.repository";
+import { ProfileRepository } from "@/lib/repositories/profile.repository";
 import { formatIsraelDate } from "@/lib/israel-date";
+import { formatPetAge } from "@/lib/pet-age";
+import { selectVisitMedicalNote } from "@/lib/visit-medical-note";
+import { PrintButton } from "./print-button";
 
 export const dynamic = "force-dynamic";
 
@@ -12,22 +18,9 @@ type Params = { params: Promise<{ token: string }> };
 
 function ExpiredNotice() {
   return (
-    <main dir="rtl" className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-3 p-6 text-center">
-      <span
-        aria-hidden="true"
-        className="h-9 w-9"
-        style={{
-          background: "var(--text-faint)",
-          WebkitMaskImage: "url(/logo-mark.svg)",
-          maskImage: "url(/logo-mark.svg)",
-          WebkitMaskRepeat: "no-repeat",
-          maskRepeat: "no-repeat",
-          WebkitMaskPosition: "center",
-          maskPosition: "center",
-          WebkitMaskSize: "contain",
-          maskSize: "contain",
-        }}
-      />
+    <main dir="rtl" className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-3 bg-white p-6 text-center">
+      {/* eslint-disable-next-line @next/next/no-img-element -- static brand asset, no Next Image optimization needed for a tiny error state */}
+      <img src="/getavet-logo.png" alt="Get A Vet" className="h-12 w-auto" />
       <h1 className="text-lg font-semibold text-zinc-900">הקישור אינו זמין</h1>
       <p className="text-sm text-zinc-600">
         ייתכן שהקישור פג תוקף או בוטל. לפרטים, אנא פנו ישירות למרפאה.
@@ -49,107 +42,164 @@ export default async function VisitSharePage({ params }: Params) {
   if (!visitResult.ok || !visitResult.value) return <ExpiredNotice />;
   const visit = visitResult.value;
 
-  const [petResult, customerResult, prescriptionsResult] = await Promise.all([
-    new PetRepository(admin).findById(visit.petId),
-    new CustomerRepository(admin).findById(visit.customerId),
-    new PrescriptionRepository(admin).listByVisit(visit.id),
-  ]);
+  const [petResult, customerResult, prescriptionsResult, clinicResult, medicalNotesResult] =
+    await Promise.all([
+      new PetRepository(admin).findById(visit.petId),
+      new CustomerRepository(admin).findById(visit.customerId),
+      new PrescriptionRepository(admin).listByVisit(visit.id),
+      new ClinicRepository(admin).findById(visit.clinicId),
+      new MedicalNoteRepository(admin).listByVisit(visit.id),
+    ]);
 
-  const petName = petResult.ok ? (petResult.value?.name ?? "") : "";
-  const customerName = customerResult.ok ? (customerResult.value?.fullName ?? "") : "";
+  const pet = petResult.ok ? petResult.value : null;
+  const customer = customerResult.ok ? customerResult.value : null;
   const prescriptions = prescriptionsResult.ok
     ? prescriptionsResult.value.filter((p) => p.status === "active")
     : [];
-  const summary = visit.aiVisitSummary ?? visit.manualVisitSummary;
+  const clinic = clinicResult.ok ? clinicResult.value : null;
+  const medicalNote = medicalNotesResult.ok ? selectVisitMedicalNote(medicalNotesResult.value) : null;
+
+  const vetProfileResult = visit.createdByUserId
+    ? await new ProfileRepository(admin).findByUserId(visit.createdByUserId)
+    : null;
+  const vetName = vetProfileResult?.ok ? (vetProfileResult.value?.fullName ?? null) : null;
+
+  const age = formatPetAge(pet?.birthDate ?? null);
+
+  const soapSections = medicalNote
+    ? {
+        history: medicalNote.subjective,
+        findings: medicalNote.objective,
+        diagnosis: medicalNote.assessment,
+        treatment: medicalNote.plan,
+      }
+    : null;
+  const hasSoapContent =
+    soapSections !== null &&
+    (soapSections.history || soapSections.findings || soapSections.diagnosis || soapSections.treatment);
+  const freeTextSummary = visit.aiVisitSummary ?? visit.manualVisitSummary;
 
   // Best-effort view tracking; never block rendering on it.
   await shareRepo.recordView(share.id, share.viewCount).catch(() => undefined);
 
+  const clinicName = clinic?.name ?? "Get A Vet";
+  const clinicAddress = clinic?.settings.contact.address ?? "";
+  const clinicPhone = clinic?.settings.contact.whatsapp ?? "";
+  const clinicEmail = clinic?.settings.contact.email ?? "";
+
+  const animalInfoFields: Array<[string, string | null]> = [
+    ["שם החיה", pet?.name ?? null],
+    ["סוג", pet?.species ?? null],
+    ["גזע", pet?.breed ?? null],
+    ["מין", pet?.sex ?? null],
+    ["גיל", age],
+    ["שבב", pet?.chipNumber ?? null],
+  ].filter(([, value]) => value !== null) as Array<[string, string]>;
+
   return (
-    <main dir="rtl" className="mx-auto min-h-screen max-w-md bg-zinc-50 p-5 text-zinc-900">
-      <header className="mb-5 flex items-center gap-3 border-b border-zinc-200 pb-4">
-        <span
-        aria-hidden="true"
-        className="h-8 w-8"
-        style={{
-          background: "var(--text-faint)",
-          WebkitMaskImage: "url(/logo-mark.svg)",
-          maskImage: "url(/logo-mark.svg)",
-          WebkitMaskRepeat: "no-repeat",
-          maskRepeat: "no-repeat",
-          WebkitMaskPosition: "center",
-          maskPosition: "center",
-          WebkitMaskSize: "contain",
-          maskSize: "contain",
-        }}
-      />
-        <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-emerald-700">
-            מרפאת Get A Vet
-          </p>
-          <h1 className="text-lg font-semibold">סיכום ביקור</h1>
+    <main dir="rtl" className="mx-auto min-h-screen max-w-2xl bg-white p-6 text-zinc-900 print:p-0">
+      <PrintButton />
+
+      <header className="mb-5 flex items-start justify-between border-b border-zinc-300 pb-4">
+        <div className="flex items-start gap-3">
+          {/* eslint-disable-next-line @next/next/no-img-element -- static brand asset */}
+          <img src="/getavet-logo.png" alt={clinicName} className="h-14 w-auto" />
+          <div className="text-sm text-zinc-700">
+            <p className="text-base font-semibold text-zinc-900">{clinicName}</p>
+            {clinicAddress ? <p>{clinicAddress}</p> : null}
+            {clinicPhone ? <p>{clinicPhone}</p> : null}
+            {clinicEmail ? <p>{clinicEmail}</p> : null}
+          </div>
+        </div>
+        <div className="text-left text-sm text-zinc-700">
+          {customer?.fullName ? <p>לקוח: {customer.fullName}</p> : null}
+          <p>תאריך: {formatIsraelDate(visit.startedAt)}</p>
         </div>
       </header>
 
-      <section className="mb-4 rounded-2xl border border-zinc-200 bg-white p-4">
-        <dl className="grid grid-cols-2 gap-3 text-sm">
-          {petName ? (
-            <div>
-              <dt className="text-zinc-500">חיה</dt>
-              <dd className="font-medium">{petName}</dd>
-            </div>
-          ) : null}
-          {customerName ? (
-            <div>
-              <dt className="text-zinc-500">בעלים</dt>
-              <dd className="font-medium">{customerName}</dd>
-            </div>
-          ) : null}
-          <div>
-            <dt className="text-zinc-500">תאריך ביקור</dt>
-            <dd className="font-medium">{formatIsraelDate(visit.startedAt)}</dd>
-          </div>
-          {visit.chiefComplaint ? (
-            <div className="col-span-2">
-              <dt className="text-zinc-500">סיבת הביקור</dt>
-              <dd className="font-medium">{visit.chiefComplaint}</dd>
-            </div>
-          ) : null}
-        </dl>
-      </section>
-
-      {summary ? (
-        <section className="mb-4 rounded-2xl border border-zinc-200 bg-white p-4">
-          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-zinc-500">
-            סיכום הביקור
-          </h2>
-          <p className="whitespace-pre-wrap text-sm leading-relaxed text-zinc-800">
-            {summary}
-          </p>
-        </section>
+      {animalInfoFields.length > 0 ? (
+        <table className="mb-5 w-full border-collapse text-sm">
+          <thead>
+            <tr>
+              {animalInfoFields.map(([label]) => (
+                <th key={label} className="border-b border-zinc-300 pb-1 text-right font-medium text-zinc-500">
+                  {label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              {animalInfoFields.map(([label, value]) => (
+                <td key={label} className="pt-1 font-medium text-zinc-900">
+                  {value}
+                </td>
+              ))}
+            </tr>
+          </tbody>
+        </table>
       ) : null}
 
+      <section className="mb-5 space-y-3 border-b border-zinc-200 pb-4 text-sm">
+        {vetName ? (
+          <p>
+            <span className="font-medium text-zinc-500">הרופא: </span>
+            {vetName}
+          </p>
+        ) : null}
+
+        {hasSoapContent ? (
+          <>
+            {soapSections?.history ? (
+              <p>
+                <span className="block font-medium text-zinc-500">היסטוריה/סיבת הביקור:</span>
+                <span className="whitespace-pre-wrap text-zinc-800">{soapSections.history}</span>
+              </p>
+            ) : null}
+            {soapSections?.findings ? (
+              <p>
+                <span className="block font-medium text-zinc-500">ממצאים ובדיקות:</span>
+                <span className="whitespace-pre-wrap text-zinc-800">{soapSections.findings}</span>
+              </p>
+            ) : null}
+            {soapSections?.diagnosis ? (
+              <p>
+                <span className="block font-medium text-zinc-500">אבחנה:</span>
+                <span className="whitespace-pre-wrap text-zinc-800">{soapSections.diagnosis}</span>
+              </p>
+            ) : null}
+            {soapSections?.treatment ? (
+              <p>
+                <span className="block font-medium text-zinc-500">הטיפול:</span>
+                <span className="whitespace-pre-wrap text-zinc-800">{soapSections.treatment}</span>
+              </p>
+            ) : null}
+          </>
+        ) : freeTextSummary ? (
+          <p>
+            <span className="block font-medium text-zinc-500">סיכום הביקור:</span>
+            <span className="whitespace-pre-wrap text-zinc-800">{freeTextSummary}</span>
+          </p>
+        ) : null}
+      </section>
+
       {prescriptions.length > 0 ? (
-        <section className="mb-4 rounded-2xl border border-zinc-200 bg-white p-4">
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-zinc-500">
-            מרשמים
-          </h2>
-          <ul className="space-y-3">
+        <section className="mb-5 text-sm">
+          <h2 className="mb-2 font-medium text-zinc-500">מרשמים:</h2>
+          <ul className="space-y-2">
             {prescriptions.map((rx) => (
-              <li key={rx.id} className="rounded-xl border border-zinc-100 bg-zinc-50 p-3">
+              <li key={rx.id} className="border-b border-zinc-100 pb-2">
                 <p className="font-semibold text-zinc-900">{rx.medicationName}</p>
-                <p className="mt-1 whitespace-pre-wrap text-sm text-zinc-700">{rx.instructions}</p>
-                {rx.notes ? (
-                  <p className="mt-1 text-xs text-zinc-500">{rx.notes}</p>
-                ) : null}
+                <p className="whitespace-pre-wrap text-zinc-800">{rx.instructions}</p>
+                {rx.notes ? <p className="text-xs text-zinc-500">{rx.notes}</p> : null}
               </li>
             ))}
           </ul>
         </section>
       ) : null}
 
-      <footer className="mt-6 text-center text-xs text-zinc-400">
-        הודעה זו נשלחה ממרפאת Get A Vet. אין להשיב להודעה זו.
+      <footer className="mt-6 text-center text-xs text-zinc-400 print:mt-3">
+        הודעה זו נשלחה ממרפאת {clinicName}. אין להשיב להודעה זו.
       </footer>
     </main>
   );

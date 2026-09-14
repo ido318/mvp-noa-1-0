@@ -24,4 +24,16 @@ export class AIEventService {
       sinceIso,
     );
   }
+
+  async countArtifactGenerationsSince(
+    sourceId: string,
+    eventType: string,
+    sinceIso: string,
+  ): Promise<Result<number>> {
+    return this.aiEventRepository.countArtifactGenerationsSince(
+      sourceId,
+      eventType,
+      sinceIso,
+    );
+  }
 }

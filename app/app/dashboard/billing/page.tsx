@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/dashboard/ui/skeleton";
 import { CreditCardIcon } from "@/components/dashboard/icons";
 import { InvoiceDraft } from "@/components/dashboard/billing/invoice-draft";
 import { PaymentForm } from "@/components/dashboard/billing/payment-form";
+import { SendPaymentLinkButton } from "@/components/dashboard/billing/send-payment-link-button";
 import type { Invoice, InvoiceStatus } from "@/types/domain/invoice";
 
 const STATUS_LABEL: Record<InvoiceStatus, string> = {
@@ -113,7 +114,12 @@ export default function BillingPage() {
                   <p className="text-sm font-semibold tabular-nums text-[var(--ink)]">{fmtMoney(inv.total)}</p>
                   <Badge color={STATUS_COLOR[inv.status]}>{STATUS_LABEL[inv.status]}</Badge>
                   {inv.status === "draft" ? <InvoiceDraft invoice={inv} /> : null}
-                  {inv.status === "sent" ? <PaymentForm clinicId={inv.clinicId} invoiceId={inv.id} /> : null}
+                  {inv.status === "sent" ? (
+                    <div className="flex flex-col items-end gap-2">
+                      <PaymentForm clinicId={inv.clinicId} invoiceId={inv.id} />
+                      <SendPaymentLinkButton invoice={inv} />
+                    </div>
+                  ) : null}
                 </div>
               </div>
             ))}

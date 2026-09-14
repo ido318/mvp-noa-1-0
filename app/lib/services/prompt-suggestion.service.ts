@@ -1,36 +1,29 @@
 import { AppError, err, type Result } from "@/lib/errors/app-error";
+import { consolidatePromptSuggestions } from "@/lib/ai/prompt-consolidation/provider";
 import { getLiveAgentConfig, publishPrompt, runRegressionTests } from "@/lib/learning/elevenlabsTesting";
 import type { PromptSuggestionRepository } from "@/lib/repositories/prompt-suggestion.repository";
-import type { ServiceActor } from "@/lib/services/service-context";
 import type { PromptSuggestion } from "@/types/domain/prompt-suggestion";
 
-function hasPrivilegedClinicRole(actor: ServiceActor, clinicId: string): boolean {
-  return actor.memberships.some(
-    (membership) =>
-      membership.clinicId === clinicId &&
-      (membership.role === "owner" || membership.role === "admin"),
-  );
-}
-
+/**
+ * Permission is enforced once, upstream, by requireProviderAdmin() at the
+ * API route boundary — this service does no actor/role checking of its own.
+ */
 export class PromptSuggestionService {
   constructor(private readonly repo: PromptSuggestionRepository) {}
 
-  async listPending(actor: ServiceActor): Promise<Result<PromptSuggestion[]>> {
-    return this.repo.listByStatus(actor.clinicIds, "pending");
+  async listPending(): Promise<Result<PromptSuggestion[]>> {
+    return this.repo.listByStatus("pending");
   }
 
-  async reject(actor: ServiceActor, id: string): Promise<Result<PromptSuggestion>> {
+  async reject(reviewedByUserId: string, id: string): Promise<Result<PromptSuggestion>> {
     const existing = await this.repo.findById(id);
     if (!existing.ok) return existing;
     if (!existing.value) return err(AppError.notFound("Prompt suggestion not found"));
-    if (!hasPrivilegedClinicRole(actor, existing.value.clinicId)) {
-      return err(AppError.forbidden("Only owner or admin can reject prompt suggestions"));
-    }
     if (existing.value.status !== "pending") {
       return err(AppError.conflict(`Prompt suggestion already ${existing.value.status}`));
     }
 
-    return this.repo.markRejected(id, actor.userId);
+    return this.repo.markRejected(id, reviewedByUserId);
   }
 
   /**
@@ -41,21 +34,18 @@ export class PromptSuggestionService {
    * suggestions carry a suggested_prompt at all — everything else is marked
    * approved directly, for manual follow-through outside this pipeline.
    */
-  async approve(actor: ServiceActor, id: string): Promise<Result<PromptSuggestion>> {
+  async approve(reviewedByUserId: string, id: string): Promise<Result<PromptSuggestion>> {
     const existing = await this.repo.findById(id);
     if (!existing.ok) return existing;
     if (!existing.value) return err(AppError.notFound("Prompt suggestion not found"));
     const suggestion = existing.value;
 
-    if (!hasPrivilegedClinicRole(actor, suggestion.clinicId)) {
-      return err(AppError.forbidden("Only owner or admin can approve prompt suggestions"));
-    }
     if (suggestion.status !== "pending") {
       return err(AppError.conflict(`Prompt suggestion already ${suggestion.status}`));
     }
 
     if (suggestion.category !== "prompt") {
-      return this.repo.markApproved(id, actor.userId);
+      return this.repo.markApproved(id, reviewedByUserId);
     }
 
     if (!suggestion.suggestedPrompt) {
@@ -75,7 +65,7 @@ export class PromptSuggestionService {
       return this.repo.recordRegressionResult(id, {
         status: regression.allPassed === false ? "failed_regression" : "pending",
         regressionResult: regression.raw,
-        reviewedByUserId: actor.userId,
+        reviewedByUserId,
       });
     }
 
@@ -97,7 +87,85 @@ export class PromptSuggestionService {
       regressionResult: regression.raw,
       previousPrompt,
       publishResult,
-      reviewedByUserId: actor.userId,
+      reviewedByUserId,
     });
+  }
+
+  /**
+   * Consolidates every pending category='prompt' suggestion into one new
+   * meta-suggestion (via an LLM call over the live prompt + all candidates'
+   * full content), then marks the originals 'merged'. The new suggestion is
+   * a normal pending suggestion afterwards — approving it runs the exact
+   * same regression+publish pipeline as any other, no new code path there.
+   */
+  async consolidatePending(): Promise<Result<PromptSuggestion>> {
+    const pendingResult = await this.repo.listByStatus("pending");
+    if (!pendingResult.ok) return pendingResult;
+
+    const candidates = pendingResult.value.filter((s) => s.category === "prompt");
+    if (candidates.length < 2) {
+      return err(AppError.conflict("At least 2 pending 'prompt' suggestions are required to consolidate"));
+    }
+
+    let livePrompt: string;
+    try {
+      const config = await getLiveAgentConfig();
+      const agent = config as { agent?: { prompt?: { prompt?: string } } };
+      livePrompt = agent.agent?.prompt?.prompt ?? "";
+    } catch (error) {
+      return err(
+        AppError.externalProvider(
+          "Failed to fetch the live agent prompt",
+          error instanceof Error ? error.message : error,
+        ),
+      );
+    }
+
+    let result: { mergedPrompt: string; summary: string };
+    try {
+      result = await consolidatePromptSuggestions({
+        livePrompt,
+        suggestions: candidates.map((s) => ({
+          patternSummary: s.patternSummary,
+          proposedChange: s.proposedChange,
+          rootCause: s.rootCause,
+          suggestedPrompt: s.suggestedPrompt,
+        })),
+      });
+    } catch (error) {
+      return err(
+        AppError.externalProvider(
+          "Failed to consolidate prompt suggestions",
+          error instanceof Error ? error.message : error,
+        ),
+      );
+    }
+
+    const created = await this.repo.createFromMerge({
+      // Safe: candidates.length >= 2 was checked above.
+      clinicId: candidates[0]!.clinicId,
+      patternSummary: `איחוד ${candidates.length} הצעות תיקון פתוחות`,
+      proposedChange: result.summary,
+      suggestedPrompt: result.mergedPrompt,
+      supportingCallReviewIds: [...new Set(candidates.flatMap((s) => s.supportingCallReviewIds))],
+      mergedFromIds: candidates.map((s) => s.id),
+    });
+    if (!created.ok) return created;
+
+    // Best-effort: the new suggestion already exists and is what the caller
+    // needs — if marking the originals 'merged' fails, surface the new
+    // suggestion anyway rather than erroring out a successful creation. A
+    // stray still-pending original is a cosmetic annoyance (visible in the
+    // list once more), not a correctness or data-loss problem.
+    const markMergedResult = await this.repo.markMerged(candidates.map((s) => s.id));
+    if (!markMergedResult.ok) {
+      console.error("[PromptSuggestionService.consolidatePending] markMerged failed after successful createFromMerge", {
+        mergedSuggestionId: created.value.id,
+        sourceIds: candidates.map((s) => s.id),
+        error: markMergedResult.error,
+      });
+    }
+
+    return created;
   }
 }

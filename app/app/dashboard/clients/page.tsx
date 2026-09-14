@@ -5,15 +5,17 @@ import { useSearchParams } from "next/navigation";
 import { Card } from "@/components/dashboard/ui/card";
 import { Badge } from "@/components/dashboard/ui/badge";
 import { Btn } from "@/components/dashboard/ui/btn";
+import { Field, Input, Select, Textarea } from "@/components/dashboard/ui/field";
 import { Drawer } from "@/components/dashboard/ui/drawer";
 import { EmptyState } from "@/components/dashboard/ui/empty-state";
 import { Skeleton } from "@/components/dashboard/ui/skeleton";
 import { PersonAvatar, AnimalAvatar } from "@/components/dashboard/ui/avatar";
 import { useToast } from "@/components/dashboard/ui/toast";
-import { SearchIcon, PhoneIcon, MailIcon, PinIcon, ChevRightIcon } from "@/components/dashboard/icons";
+import { SearchIcon, PhoneIcon, MailIcon, PinIcon, ChevRightIcon, XIcon } from "@/components/dashboard/icons";
 import { NewCustomerModal } from "@/components/dashboard/new-customer-modal";
 import { NewPetModal } from "@/components/dashboard/new-pet-modal";
 import { InvoicesSection } from "@/components/dashboard/invoices-section";
+import { SendMessageModal } from "@/components/dashboard/send-message-modal";
 import type { Customer, PreferredContactMethod } from "@/types/domain/customer";
 import type { Pet } from "@/types/domain/pet";
 import type { Appointment } from "@/types/domain/appointment";
@@ -24,11 +26,6 @@ import type { Visit } from "@/types/domain/visit";
 const TZ = "Asia/Jerusalem";
 function fmtDate(iso: string) {
   return new Intl.DateTimeFormat("he-IL", { timeZone: TZ, day: "numeric", month: "short", year: "numeric" }).format(new Date(iso));
-}
-
-function waPhone(phone: string): string {
-  const digits = phone.replace(/\D/g, "");
-  return digits.startsWith("0") ? `972${digits.slice(1)}` : digits;
 }
 
 function petAge(birthDate: string | null): string | null {
@@ -51,24 +48,26 @@ function PetCard({ pet }: { pet: Pet }) {
   return (
     <Link href={`/dashboard/pets/${pet.id}`} className="block">
       <Card hover>
-        <div className="flex items-start gap-3">
-          <AnimalAvatar species={pet.species} size={36} />
-          <div className="flex-1 min-w-0">
+        <div className="flex flex-col items-start gap-2.5">
+          <AnimalAvatar species={pet.species} size={56} />
+          <div className="w-full min-w-0">
             <div className="flex items-center gap-2">
-              <p className="font-semibold text-[14px] text-[var(--ink)]">{pet.name}</p>
-              {pet.isNeutered && <Badge color="muted">מעוקר/ת</Badge>}
+              <p className="min-w-0 flex-1 truncate font-semibold text-[15px] text-[var(--text-primary)]">{pet.name}</p>
+              {pet.isNeutered && <Badge tone="neutral" className="flex-shrink-0">מעוקר/ת</Badge>}
             </div>
-            <p className="text-xs text-[var(--muted)]">
+            <p className="truncate text-xs text-[var(--text-muted)]">
               {pet.species}{pet.breed ? ` · ${pet.breed}` : ""}{age ? ` · ${age}` : ""}
               {pet.sex === "male" ? " · זכר" : pet.sex === "female" ? " · נקבה" : ""}
             </p>
             {pet.weight && (
-              <p className="mt-0.5 text-xs text-[var(--muted)]">{`${pet.weight} ק"ג`}</p>
+              <p className="mt-0.5 truncate text-xs text-[var(--text-muted)]">{`${pet.weight} ק"ג`}</p>
             )}
             {pet.chronicConditions && (
-              <p className="mt-1 text-xs text-[var(--red-700)] bg-[var(--red-50)] rounded px-1.5 py-0.5 inline-block">
-                {pet.chronicConditions}
-              </p>
+              <div className="mt-1 inline-block w-fit max-w-full rounded bg-[var(--red-50)] px-1.5 py-0.5">
+                <p className="line-clamp-2 text-xs text-[var(--red-700)]">
+                  {pet.chronicConditions}
+                </p>
+              </div>
             )}
           </div>
         </div>
@@ -96,6 +95,7 @@ function ClientProfile({
   const [visits, setVisits] = useState<Visit[]>([]);
   const [visitsLoading, setVisitsLoading] = useState(true);
   const [showNewPet, setShowNewPet] = useState(false);
+  const [messageTarget, setMessageTarget] = useState<Customer | null>(null);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [fullName, setFullName] = useState(customer.fullName);
@@ -104,7 +104,24 @@ function ClientProfile({
   const [address, setAddress] = useState(customer.address ?? "");
   const [preferredContactMethod, setPreferredContactMethod] = useState<PreferredContactMethod>(customer.preferredContactMethod);
   const [notes, setNotes] = useState(customer.notes ?? "");
+  const [tags, setTags] = useState<string[]>(customer.tags);
+  const [tagInput, setTagInput] = useState("");
   const [, startTransition] = useTransition();
+
+  function addTag() {
+    const value = tagInput.trim();
+    if (!value) return;
+    if (tags.length >= 10) {
+      toast("עד 10 תגיות ללקוח", "error");
+      return;
+    }
+    if (!tags.includes(value)) setTags((current) => [...current, value]);
+    setTagInput("");
+  }
+
+  function removeTag(tag: string) {
+    setTags((current) => current.filter((item) => item !== tag));
+  }
 
   const fetchPets = useCallback(async (showLoading = true) => {
     if (showLoading) setPetsLoading(true);
@@ -130,6 +147,8 @@ function ClientProfile({
     setAddress(customer.address ?? "");
     setPreferredContactMethod(customer.preferredContactMethod);
     setNotes(customer.notes ?? "");
+    setTags(customer.tags);
+    setTagInput("");
   }, [customer]);
 
   useEffect(() => {
@@ -186,6 +205,7 @@ function ClientProfile({
           address: address.trim() || null,
           preferredContactMethod,
           notes: notes.trim() || null,
+          tags,
         }),
       });
       if (!res.ok) throw new Error();
@@ -210,8 +230,8 @@ function ClientProfile({
           <div className="flex items-center gap-3">
             <PersonAvatar initials={initials(customer.fullName)} size={44} />
             <div>
-              <p className="text-[15px] font-semibold text-[var(--ink)]">{customer.fullName}</p>
-              <p className="text-xs font-normal text-[var(--muted)]">לקוח/ה מאז {fmtDate(customer.createdAt)}</p>
+              <p className="text-[15px] font-semibold text-[var(--text-primary)]">{customer.fullName}</p>
+              <p className="text-xs font-normal text-[var(--text-muted)]">לקוח/ה מאז {fmtDate(customer.createdAt)}</p>
             </div>
           </div>
         }
@@ -219,84 +239,113 @@ function ClientProfile({
         <div className="px-5 py-4 space-y-6">
           {/* Quick actions */}
           <div className="flex flex-wrap gap-2">
-            <Link
-              href={`/dashboard/calendar?newAppointment=1&customerId=${customer.id}`}
-              className="inline-flex items-center justify-center rounded-full bg-[var(--brand-600)] px-4 py-2 text-[13px] font-semibold text-white"
-            >
+            <Btn href={`/dashboard/calendar?newAppointment=1&customerId=${customer.id}`} variant="primary" size="sm">
               תור חדש
-            </Link>
+            </Btn>
             <Btn type="button" variant="soft" size="sm" onClick={() => setEditing((value) => !value)}>
               {editing ? "סגור עריכה" : "ערוך פרטים"}
             </Btn>
           </div>
 
           {editing && (
-            <form onSubmit={saveCustomer} className="space-y-3 rounded-[var(--r-lg)] border border-[var(--line)] p-3">
-              <div>
-                <label htmlFor="editCustomerFullName" className="mb-1 block text-xs font-semibold text-[var(--ink-2)]">שם מלא</label>
-                <input
+            <form onSubmit={saveCustomer} className="space-y-3 rounded-[var(--radius-3)] border border-[var(--border-hairline)] p-3">
+              <Field label="שם מלא" htmlFor="editCustomerFullName">
+                <Input
                   id="editCustomerFullName"
                   value={fullName}
                   onChange={(event) => setFullName(event.target.value)}
-                  className="w-full rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--ink)] focus:outline-none focus:border-[var(--brand-400)]"
                 />
-              </div>
+              </Field>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div>
-                  <label htmlFor="editCustomerPhone" className="mb-1 block text-xs font-semibold text-[var(--ink-2)]">טלפון</label>
-                  <input
+                <Field label="טלפון" htmlFor="editCustomerPhone">
+                  <Input
                     id="editCustomerPhone"
                     value={phone}
                     onChange={(event) => setPhone(event.target.value)}
                     dir="ltr"
-                    className="w-full rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--ink)] focus:outline-none focus:border-[var(--brand-400)]"
                   />
-                </div>
-                <div>
-                  <label htmlFor="editCustomerEmail" className="mb-1 block text-xs font-semibold text-[var(--ink-2)]">אימייל</label>
-                  <input
+                </Field>
+                <Field label="אימייל" htmlFor="editCustomerEmail">
+                  <Input
                     id="editCustomerEmail"
                     type="email"
                     value={email}
                     onChange={(event) => setEmail(event.target.value)}
                     dir="ltr"
-                    className="w-full rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--ink)] focus:outline-none focus:border-[var(--brand-400)]"
                   />
-                </div>
+                </Field>
               </div>
-              <div>
-                <label htmlFor="editCustomerAddress" className="mb-1 block text-xs font-semibold text-[var(--ink-2)]">כתובת</label>
-                <input
+              <Field label="כתובת" htmlFor="editCustomerAddress">
+                <Input
                   id="editCustomerAddress"
                   value={address}
                   onChange={(event) => setAddress(event.target.value)}
-                  className="w-full rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--ink)] focus:outline-none focus:border-[var(--brand-400)]"
                 />
-              </div>
-              <div>
-                <label htmlFor="editCustomerPreferredContactMethod" className="mb-1 block text-xs font-semibold text-[var(--ink-2)]">ערוץ מועדף</label>
-                <select
+              </Field>
+              <Field label="ערוץ מועדף" htmlFor="editCustomerPreferredContactMethod">
+                <Select
                   id="editCustomerPreferredContactMethod"
                   value={preferredContactMethod}
                   onChange={(event) => setPreferredContactMethod(event.target.value as PreferredContactMethod)}
-                  className="w-full rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--ink)] focus:outline-none focus:border-[var(--brand-400)]"
                 >
                   <option value="phone">טלפון</option>
                   <option value="sms">SMS</option>
                   <option value="whatsapp">WhatsApp</option>
                   <option value="email">אימייל</option>
-                </select>
-              </div>
-              <div>
-                <label htmlFor="editCustomerNotes" className="mb-1 block text-xs font-semibold text-[var(--ink-2)]">הערות</label>
-                <textarea
+                </Select>
+              </Field>
+              <Field label="הערות" htmlFor="editCustomerNotes">
+                <Textarea
                   id="editCustomerNotes"
                   value={notes}
                   onChange={(event) => setNotes(event.target.value)}
                   rows={3}
-                  className="w-full rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--ink)] focus:outline-none focus:border-[var(--brand-400)]"
                 />
-              </div>
+              </Field>
+              <Field label="תגיות" htmlFor="editCustomerTagInput" hint="למשל: VIP, רגיש להרדמה — עד 10 תגיות">
+                {tags.length > 0 && (
+                  <div className="mb-2 flex flex-wrap gap-1.5">
+                    {tags.map((tag) => (
+                      <span
+                        key={tag}
+                        className="inline-flex items-center gap-1 px-2 text-[12px]"
+                        style={{
+                          height: "var(--chip-h)",
+                          borderRadius: "var(--radius-1)",
+                          background: "var(--status-neutral-wash)",
+                          color: "var(--status-neutral-text)",
+                          fontWeight: "var(--w-semibold)",
+                        }}
+                      >
+                        {tag}
+                        <button
+                          type="button"
+                          onClick={() => removeTag(tag)}
+                          aria-label={`הסר תגית ${tag}`}
+                          className="hover:opacity-70"
+                        >
+                          <XIcon size={11} />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <Input
+                    id="editCustomerTagInput"
+                    value={tagInput}
+                    onChange={(event) => setTagInput(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        addTag();
+                      }
+                    }}
+                    placeholder="הוספת תגית..."
+                  />
+                  <Btn type="button" variant="soft" size="sm" onClick={addTag}>הוסף</Btn>
+                </div>
+              </Field>
               <div className="flex justify-end gap-2">
                 <Btn type="button" variant="ghost" size="sm" onClick={() => setEditing(false)}>ביטול</Btn>
                 <Btn type="submit" size="sm" loading={saving}>שמור</Btn>
@@ -304,79 +353,88 @@ function ClientProfile({
             </form>
           )}
 
-          {/* Contact info */}
-          <div className="space-y-2">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">פרטי קשר</p>
-            {customer.phone && (
-              <>
-                <div className="flex items-center gap-2 text-sm text-[var(--ink)]">
-                  <PhoneIcon size={14} className="text-[var(--muted)]" />
-                  <a href={`tel:${customer.phone}`} className="hover:text-[var(--brand-600)]">{customer.phone}</a>
-                </div>
-                <div className="flex items-center gap-2">
-                  <a href={`sms:${customer.phone}`} className="text-xs font-semibold text-[var(--brand-600)] hover:underline">שלח SMS</a>
-                  <a
-                    href={`https://wa.me/${waPhone(customer.phone)}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-xs font-semibold text-[var(--brand-600)] hover:underline"
-                  >
-                    WhatsApp
-                  </a>
-                </div>
-              </>
-            )}
-            {customer.email && (
-              <div className="flex items-center gap-2 text-sm text-[var(--ink)]">
-                <MailIcon size={14} className="text-[var(--muted)]" />
-                <a href={`mailto:${customer.email}`} className="hover:text-[var(--brand-600)]">{customer.email}</a>
-              </div>
-            )}
-            {customer.address && (
-              <div className="flex items-center gap-2 text-sm text-[var(--ink)]">
-                <PinIcon size={14} className="text-[var(--muted)]" />
-                {customer.address}
-              </div>
-            )}
-          </div>
+          {!editing && customer.tags.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {customer.tags.map((tag) => (
+                <Badge key={tag} tone="neutral">{tag}</Badge>
+              ))}
+            </div>
+          )}
 
-          {/* Pets */}
+          {/* Pets — hero */}
           <div>
-            <div className="mb-2 flex items-center justify-between">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
+            <div className="mb-2.5 flex items-center justify-between">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
                 חיות מחמד ({petsLoading ? "…" : pets.length})
               </p>
               <Btn size="sm" variant="ghost" onClick={() => setShowNewPet(true)}>+ הוסף חיה</Btn>
             </div>
             {petsLoading ? (
-              <Skeleton className="h-24" />
+              <div className="grid grid-cols-2 gap-3">
+                <Skeleton className="h-32" />
+                <Skeleton className="h-32" />
+              </div>
             ) : pets.length === 0 ? (
-              <p className="text-sm text-[var(--faint)]">אין חיות מחמד רשומות</p>
+              <p className="text-sm text-[var(--text-faint)]">אין חיות מחמד רשומות</p>
             ) : (
-              <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-3">
                 {pets.map(pet => <PetCard key={pet.id} pet={pet} />)}
+              </div>
+            )}
+          </div>
+
+          {/* Contact info */}
+          <div className="space-y-2">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">פרטי קשר</p>
+            {customer.phone && (
+              <>
+                <div className="flex items-center gap-2 text-sm text-[var(--text-primary)]">
+                  <PhoneIcon size={14} className="text-[var(--text-muted)]" />
+                  <a href={`tel:${customer.phone}`} className="hover:text-[var(--accent)]">{customer.phone}</a>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setMessageTarget(customer)}
+                    className="text-xs font-semibold text-[var(--accent)] hover:underline"
+                  >
+                    שלח הודעה
+                  </button>
+                </div>
+              </>
+            )}
+            {customer.email && (
+              <div className="flex items-center gap-2 text-sm text-[var(--text-primary)]">
+                <MailIcon size={14} className="text-[var(--text-muted)]" />
+                <a href={`mailto:${customer.email}`} className="hover:text-[var(--accent)]">{customer.email}</a>
+              </div>
+            )}
+            {customer.address && (
+              <div className="flex items-center gap-2 text-sm text-[var(--text-primary)]">
+                <PinIcon size={14} className="text-[var(--text-muted)]" />
+                {customer.address}
               </div>
             )}
           </div>
 
           {/* Appointment history */}
           <div>
-            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
               היסטוריית תורים ({apptLoading ? "…" : appointments.length})
             </p>
             {apptLoading ? (
               <Skeleton className="h-24" />
             ) : appointments.length === 0 ? (
-              <p className="text-sm text-[var(--faint)]">אין תורים רשומים</p>
+              <p className="text-sm text-[var(--text-faint)]">אין תורים רשומים</p>
             ) : (
-              <div className="rounded-[var(--r-lg)] border border-[var(--line)] divide-y divide-[var(--line-2)]">
+              <div className="rounded-[var(--radius-3)] border border-[var(--border-hairline)] divide-y divide-[var(--border-row)]">
                 {appointments.slice(0, 10).map(appt => (
                   <div key={appt.id} className="flex items-center justify-between px-3 py-2.5">
                     <div>
-                      <p className="text-[13px] font-semibold text-[var(--ink)]">
+                      <p className="text-[13px] font-semibold text-[var(--text-primary)]">
                         {fmtDate(appt.scheduledAt)}
                       </p>
-                      <p className="text-xs text-[var(--muted)]">{appt.appointmentType}</p>
+                      <p className="text-xs text-[var(--text-muted)]">{appt.appointmentType}</p>
                     </div>
                     <Badge
                       tone={
@@ -395,35 +453,36 @@ function ClientProfile({
 
           {/* Visit history */}
           <div>
-            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
               ביקורים רפואיים ({visitsLoading ? "…" : visits.length})
             </p>
             {visitsLoading ? (
               <Skeleton className="h-24" />
             ) : visits.length === 0 ? (
-              <p className="text-sm text-[var(--faint)]">אין ביקורים רשומים</p>
+              <p className="text-sm text-[var(--text-faint)]">אין ביקורים רשומים</p>
             ) : (
-              <div className="rounded-[var(--r-lg)] border border-[var(--line)] divide-y divide-[var(--line-2)]">
+              <div className="rounded-[var(--radius-3)] border border-[var(--border-hairline)] divide-y divide-[var(--border-row)]">
                 {visits.map(visit => (
                   <Link
                     key={visit.id}
                     href={`/dashboard/visits/${visit.id}`}
-                    className="flex items-center justify-between px-3 py-2.5 hover:bg-[var(--surface-2)] transition-colors"
+                    className="flex items-center justify-between px-3 py-2.5 hover:bg-[var(--surface-hover)] transition-colors"
                   >
                     <div className="min-w-0">
-                      <p className="text-[13px] font-semibold text-[var(--ink)]">{fmtDate(visit.startedAt)}</p>
-                      <p className="truncate text-xs text-[var(--muted)]">{visit.chiefComplaint ?? "ללא תלונה ראשית"}</p>
+                      <p className="text-[13px] font-semibold text-[var(--text-primary)]">{fmtDate(visit.startedAt)}</p>
+                      <p className="truncate text-xs text-[var(--text-muted)]">{visit.chiefComplaint ?? "ללא תלונה ראשית"}</p>
                     </div>
                     <div className="flex flex-shrink-0 items-center gap-1.5">
-                      {visit.aiVisitSummary && <Badge color="brand">AI</Badge>}
-                      <span className={[
-                        "text-[11px] font-semibold px-2 py-0.5 rounded-full",
-                        visit.status === "completed" ? "bg-[#E9F5EF] text-[#2F7D5B]"
-                          : visit.status === "cancelled" ? "bg-[var(--line-2)] text-[var(--muted)]"
-                          : "bg-[var(--brand-50)] text-[var(--brand-700)]",
-                      ].join(" ")}>
+                      {visit.aiVisitSummary && <Badge tone="info">AI</Badge>}
+                      <Badge
+                        tone={
+                          visit.status === "completed" ? "done"
+                            : visit.status === "cancelled" ? "neutral"
+                            : "info"
+                        }
+                      >
                         {visit.status === "completed" ? "הושלם" : visit.status === "cancelled" ? "בוטל" : "בטיפול"}
-                      </span>
+                      </Badge>
                     </div>
                   </Link>
                 ))}
@@ -437,8 +496,8 @@ function ClientProfile({
           {/* Notes */}
           {customer.notes && (
             <div>
-              <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">הערות</p>
-              <p className="text-sm text-[var(--ink)] leading-relaxed">{customer.notes}</p>
+              <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">הערות</p>
+              <p className="text-sm text-[var(--text-primary)] leading-relaxed">{customer.notes}</p>
             </div>
           )}
         </div>
@@ -451,6 +510,19 @@ function ClientProfile({
         customerId={customer.id}
         onCreated={() => { void fetchPets(false); }}
       />
+
+      {messageTarget?.phone && (
+        <SendMessageModal
+          customerId={messageTarget.id}
+          customerName={messageTarget.fullName}
+          phone={messageTarget.phone}
+          // Only when there is no ambiguity. With several animals this used to
+          // put the first one's name into "reminder" and "follow-up" templates,
+          // which is how a client gets a message about the wrong pet.
+          petName={pets.length === 1 ? pets[0]!.name : undefined}
+          onClose={() => setMessageTarget(null)}
+        />
+      )}
     </>
   );
 }
@@ -463,11 +535,18 @@ function ClientCard({ customer, onClick }: { customer: Customer; onClick: () => 
       <div className="flex items-center gap-3">
         <PersonAvatar initials={initials(customer.fullName)} size={36} />
         <div className="flex-1 min-w-0">
-          <p className="font-semibold text-[14px] text-[var(--ink)] truncate">{customer.fullName}</p>
-          <p className="text-xs text-[var(--muted)] truncate">{customer.phone ?? customer.email ?? "—"}</p>
+          <p className="font-semibold text-[14px] text-[var(--text-primary)] truncate">{customer.fullName}</p>
+          <p className="text-xs text-[var(--text-muted)] truncate">{customer.phone ?? customer.email ?? "—"}</p>
         </div>
-        <ChevRightIcon size={14} className="flex-shrink-0 text-[var(--faint)]" />
+        <ChevRightIcon size={14} className="flex-shrink-0 text-[var(--text-faint)]" />
       </div>
+      {customer.tags.length > 0 && (
+        <div className="mt-2.5 flex flex-wrap gap-1">
+          {customer.tags.map((tag) => (
+            <Badge key={tag} tone="neutral">{tag}</Badge>
+          ))}
+        </div>
+      )}
     </Card>
   );
 }
@@ -527,23 +606,28 @@ export default function ClientsPage() {
     <div className="p-6 space-y-5">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-[var(--ink)]">לקוחות</h1>
-        <span className="text-sm text-[var(--muted)]">{items.length} רשומים</span>
+        <div className="flex items-baseline gap-2.5">
+          <h1 className="text-[length:var(--size-page-title-lg)] font-semibold text-[var(--text-primary)]">לקוחות</h1>
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-[length:var(--size-metric)] font-semibold text-[var(--text-primary)] tabular-nums">{items.length}</span>
+            <span className="text-xs text-[var(--text-muted)]">רשומים</span>
+          </div>
+        </div>
         <Btn size="sm" onClick={() => setShowNewCustomer(true)}>לקוח חדש</Btn>
       </div>
 
       {/* Search */}
       <div className="relative max-w-sm">
-        <SearchIcon size={15} className="absolute start-3 top-1/2 -translate-y-1/2 text-[var(--muted)] pointer-events-none" />
+        <SearchIcon size={15} className="absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] pointer-events-none" />
         <input
           type="text"
           placeholder="חיפוש לפי שם, טלפון או מייל…"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          className="w-full rounded-[var(--r-lg)] border border-[var(--line)] bg-[var(--surface)] py-2 pe-3 ps-9 text-sm text-[var(--ink)] placeholder:text-[var(--faint)] focus:outline-none focus:border-[var(--brand-400)]"
+          className="w-full rounded-[var(--radius-3)] border border-[var(--border-hairline)] bg-[var(--surface-raised)] py-2 pe-3 ps-9 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-faint)] focus:outline-none focus:border-[var(--border-focus)]"
         />
         {searching && (
-          <span className="absolute end-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 rounded-full border-2 border-[var(--brand-400)] border-t-transparent animate-spin" />
+          <span className="absolute end-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 rounded-full border-2 border-[var(--border-focus)] border-t-transparent animate-spin" />
         )}
       </div>
 

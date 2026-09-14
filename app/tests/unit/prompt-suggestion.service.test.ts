@@ -1,15 +1,16 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { ok } from "@/lib/errors/app-error";
+import { ok, err, AppError } from "@/lib/errors/app-error";
 import { PromptSuggestionService } from "@/lib/services/prompt-suggestion.service";
 import type { PromptSuggestionRepository } from "@/lib/repositories/prompt-suggestion.repository";
-import type { ServiceActor } from "@/lib/services/service-context";
 import type { PromptSuggestion } from "@/types/domain/prompt-suggestion";
 
-const { mockRunRegressionTests, mockGetLiveAgentConfig, mockPublishPrompt } = vi.hoisted(() => ({
-  mockRunRegressionTests: vi.fn(),
-  mockGetLiveAgentConfig: vi.fn(),
-  mockPublishPrompt: vi.fn(),
-}));
+const { mockRunRegressionTests, mockGetLiveAgentConfig, mockPublishPrompt, mockConsolidatePromptSuggestions } =
+  vi.hoisted(() => ({
+    mockRunRegressionTests: vi.fn(),
+    mockGetLiveAgentConfig: vi.fn(),
+    mockPublishPrompt: vi.fn(),
+    mockConsolidatePromptSuggestions: vi.fn(),
+  }));
 
 vi.mock("@/lib/learning/elevenlabsTesting", () => ({
   runRegressionTests: mockRunRegressionTests,
@@ -17,26 +18,16 @@ vi.mock("@/lib/learning/elevenlabsTesting", () => ({
   publishPrompt: mockPublishPrompt,
 }));
 
-const TARGET_CLINIC = "clinic-target";
+vi.mock("@/lib/ai/prompt-consolidation/provider", () => ({
+  consolidatePromptSuggestions: mockConsolidatePromptSuggestions,
+}));
 
-const staffActor: ServiceActor = {
-  userId: "user-1",
-  clinicIds: [TARGET_CLINIC],
-  defaultClinicId: TARGET_CLINIC,
-  memberships: [{ clinicId: TARGET_CLINIC, role: "staff" }],
-};
-
-const adminActor: ServiceActor = {
-  userId: "user-2",
-  clinicIds: [TARGET_CLINIC],
-  defaultClinicId: TARGET_CLINIC,
-  memberships: [{ clinicId: TARGET_CLINIC, role: "admin" }],
-};
+const REVIEWER_ID = "user-2";
 
 function suggestion(overrides: Partial<PromptSuggestion> = {}): PromptSuggestion {
   return {
     id: "sugg-1",
-    clinicId: TARGET_CLINIC,
+    clinicId: "clinic-target",
     status: "pending",
     category: "prompt",
     targetFile: null,
@@ -52,6 +43,7 @@ function suggestion(overrides: Partial<PromptSuggestion> = {}): PromptSuggestion
     reviewedAt: null,
     publishedAt: null,
     createdAt: "2026-08-20T09:00:00.000Z",
+    mergedFromIds: null,
     ...overrides,
   };
 }
@@ -83,6 +75,8 @@ function baseRepo() {
         ),
       ),
     ),
+    createFromMerge: vi.fn().mockResolvedValue(ok(suggestion({ id: "merged-1", category: "prompt" }))),
+    markMerged: vi.fn().mockResolvedValue(ok(undefined)),
   };
 }
 
@@ -90,56 +84,63 @@ beforeEach(() => {
   mockRunRegressionTests.mockReset();
   mockGetLiveAgentConfig.mockReset();
   mockPublishPrompt.mockReset();
+  mockConsolidatePromptSuggestions.mockReset();
 });
 
 describe("PromptSuggestionService.reject", () => {
-  it("forbids rejecting without owner/admin role in the suggestion's clinic", async () => {
+  it("rejects a pending suggestion", async () => {
     const { service, repo } = buildService();
-    const result = await service.reject(staffActor, "sugg-1");
-    expect(result.ok).toBe(false);
-    if (result.ok) return;
-    expect(result.error.status).toBe(403);
-    expect(repo.markRejected).not.toHaveBeenCalled();
+    const result = await service.reject(REVIEWER_ID, "sugg-1");
+    expect(result.ok).toBe(true);
+    expect(repo.markRejected).toHaveBeenCalledWith("sugg-1", REVIEWER_ID);
   });
 
-  it("allows rejecting with owner/admin role", async () => {
-    const { service, repo } = buildService();
-    const result = await service.reject(adminActor, "sugg-1");
-    expect(result.ok).toBe(true);
-    expect(repo.markRejected).toHaveBeenCalledWith("sugg-1", adminActor.userId);
+  it("returns notFound when the suggestion does not exist", async () => {
+    const { service } = buildService({ findById: vi.fn().mockResolvedValue(ok(null)) });
+    const result = await service.reject(REVIEWER_ID, "missing");
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.status).toBe(404);
   });
 });
 
 describe("PromptSuggestionService.approve", () => {
-  it("forbids approving without owner/admin role", async () => {
-    const { service } = buildService();
-    const result = await service.approve(staffActor, "sugg-1");
-    expect(result.ok).toBe(false);
-    if (result.ok) return;
-    expect(result.error.status).toBe(403);
-    expect(mockRunRegressionTests).not.toHaveBeenCalled();
-  });
-
-  it("forbids approving without owner/admin role even for a non-prompt category", async () => {
+  it("marks non-prompt categories approved without running regression or publish", async () => {
     const { service, repo } = buildService({
       findById: vi.fn().mockResolvedValue(ok(suggestion({ category: "knowledge_base", suggestedPrompt: null }))),
     });
 
-    const result = await service.approve(staffActor, "sugg-1");
+    const result = await service.approve(REVIEWER_ID, "sugg-1");
 
-    expect(result.ok).toBe(false);
-    if (result.ok) return;
-    expect(result.error.status).toBe(403);
-    expect(repo.markApproved).not.toHaveBeenCalled();
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.status).toBe("approved");
+    expect(repo.markApproved).toHaveBeenCalledWith("sugg-1", REVIEWER_ID);
     expect(mockRunRegressionTests).not.toHaveBeenCalled();
+    expect(mockPublishPrompt).not.toHaveBeenCalled();
   });
+
+  it.each(["tool", "backend_logic", "conversation_flow"] as const)(
+    "marks category '%s' approved without publish, same as knowledge_base",
+    async (category) => {
+      const { service, repo } = buildService({
+        findById: vi.fn().mockResolvedValue(ok(suggestion({ category, suggestedPrompt: null }))),
+      });
+
+      const result = await service.approve(REVIEWER_ID, "sugg-1");
+
+      expect(result.ok).toBe(true);
+      expect(repo.markApproved).toHaveBeenCalledOnce();
+      expect(mockRunRegressionTests).not.toHaveBeenCalled();
+    },
+  );
 
   it("returns an internal error if a 'prompt' category suggestion is somehow missing suggested_prompt", async () => {
     const { service, repo } = buildService({
       findById: vi.fn().mockResolvedValue(ok(suggestion({ category: "prompt", suggestedPrompt: null }))),
     });
 
-    const result = await service.approve(adminActor, "sugg-1");
+    const result = await service.approve(REVIEWER_ID, "sugg-1");
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
@@ -152,7 +153,7 @@ describe("PromptSuggestionService.approve", () => {
     const { service } = buildService({
       findById: vi.fn().mockResolvedValue(ok(suggestion({ status: "published" }))),
     });
-    const result = await service.approve(adminActor, "sugg-1");
+    const result = await service.approve(REVIEWER_ID, "sugg-1");
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.error.status).toBe(409);
@@ -165,7 +166,7 @@ describe("PromptSuggestionService.approve", () => {
     mockPublishPrompt.mockResolvedValue({ agent_id: "agent_1" });
 
     const { service, repo } = buildService();
-    const result = await service.approve(adminActor, "sugg-1");
+    const result = await service.approve(REVIEWER_ID, "sugg-1");
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -180,7 +181,7 @@ describe("PromptSuggestionService.approve", () => {
     mockRunRegressionTests.mockResolvedValue({ allPassed: false, raw: { test_results: [{ result: "failure" }] } });
 
     const { service, repo } = buildService();
-    const result = await service.approve(adminActor, "sugg-1");
+    const result = await service.approve(REVIEWER_ID, "sugg-1");
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -196,7 +197,7 @@ describe("PromptSuggestionService.approve", () => {
     mockRunRegressionTests.mockResolvedValue({ allPassed: null, raw: { unexpected: "shape" } });
 
     const { service, repo } = buildService();
-    const result = await service.approve(adminActor, "sugg-1");
+    const result = await service.approve(REVIEWER_ID, "sugg-1");
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -214,41 +215,136 @@ describe("PromptSuggestionService.approve", () => {
     mockPublishPrompt.mockRejectedValue(new Error("ElevenLabs 500"));
 
     const { service, repo } = buildService();
-    const result = await service.approve(adminActor, "sugg-1");
+    const result = await service.approve(REVIEWER_ID, "sugg-1");
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.error.status).toBe(502);
     expect(repo.markPublished).not.toHaveBeenCalled();
   });
+});
 
-  it("marks non-prompt categories approved without running regression or publish", async () => {
-    const { service, repo } = buildService({
-      findById: vi.fn().mockResolvedValue(ok(suggestion({ category: "knowledge_base", suggestedPrompt: null }))),
+describe("PromptSuggestionService.consolidatePending", () => {
+  it("returns a conflict when fewer than 2 pending 'prompt' suggestions exist", async () => {
+    const { service } = buildService({
+      listByStatus: vi.fn().mockResolvedValue(ok([suggestion({ category: "prompt" })])),
     });
 
-    const result = await service.approve(adminActor, "sugg-1");
+    const result = await service.consolidatePending();
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.status).toBe(409);
+    expect(mockConsolidatePromptSuggestions).not.toHaveBeenCalled();
+  });
+
+  it("ignores non-'prompt' categories when counting candidates", async () => {
+    const { service } = buildService({
+      listByStatus: vi.fn().mockResolvedValue(
+        ok([
+          suggestion({ id: "s1", category: "prompt" }),
+          suggestion({ id: "s2", category: "knowledge_base" }),
+        ]),
+      ),
+    });
+
+    const result = await service.consolidatePending();
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.status).toBe(409);
+  });
+
+  it("merges 2+ pending prompt suggestions into one new suggestion and marks the originals merged", async () => {
+    const s1 = suggestion({ id: "s1", category: "prompt", supportingCallReviewIds: ["r1", "r2"] });
+    const s2 = suggestion({ id: "s2", category: "prompt", supportingCallReviewIds: ["r2", "r3"] });
+    mockGetLiveAgentConfig.mockResolvedValue({ agent: { prompt: { prompt: "live prompt text" } } });
+    mockConsolidatePromptSuggestions.mockResolvedValue({ mergedPrompt: "merged text", summary: "summary text" });
+
+    const createFromMerge = vi.fn().mockResolvedValue(
+      ok(suggestion({ id: "merged-1", category: "prompt", suggestedPrompt: "merged text", mergedFromIds: ["s1", "s2"] })),
+    );
+    const markMerged = vi.fn().mockResolvedValue(ok(undefined));
+    const { service } = buildService({
+      listByStatus: vi.fn().mockResolvedValue(ok([s1, s2])),
+      createFromMerge,
+      markMerged,
+    });
+
+    const result = await service.consolidatePending();
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.value.status).toBe("approved");
-    expect(repo.markApproved).toHaveBeenCalledWith("sugg-1", adminActor.userId);
-    expect(mockRunRegressionTests).not.toHaveBeenCalled();
-    expect(mockPublishPrompt).not.toHaveBeenCalled();
+    expect(result.value.id).toBe("merged-1");
+    expect(mockConsolidatePromptSuggestions).toHaveBeenCalledWith({
+      livePrompt: "live prompt text",
+      suggestions: [
+        { patternSummary: s1.patternSummary, proposedChange: s1.proposedChange, rootCause: s1.rootCause, suggestedPrompt: s1.suggestedPrompt },
+        { patternSummary: s2.patternSummary, proposedChange: s2.proposedChange, rootCause: s2.rootCause, suggestedPrompt: s2.suggestedPrompt },
+      ],
+    });
+    expect(createFromMerge).toHaveBeenCalledWith({
+      clinicId: s1.clinicId,
+      patternSummary: "איחוד 2 הצעות תיקון פתוחות",
+      proposedChange: "summary text",
+      suggestedPrompt: "merged text",
+      supportingCallReviewIds: ["r1", "r2", "r3"],
+      mergedFromIds: ["s1", "s2"],
+    });
+    expect(markMerged).toHaveBeenCalledWith(["s1", "s2"]);
   });
 
-  it.each(["tool", "backend_logic", "conversation_flow"] as const)(
-    "marks category '%s' approved without publish, same as knowledge_base",
-    async (category) => {
-      const { service, repo } = buildService({
-        findById: vi.fn().mockResolvedValue(ok(suggestion({ category, suggestedPrompt: null }))),
-      });
+  it("returns externalProvider when fetching the live prompt fails, without calling the LLM", async () => {
+    mockGetLiveAgentConfig.mockRejectedValue(new Error("ElevenLabs down"));
+    const { service } = buildService({
+      listByStatus: vi.fn().mockResolvedValue(
+        ok([suggestion({ id: "s1", category: "prompt" }), suggestion({ id: "s2", category: "prompt" })]),
+      ),
+    });
 
-      const result = await service.approve(adminActor, "sugg-1");
+    const result = await service.consolidatePending();
 
-      expect(result.ok).toBe(true);
-      expect(repo.markApproved).toHaveBeenCalledOnce();
-      expect(mockRunRegressionTests).not.toHaveBeenCalled();
-    },
-  );
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.status).toBe(502);
+    expect(mockConsolidatePromptSuggestions).not.toHaveBeenCalled();
+  });
+
+  it("returns externalProvider when the LLM call fails, without creating a row", async () => {
+    mockGetLiveAgentConfig.mockResolvedValue({ agent: { prompt: { prompt: "live" } } });
+    mockConsolidatePromptSuggestions.mockRejectedValue(new Error("OpenAI down"));
+    const createFromMerge = vi.fn();
+    const { service } = buildService({
+      listByStatus: vi.fn().mockResolvedValue(
+        ok([suggestion({ id: "s1", category: "prompt" }), suggestion({ id: "s2", category: "prompt" })]),
+      ),
+      createFromMerge,
+    });
+
+    const result = await service.consolidatePending();
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.status).toBe(502);
+    expect(createFromMerge).not.toHaveBeenCalled();
+  });
+
+  it("still returns ok with the new suggestion when markMerged fails (best-effort)", async () => {
+    mockGetLiveAgentConfig.mockResolvedValue({ agent: { prompt: { prompt: "live" } } });
+    mockConsolidatePromptSuggestions.mockResolvedValue({ mergedPrompt: "merged", summary: "summary" });
+    const created = suggestion({ id: "merged-1", category: "prompt" });
+    const { service } = buildService({
+      listByStatus: vi.fn().mockResolvedValue(
+        ok([suggestion({ id: "s1", category: "prompt" }), suggestion({ id: "s2", category: "prompt" })]),
+      ),
+      createFromMerge: vi.fn().mockResolvedValue(ok(created)),
+      markMerged: vi.fn().mockResolvedValue(err(AppError.externalProvider("db down"))),
+    });
+
+    const result = await service.consolidatePending();
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.id).toBe("merged-1");
+  });
 });

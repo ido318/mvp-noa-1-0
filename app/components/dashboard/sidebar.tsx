@@ -21,40 +21,50 @@ interface NavGroup {
   items: NavItem[];
 }
 
-const NAV_GROUPS: NavGroup[] = [
-  {
-    label: "מרפאה",
-    items: [
-      { href: "/dashboard", label: "היום" },
-      { href: "/dashboard/calendar", label: "לוח שנה" },
-      { href: "/dashboard/clients", label: "לקוחות ומטופלים" },
-      { href: "/dashboard/waitlist", label: "המתנה" },
-    ],
-  },
-  {
-    label: "תומר",
-    items: [
-      { href: "/dashboard/calls", label: "שיחות" },
-      { href: "/dashboard/escalations", label: "תשומת לב", countKey: "escalations", critical: true },
-    ],
-  },
-  {
-    label: "רפואה",
-    items: [
-      { href: "/dashboard/visits", label: "ביקורים" },
-      { href: "/dashboard/tasks", label: "משימות", countKey: "tasks" },
-      { href: "/dashboard/lab", label: "מעבדה" },
-    ],
-  },
-  {
-    label: "ניהול",
-    items: [
-      { href: "/dashboard/billing", label: "חיובים" },
-      { href: "/dashboard/inventory", label: "מלאי" },
-      { href: "/dashboard/settings", label: "הגדרות" },
-    ],
-  },
-];
+export function getNavGroups(isProviderAdmin: boolean): NavGroup[] {
+  return [
+    {
+      label: "מרפאה",
+      items: [
+        { href: "/dashboard", label: "היום" },
+        { href: "/dashboard/calendar", label: "לוח שנה" },
+        { href: "/dashboard/clients", label: "לקוחות ומטופלים" },
+        { href: "/dashboard/pets", label: "חיות מחמד" },
+        { href: "/dashboard/waitlist", label: "המתנה" },
+      ],
+    },
+    {
+      label: "תומר",
+      items: [
+        { href: "/dashboard/calls", label: "שיחות" },
+        { href: "/dashboard/escalations", label: "תשומת לב", countKey: "escalations", critical: true },
+        ...(isProviderAdmin
+          ? [
+              { href: "/dashboard/qa-calls", label: "שיחות QA" },
+              { href: "/dashboard/improvements", label: "הצעות תיקון" },
+            ]
+          : []),
+      ],
+    },
+    {
+      label: "רפואה",
+      items: [
+        { href: "/dashboard/visits", label: "ביקורים" },
+        { href: "/dashboard/records", label: "תיקים רפואיים" },
+        { href: "/dashboard/tasks", label: "משימות", countKey: "tasks" },
+        { href: "/dashboard/lab", label: "מעבדה" },
+      ],
+    },
+    {
+      label: "ניהול",
+      items: [
+        { href: "/dashboard/billing", label: "חיובים" },
+        { href: "/dashboard/inventory", label: "מלאי" },
+        { href: "/dashboard/settings", label: "הגדרות" },
+      ],
+    },
+  ];
+}
 
 interface SidebarProps {
   openEscalations?: number;
@@ -63,6 +73,7 @@ interface SidebarProps {
   userRole?: string;
   agentStatus?: string;
   agentDetail?: string;
+  isProviderAdmin?: boolean;
 }
 
 function NavLink({ item, count }: { item: NavItem; count?: number }) {
@@ -97,7 +108,7 @@ function NavLink({ item, count }: { item: NavItem; count?: number }) {
             className="gv-data text-[11.5px]"
             style={{
               fontWeight: "var(--w-semibold)",
-              color: item.critical ? "#E9908A" : "var(--rail-text-muted)",
+              color: item.critical ? "var(--rail-critical-text)" : "var(--rail-text-muted)",
             }}
           >
             {count}
@@ -115,8 +126,10 @@ export function Sidebar({
   userRole = "וטרינרית ראשית",
   agentStatus = "מענה קולי פעיל",
   agentDetail,
+  isProviderAdmin = false,
 }: SidebarProps) {
   const counts = { escalations: openEscalations, tasks: openTasks };
+  const navGroups = getNavGroups(isProviderAdmin);
 
   const initials = userName
     .replace("ד״ר ", "")
@@ -170,7 +183,7 @@ export function Sidebar({
 
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto">
-        {NAV_GROUPS.map((group) => (
+        {navGroups.map((group) => (
           <div key={group.label}>
             <div
               className="pt-4 pb-1 px-3 text-[10.5px]"

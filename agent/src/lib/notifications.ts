@@ -2,11 +2,14 @@ import { getSupabase } from "./supabase.js";
 import {
   smsTemplates,
   formatAppointmentDateTime,
+  israelDateIso,
+  israelDateAtHour,
+  israelDayHourMinute,
   CLINIC_LOCATION,
   HOME_VISIT_LOCATION,
   type BookingConfirmationData,
   type MorningReminderData,
-} from "../services/sms.templates.js";
+} from "@tomer/shared";
 import { getVisitConfig, type VisitType } from "./appointments.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -22,59 +25,40 @@ export type NotificationType =
   | "cancellation_update"
   | "client_cancellation_confirmation";
 
-// Price per visit type (displayed in booking_confirmation SMS)
+// Price per visit type (displayed in booking_confirmation SMS). Whole segment,
+// not just a number — neutering has no fixed price (it depends on species,
+// weight, age and medical state, and only Dr. Noa quotes it), so the SMS must
+// not name one either. Kept in sync with knowledge/kb/pricing_and_visits.md.
+export const NO_FIXED_PRICE_TEXT = 'המחיר יימסר על ידי ד"ר נועה';
+
 const VISIT_PRICE: Record<VisitType, string> = {
-  checkup:            "150",
-  home_visit:         "300",
-  vaccination:        "150",
-  phone_consultation: "200",
-  neutering:          "350",
-  consultation:       "150",
-  urgent:             "200",
-  follow_up:          "150",
-  other:              "150",
+  checkup:            "150 ₪",
+  home_visit:         "300 ₪",
+  vaccination:        "150 ₪",
+  phone_consultation: "200 ₪",
+  neutering:          NO_FIXED_PRICE_TEXT,
+  consultation:       "150 ₪",
+  urgent:             "200 ₪",
+  follow_up:          "150 ₪",
+  other:              "150 ₪",
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Jerusalem timezone helpers (DST-correct via Intl — no fixed offset)
+// Jerusalem timezone helpers — Intl-based math lives in @tomer/shared; the
+// quiet-hours business rule (21:00–07:59) stays local to the agent.
 // ─────────────────────────────────────────────────────────────────────────────
 
-function israelHour(d: Date): number {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "Asia/Jerusalem",
-    hour: "numeric",
-    hour12: false,
-  }).formatToParts(d);
-  return parseInt(parts.find((p) => p.type === "hour")?.value ?? "0", 10);
-}
-
-/** Returns the date portion (YYYY-MM-DD) in Israel timezone. */
-export function israelDateIso(d: Date): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Jerusalem",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(d);
-}
+export { israelDateIso };
 
 /** Returns true if `now` falls in quiet hours (21:00–07:59 Israel time). */
 export function isQuietHours(now: Date): boolean {
-  const h = israelHour(now);
-  return h >= 21 || h < 8;
+  const { hour } = israelDayHourMinute(now);
+  return hour >= 21 || hour < 8;
 }
 
-/**
- * Returns the UTC Date representing 08:00 Israel time for `dateIso` (YYYY-MM-DD).
- * Israel is UTC+2 (winter) or UTC+3 (summer); Intl handles DST automatically.
- */
+/** Alias kept for call sites that read "morning reminder = 08:00 Israel". */
 export function morningReminderTime(dateIso: string): Date {
-  // Try UTC 05:00 (= 08:00 Israel UTC+3 summer) then 06:00 (= 08:00 Israel UTC+2 winter)
-  for (const utcHour of [5, 6]) {
-    const candidate = new Date(`${dateIso}T${String(utcHour).padStart(2, "0")}:00:00Z`);
-    if (israelHour(candidate) === 8) return candidate;
-  }
-  return new Date(`${dateIso}T05:00:00Z`); // fallback (should never be reached)
+  return israelDateAtHour(dateIso, 8);
 }
 
 /**
@@ -217,6 +201,18 @@ export async function scheduleBookingNotifications(p: BookingNotificationParams)
 }
 
 /** Skip all pending future notifications for a given appointment. */
+/**
+ * Skips pending AND in-flight notifications for a cancelled/rescheduled
+ * appointment. 'processing' rows are included because the atomic-claim
+ * processor (notificationProcessor.ts) can be mid-send when a cancellation
+ * comes in — without this, that row stays 'processing' and never gets
+ * flagged, so the customer can receive an SMS seconds after cancelling.
+ * This can't recall an SMS already handed to Twilio, but it does prevent
+ * the processor's own post-send update from silently overwriting the
+ * cancellation back to 'sent' (that update is itself guarded on
+ * status='processing', so once this flips a row to 'skipped' first, the
+ * processor's write becomes a no-op instead of clobbering it).
+ */
 export async function cancelFutureNotifications(
   appointmentId: string,
   clinicId: string,
@@ -226,7 +222,7 @@ export async function cancelFutureNotifications(
     .update({ status: "skipped", updated_at: new Date().toISOString() })
     .eq("appointment_id", appointmentId)
     .eq("clinic_id", clinicId)
-    .eq("status", "pending");
+    .in("status", ["pending", "processing"]);
   if (error) throw new Error(`cancelFutureNotifications failed: ${error.message}`);
 }
 

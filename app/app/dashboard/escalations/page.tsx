@@ -3,11 +3,14 @@ import React, { useEffect, useState, useCallback } from "react";
 import { Card } from "@/components/dashboard/ui/card";
 import { Badge } from "@/components/dashboard/ui/badge";
 import { Btn } from "@/components/dashboard/ui/btn";
+import { Modal } from "@/components/dashboard/ui/modal";
+import { Field, Textarea } from "@/components/dashboard/ui/field";
+import { Tabs } from "@/components/dashboard/ui/tabs";
 import { UrgencyMeter } from "@/components/dashboard/ui/urgency-meter";
 import { EmptyState } from "@/components/dashboard/ui/empty-state";
 import { Skeleton } from "@/components/dashboard/ui/skeleton";
 import { useToast } from "@/components/dashboard/ui/toast";
-import { EscalationIcon, ClockIcon, PhoneIcon } from "@/components/dashboard/icons";
+import { ClockIcon, PhoneIcon } from "@/components/dashboard/icons";
 import type { Escalation } from "@/types/domain/escalation";
 import { formatEscalationReason, parseEscalationReason } from "@/lib/triage-labels";
 
@@ -50,38 +53,24 @@ function ResolveModal({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-md rounded-[var(--r-xl)] bg-[var(--surface)] p-6 shadow-[var(--sh-lg)] modal-enter"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h3 className="text-[15px] font-semibold text-[var(--ink)]">סגירת אסקלציה</h3>
-        <p className="mt-1 text-sm text-[var(--muted)] truncate">
-          {formatEscalationReason(escalation.reason)}
-        </p>
+    <Modal open onClose={onClose} title="סגירת אסקלציה" subtitle={formatEscalationReason(escalation.reason)} maxWidth={420}>
+      <Field label="הערות (אופציונלי)" htmlFor="resolve-notes">
+        <Textarea
+          id="resolve-notes"
+          rows={3}
+          placeholder="מה בוצע? הערות לתיק..."
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+        />
+      </Field>
 
-        <div className="mt-4">
-          <label className="block text-xs font-semibold text-[var(--ink-2)] mb-1">הערות (אופציונלי)</label>
-          <textarea
-            className="w-full rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--ink)] placeholder:text-[var(--faint)] focus:outline-none focus:border-[var(--brand-400)] resize-none"
-            rows={3}
-            placeholder="מה בוצע? הערות לתיק..."
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-          />
-        </div>
-
-        <div className="mt-5 flex justify-end gap-2">
-          <Btn variant="ghost" size="sm" onClick={onClose}>ביטול</Btn>
-          <Btn variant="primary" size="sm" loading={loading} onClick={handleResolve}>
-            סמן כטופלה
-          </Btn>
-        </div>
+      <div className="mt-5 flex justify-end gap-2">
+        <Btn variant="ghost" size="sm" onClick={onClose}>ביטול</Btn>
+        <Btn variant="primary" size="sm" loading={loading} onClick={handleResolve}>
+          סמן כטופלה
+        </Btn>
       </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -102,14 +91,14 @@ function EscalationCard({
           <div className="flex flex-wrap items-center gap-2 mb-2">
             <UrgencyMeter value={escalation.urgency} />
             {escalation.afterHours && (
-              <Badge color="amber" dot>אחרי שעות פעילות</Badge>
+              <Badge tone="pending" dot>אחרי שעות פעילות</Badge>
             )}
-            {isResolved && <Badge color="green">טופלה</Badge>}
+            {isResolved && <Badge tone="done">טופלה</Badge>}
           </div>
 
           <EscalationReason reason={escalation.reason} />
 
-          <div className="mt-2 flex flex-wrap gap-3 text-[11px] text-[var(--muted)]">
+          <div className="mt-2 flex flex-wrap gap-3 text-[11px]" style={{ color: "var(--text-muted)" }}>
             <span className="flex items-center gap-1">
               <ClockIcon size={11} />
               {formatDate(escalation.createdAt)}
@@ -123,7 +112,10 @@ function EscalationCard({
           </div>
 
           {isResolved && escalation.notes && (
-            <p className="mt-2 text-xs text-[var(--ink-2)] rounded-[var(--r-sm)] bg-[var(--bg)] px-2 py-1">
+            <p
+              className="mt-2 text-xs px-2 py-1"
+              style={{ color: "var(--text-secondary)", borderRadius: "var(--radius-1)", background: "var(--surface-sunken)" }}
+            >
               {escalation.notes}
             </p>
           )}
@@ -142,7 +134,6 @@ function EscalationCard({
 
 type FilterStatus = "open" | "resolved" | "all";
 
-
 /**
  * The agent stores the reason as one machine-readable string. Rendered as its
  * parts, the decision leads, the matched red flags read as chips, and what the
@@ -153,14 +144,14 @@ function EscalationReason({ reason }: { reason: string }) {
 
   if (!decision) {
     return (
-      <p className="text-[14px] font-semibold text-[var(--text-primary)] leading-snug">{raw}</p>
+      <p className="text-[14px] font-semibold leading-snug" style={{ color: "var(--text-primary)" }}>{raw}</p>
     );
   }
 
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-[14px] font-semibold text-[var(--text-primary)] leading-snug">
+        <span className="text-[14px] font-semibold leading-snug" style={{ color: "var(--text-primary)" }}>
           {decision}
         </span>
         {flags.map((flag) => (
@@ -208,8 +199,8 @@ export default function EscalationsPage() {
     <div className="p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <h1 className="text-xl font-semibold text-[var(--ink)]">אסקלציות</h1>
+        <div className="flex items-baseline gap-2">
+          <h1 className="text-xl" style={{ color: "var(--text-primary)" }}>אסקלציות</h1>
           {openCount > 0 && (
             <span
               className="gv-data text-[13px]"
@@ -220,23 +211,17 @@ export default function EscalationsPage() {
           )}
         </div>
 
-        {/* Filter tabs */}
-        <div className="flex rounded-[var(--r-md)] border border-[var(--line)] overflow-hidden">
-          {(["open", "resolved", "all"] as FilterStatus[]).map((f) => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={[
-                "px-3 py-1.5 text-xs font-semibold transition-colors",
-                filter === f
-                  ? "bg-[var(--brand-600)] text-white"
-                  : "text-[var(--ink-2)] hover:bg-[var(--surface-2)]",
-              ].join(" ")}
-            >
-              {f === "open" ? "פתוחות" : f === "resolved" ? "טופלו" : "הכול"}
-            </button>
-          ))}
-        </div>
+        <Tabs
+          variant="pill"
+          size="sm"
+          value={filter}
+          onChange={setFilter}
+          items={[
+            { value: "open", label: "פתוחות" },
+            { value: "resolved", label: "טופלו" },
+            { value: "all", label: "הכול" },
+          ]}
+        />
       </div>
 
       {/* Content */}
@@ -248,7 +233,6 @@ export default function EscalationsPage() {
         </div>
       ) : items.length === 0 ? (
         <EmptyState
-          icon={<EscalationIcon size={32} />}
           title={filter === "open" ? "אין אסקלציות פתוחות" : "אין אסקלציות"}
           subtitle={filter === "open" ? "כשתומר יסמן מקרה כדחוף — הוא יופיע כאן" : ""}
         />

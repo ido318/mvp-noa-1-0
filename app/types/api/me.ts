@@ -10,6 +10,7 @@ export type MeResponse = {
     fullName: string | null;
     phone: string | null;
     defaultClinicId: string | null;
+    role: "clinic_user" | "provider_admin";
   };
   memberships: Array<{
     clinicId: string;

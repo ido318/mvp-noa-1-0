@@ -188,15 +188,17 @@ describe("enqueueNotification", () => {
 
 describe("cancelFutureNotifications", () => {
   it("calls update with status=skipped for the given appointment", async () => {
-    const mockChain = { eq: vi.fn().mockReturnThis() };
-    mockChain.eq.mockReturnValue(mockChain);
-    mockChain.eq
-      .mockReturnValueOnce(mockChain)
-      .mockReturnValueOnce(mockChain)
-      .mockReturnValueOnce({ error: null });
+    const mockIn = vi.fn().mockResolvedValue({ error: null });
+    const mockChain: Record<string, unknown> = { in: mockIn };
+    mockChain.eq = vi.fn().mockReturnValue(mockChain);
     mockFrom.mockReturnValue({ update: vi.fn().mockReturnValue(mockChain) });
 
     await expect(cancelFutureNotifications("appt-1", "clinic-1")).resolves.toBeUndefined();
+
+    // M11: must also catch rows the atomic-claim processor already has
+    // 'processing' — not just 'pending' — or a cancellation can lose the
+    // race with an in-flight send.
+    expect(mockIn).toHaveBeenCalledWith("status", ["pending", "processing"]);
   });
 });
 
@@ -295,8 +297,9 @@ describe("enqueueRescheduleNotification", () => {
 
 describe("enqueueClientCancellationConfirmation", () => {
   it("sends client_cancellation_confirmation (client-requested wording, not 'אילוץ רפואי')", async () => {
-    const mockChain = { eq: vi.fn().mockReturnThis() };
-    mockChain.eq.mockReturnValueOnce(mockChain).mockReturnValueOnce(mockChain).mockReturnValueOnce({ error: null });
+    // cancelFutureNotifications chain (called first, internally)
+    const mockChain: Record<string, unknown> = { in: vi.fn().mockResolvedValue({ error: null }) };
+    mockChain.eq = vi.fn().mockReturnValue(mockChain);
     mockFrom.mockReturnValue({ update: vi.fn().mockReturnValue(mockChain), upsert: mockUpsert });
 
     await enqueueClientCancellationConfirmation({

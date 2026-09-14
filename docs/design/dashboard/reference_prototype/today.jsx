@@ -11,36 +11,38 @@ const ApptCard = ({appt, onOpen})=>{
   const height=Math.max(appt.dur*(HOUR_PX/60)-6, 44);
   const compact=appt.dur<=30;
   return (
-    <div onClick={()=>onOpen(client)} style={{
+    <div onClick={()=>onOpen(appt)} style={{
       position:"absolute", top, height, right:0, left:8,
       background:"var(--surface)", borderRadius:13,
       border:"1px solid var(--line)", borderInlineStart:`4px solid ${s.fg}`,
       boxShadow:"var(--sh-sm)", padding: compact?"8px 12px":"11px 13px",
       cursor:"pointer", overflow:"hidden", transition:"box-shadow .2s, transform .15s",
-      display:"flex", alignItems:"center", gap:11
+      display:"flex", alignItems:"center", gap:13
     }}
     onMouseEnter={e=>{e.currentTarget.style.boxShadow="var(--sh-md)";e.currentTarget.style.transform="translateX(-3px)";}}
     onMouseLeave={e=>{e.currentTarget.style.boxShadow="var(--sh-sm)";e.currentTarget.style.transform="none";}}>
+      <span style={{display:"flex",alignItems:"center",gap:5,flexShrink:0,minWidth:58}}>
+        <span style={{fontVariantNumeric:"tabular-nums",fontWeight:800,fontSize:14,color:"var(--ink)",letterSpacing:"-.02em"}}>{appt.start}</span>
+        {appt.loc==="home" && <span title="ביקור בית" style={{display:"grid",placeItems:"center",color:"var(--teal-600)"}}><Icon name="home" size={14} sw={2}/></span>}
+      </span>
+      <span style={{width:1,height:compact?22:30,background:"var(--line-2)",flexShrink:0}}/>
       <AnimalAvatar pet={pet} size={compact?32:38}/>
-      <div style={{flex:1,minWidth:0}}>
-        <div style={{display:"flex",alignItems:"center",gap:8}}>
-          <span style={{fontWeight:700,fontSize:compact?13.5:14.5,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{pet.name}</span>
-          <span style={{fontSize:12.5,color:"var(--muted)",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>· {client.name}</span>
+      <div style={{flexShrink:0,minWidth:0,maxWidth:188}}>
+        <div style={{display:"flex",alignItems:"baseline",gap:7}}>
+          <span style={{fontWeight:700,fontSize:compact?13.5:14.5,whiteSpace:"nowrap",flexShrink:0}}>{pet.name}</span>
+          <span style={{fontSize:12.5,color:"var(--muted)",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{client.name}</span>
         </div>
-        {!compact && <div style={{fontSize:12.5,color:"var(--faint)",marginTop:2,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{appt.note}</div>}
+        {!compact && <div style={{fontSize:11.5,color:"var(--faint)",marginTop:1,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{SPECIES[pet.species].he} · {pet.breed}</div>}
       </div>
-      <div style={{display:"flex",flexDirection:"column",alignItems:"flex-start",gap:6,flexShrink:0}}>
-        <span style={{display:"flex",alignItems:"center",gap:5}}>
-          {appt.loc==="home" && <span title="ביקור בית" style={{display:"grid",placeItems:"center",color:"var(--teal-600)"}}><Icon name="home" size={14} sw={2}/></span>}
-          <span style={{fontVariantNumeric:"tabular-nums",fontWeight:700,fontSize:13,color:"var(--ink-2)"}}>{appt.start}</span>
-        </span>
-        {!compact && <span style={{fontSize:11.5,fontWeight:600,color:s.fg,background:s.bg,padding:"2px 8px",borderRadius:99}}>{VISIT_TYPES[appt.type].he}</span>}
+      <div style={{flex:1,minWidth:0,display:"flex",alignItems:"center"}}>
+        <span style={{fontSize:13,color:"var(--ink-2)",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{appt.note}</span>
       </div>
+      <span style={{flexShrink:0,fontSize:11.5,fontWeight:600,color:s.fg,background:s.bg,padding:"4px 11px",borderRadius:99}}>{VISIT_TYPES[appt.type].he}</span>
     </div>
   );
 };
 
-const Timeline = ({onOpenClient})=>{
+const Timeline = ({onOpenVisit})=>{
   const hours=[]; for(let h=TODAY_START_H;h<=TODAY_END_H;h++) hours.push(h);
   const nowTop=(toMin(NOW_TIME)-TODAY_START_H*60)*(HOUR_PX/60);
   return (
@@ -72,7 +74,7 @@ const Timeline = ({onOpenClient})=>{
               <span style={{flex:1,height:2,background:"var(--red-500)",opacity:.85}}/>
             </div>
             {/* appointments */}
-            {APPTS_TODAY.map(a=> <ApptCard key={a.id} appt={a} onOpen={onOpenClient}/>)}
+            {APPTS_TODAY.map(a=> <ApptCard key={a.id} appt={a} onOpen={onOpenVisit}/>)}
           </div>
         </div>
       </div>
@@ -173,7 +175,7 @@ const StatTile = ({value, label, icon, tone="teal", delta})=>{
   );
 };
 
-const TodayScreen = ({nav, onOpenClient, onOpenCall, loading})=>{
+const TodayScreen = ({nav, onOpenClient, onOpenCall, onOpenVisit, loading})=>{
   if(loading){
     return (
       <div style={{display:"grid",gridTemplateColumns:"1fr 360px",gap:22,alignItems:"start"}}>
@@ -197,7 +199,7 @@ const TodayScreen = ({nav, onOpenClient, onOpenCall, loading})=>{
         </div>
       </div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 360px",gap:22,alignItems:"start"}}>
-        <Timeline onOpenClient={onOpenClient}/>
+        <Timeline onOpenVisit={onOpenVisit}/>
         <div style={{display:"flex",flexDirection:"column",gap:16}}>
           <EscalationsHeroCard onGo={()=>nav("escalations")}/>
           <CallsTodayCard onGoCalls={()=>nav("calls")} onOpenCall={onOpenCall}/>

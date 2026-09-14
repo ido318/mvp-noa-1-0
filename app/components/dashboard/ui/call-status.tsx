@@ -46,4 +46,14 @@ export function CallDirection({ direction = "inbound" }: { direction?: string })
   );
 }
 
+/** The call's category — operation (a booking/cancellation) vs. plain information. */
+export function CallCategoryBadge({ category }: { category: string | null | undefined }) {
+  if (!category) return <span style={{ color: "var(--text-faint)" }}>—</span>;
+  return (
+    <Badge tone={category === "operation" ? "info" : "neutral"}>
+      {category === "operation" ? "פעולה" : "מידע"}
+    </Badge>
+  );
+}
+
 export { CALL_STATUS };

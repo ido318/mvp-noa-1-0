@@ -106,11 +106,11 @@
           },
           "customer_id": {
             "type": "string",
-            "description": "מזהה הלקוח מ-lookup-customer (UUID)"
+            "description": "מזהה הלקוח (UUID), אופציונלי — כרגע אין כלי שמחזיר אותו; יש למלא רק אם ידוע ממקור אחר"
           },
           "pet_id": {
             "type": "string",
-            "description": "מזהה החיה מ-lookup-customer (UUID)"
+            "description": "מזהה החיה מ-list-customer-pets (UUID)"
           }
         },
         "required": ["symptoms_he", "pet_type"]
@@ -334,6 +334,106 @@
           }
         },
         "required": []
+      }
+    }
+  },
+  {
+    "type": "webhook",
+    "name": "list-customer-pets",
+    "description": "מאתר את כל חיות המחמד הרשומות ללקוח לפי מספר טלפון, ומחזיר שם, סוג ומזהה (pet_id) לכל חיה. יש לקרוא לכלי זה מיד אחרי ש-lookup-customer מזהה לקוח מוכר עם חיה אחת או יותר, כדי לקבל pet_id לשימוש בשלושת הכלים הבאים. אם יש יותר מחיה אחת, יש לשאול על איזו חיה מדובר לפני שממשיכים.",
+    "api_schema": {
+      "url": "{{AGENT_PUBLIC_URL}}/tools/list-customer-pets",
+      "method": "POST",
+      "request_headers": {
+        "Authorization": "Bearer {{AGENT_TOOLS_BEARER_TOKEN}}"
+      },
+      "request_body_schema": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "description": "מספר טלפון הלקוח"
+          }
+        },
+        "required": ["phone"]
+      }
+    }
+  },
+  {
+    "type": "webhook",
+    "name": "get-patient-reminders",
+    "description": "מחזיר תזכורות חיסון באיחור או קרובות עבור חיה ספציפית שכבר זוהתה דרך list-customer-pets. יש לקרוא לכלי זה ביוזמתך ברגע שידוע pet_id, כדי לציין חיסון שמגיע מועדו באופן טבעי במהלך השיחה.",
+    "api_schema": {
+      "url": "{{AGENT_PUBLIC_URL}}/tools/get-patient-reminders",
+      "method": "POST",
+      "request_headers": {
+        "Authorization": "Bearer {{AGENT_TOOLS_BEARER_TOKEN}}"
+      },
+      "request_body_schema": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "description": "מספר טלפון הלקוח"
+          },
+          "pet_id": {
+            "type": "string",
+            "description": "מזהה החיה (UUID) שהתקבל מ-list-customer-pets"
+          }
+        },
+        "required": ["phone", "pet_id"]
+      }
+    }
+  },
+  {
+    "type": "webhook",
+    "name": "get-patient-chronic-conditions",
+    "description": "מחזיר מצבים כרוניים רשומים עבור חיה ספציפית שכבר זוהתה דרך list-customer-pets. אם בעל החיה מדווח כרגע על החמרה בתסמינים ויש מצב כרוני רשום — יש להתייחס לכך כדגל אדום פוטנציאלי ולהמשיך דרך triage-pet-case (הכולל כבר לוגיקת אסקלציה לד\"ר נועה במידת הצורך); בכל מקרה יש להציע את התור המוקדם ביותר האפשרי. אין לפתוח נתיב הפניה חדש ואין לקרוא ל-escalate-to-noa או ל-request-human-handoff עבור זה.",
+    "api_schema": {
+      "url": "{{AGENT_PUBLIC_URL}}/tools/get-patient-chronic-conditions",
+      "method": "POST",
+      "request_headers": {
+        "Authorization": "Bearer {{AGENT_TOOLS_BEARER_TOKEN}}"
+      },
+      "request_body_schema": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "description": "מספר טלפון הלקוח"
+          },
+          "pet_id": {
+            "type": "string",
+            "description": "מזהה החיה (UUID) שהתקבל מ-list-customer-pets"
+          }
+        },
+        "required": ["phone", "pet_id"]
+      }
+    }
+  },
+  {
+    "type": "webhook",
+    "name": "get-last-visit-plan",
+    "description": "מחזיר את תוכנית הטיפול/המעקב מהרשומה הרפואית המאושרת האחרונה של החיה. יש לקרוא לכלי זה כשהלקוח מזכיר 'המעקב מהפעם הקודמת' או ניסוח דומה.",
+    "api_schema": {
+      "url": "{{AGENT_PUBLIC_URL}}/tools/get-last-visit-plan",
+      "method": "POST",
+      "request_headers": {
+        "Authorization": "Bearer {{AGENT_TOOLS_BEARER_TOKEN}}"
+      },
+      "request_body_schema": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "description": "מספר טלפון הלקוח"
+          },
+          "pet_id": {
+            "type": "string",
+            "description": "מזהה החיה (UUID) שהתקבל מ-list-customer-pets"
+          }
+        },
+        "required": ["phone", "pet_id"]
       }
     }
   }

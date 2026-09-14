@@ -13,10 +13,10 @@ function statusHe(status: Visit["status"]): string {
   return "בטיפול";
 }
 
-function statusColor(status: Visit["status"]): "green" | "red" | "amber" {
-  if (status === "completed") return "green";
-  if (status === "cancelled") return "red";
-  return "amber";
+function statusTone(status: Visit["status"]): "done" | "critical" | "pending" {
+  if (status === "completed") return "done";
+  if (status === "cancelled") return "critical";
+  return "pending";
 }
 
 export default async function RecordsPage() {
@@ -29,8 +29,8 @@ export default async function RecordsPage() {
     <div className="p-6 space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-[var(--ink)]">תיקים רפואיים</h1>
-          <p className="mt-1 text-sm text-[var(--muted)]">ביקורים, סיכומי AI, הערות, תרופות וחיסונים.</p>
+          <h1 className="text-xl font-semibold text-[var(--text-primary)]">תיקים רפואיים</h1>
+          <p className="mt-1 text-sm text-[var(--text-muted)]">ביקורים, סיכומי AI, הערות, תרופות וחיסונים.</p>
         </div>
         <Link
           href="/dashboard/visits/new"
@@ -42,16 +42,16 @@ export default async function RecordsPage() {
 
       <div className="grid gap-3 md:grid-cols-3">
         <Card>
-          <p className="text-xs text-[var(--muted)]">ביקורים</p>
-          <p className="mt-1 text-2xl font-semibold text-[var(--ink)]">{visits.length}</p>
+          <p className="text-xs text-[var(--text-muted)]">ביקורים</p>
+          <p className="mt-1 text-2xl font-semibold text-[var(--text-primary)]">{visits.length}</p>
         </Card>
         <Card>
-          <p className="text-xs text-[var(--muted)]">הושלמו</p>
-          <p className="mt-1 text-2xl font-semibold text-[var(--ink)]">{completed}</p>
+          <p className="text-xs text-[var(--text-muted)]">הושלמו</p>
+          <p className="mt-1 text-2xl font-semibold text-[var(--text-primary)]">{completed}</p>
         </Card>
         <Card>
-          <p className="text-xs text-[var(--muted)]">עם סיכום AI</p>
-          <p className="mt-1 text-2xl font-semibold text-[var(--ink)]">{withAi}</p>
+          <p className="text-xs text-[var(--text-muted)]">עם סיכום AI</p>
+          <p className="mt-1 text-2xl font-semibold text-[var(--text-primary)]">{withAi}</p>
         </Card>
       </div>
 
@@ -63,29 +63,29 @@ export default async function RecordsPage() {
         />
       ) : (
         <Card noPad>
-          <ul className="divide-y divide-[var(--line-2)]">
+          <ul className="divide-y divide-[var(--border-row)]">
             {visits.map((visit) => (
               <li key={visit.id} className="p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <Link
                       href={`/dashboard/visits/${visit.id}`}
-                      className="font-semibold text-[var(--ink)] hover:text-[var(--brand-700)]"
+                      className="font-semibold text-[var(--text-primary)] hover:text-[var(--accent-hover)]"
                     >
                       {formatIsraelDateTime(visit.startedAt)}
                     </Link>
-                    <p className="mt-1 text-sm text-[var(--muted)]">
+                    <p className="mt-1 text-sm text-[var(--text-muted)]">
                       {visit.chiefComplaint ?? "ללא תלונה ראשית"}
                     </p>
                     <div className="mt-2 flex flex-wrap gap-2">
-                      {visit.manualVisitSummary && <Badge color="muted">סיכום ידני</Badge>}
-                      {visit.aiVisitSummary && <Badge color="brand">סיכום AI</Badge>}
-                      <Link className="text-xs font-semibold text-[var(--brand-700)]" href={`/dashboard/pets/${visit.petId}`}>
+                      {visit.manualVisitSummary && <Badge tone="neutral">סיכום ידני</Badge>}
+                      {visit.aiVisitSummary && <Badge tone="info">סיכום AI</Badge>}
+                      <Link className="text-xs font-semibold text-[var(--accent-hover)]" href={`/dashboard/pets/${visit.petId}`}>
                         פרופיל חיה
                       </Link>
                     </div>
                   </div>
-                  <Badge color={statusColor(visit.status)}>{statusHe(visit.status)}</Badge>
+                  <Badge tone={statusTone(visit.status)}>{statusHe(visit.status)}</Badge>
                 </div>
               </li>
             ))}

@@ -4,6 +4,7 @@ import { handleRouteError, jsonSuccess } from "@/lib/api/response";
 import { parseOrThrow } from "@/lib/api/validation";
 import { availabilitySchema } from "@/lib/validators/appointment";
 import { AppError } from "@/lib/errors/app-error";
+import { ISRAEL_TIMEZONE } from "@tomer/shared";
 
 export async function GET(request: Request) {
   const requestId = createRequestId();
@@ -24,7 +25,7 @@ export async function GET(request: Request) {
       actor,
       parsed.clinicId,
       parsed.date,
-      "Asia/Jerusalem",
+      ISRAEL_TIMEZONE,
       parsed.visitType,
     );
     if (!result.ok) return handleRouteError(result.error, requestId);

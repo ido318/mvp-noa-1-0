@@ -10,6 +10,10 @@ export const preferredContactMethodSchema = z.enum([
 
 const nullableTrimmed = z.string().trim().min(1).optional().nullable();
 
+export const customerTagsSchema = z
+  .array(z.string().trim().min(1).max(30))
+  .max(10);
+
 export const createCustomerSchema = z.object({
   clinicId: z.string().uuid(),
   fullName: z.string().trim().min(2).max(120),
@@ -19,6 +23,7 @@ export const createCustomerSchema = z.object({
   preferredContactMethod: preferredContactMethodSchema.optional(),
   notes: z.string().trim().max(2000).optional().nullable(),
   status: customerStatusSchema.optional(),
+  tags: customerTagsSchema.optional(),
 });
 
 export const updateCustomerSchema = createCustomerSchema

@@ -124,54 +124,54 @@ export function AppointmentDrawer({
             <div className="flex items-center gap-3">
               <AnimalIcon species={appointment.petSpecies ?? "dog"} size={28} />
               <div className="min-w-0">
-                <p className="truncate text-[16px] font-semibold text-[var(--ink)]">{appointment.petName ?? "חיה"}</p>
-                <p className="truncate text-[13px] text-[var(--muted)]">{appointment.customerName ?? "לקוח"}</p>
+                <p className="truncate text-[16px] font-semibold text-[var(--text-primary)]">{appointment.petName ?? "חיה"}</p>
+                <p className="truncate text-[13px] text-[var(--text-muted)]">{appointment.customerName ?? "לקוח"}</p>
               </div>
-              <Badge color={appointment.status === "pending_approval" ? "amber" : "muted"} className="ms-auto">
+              <Badge tone={appointment.status === "pending_approval" ? "pending" : "neutral"} className="ms-auto">
                 {STATUS_LABEL[appointment.status] ?? appointment.status}
               </Badge>
             </div>
 
             <dl className="space-y-2 text-[13px]">
               <div className="flex justify-between gap-3">
-                <dt className="text-[var(--muted)]">סוג תור</dt>
-                <dd className="font-semibold text-[var(--ink)]">{visitLabel(appointment.appointmentType)}</dd>
+                <dt className="text-[var(--text-muted)]">סוג תור</dt>
+                <dd className="font-semibold text-[var(--text-primary)]">{visitLabel(appointment.appointmentType)}</dd>
               </div>
               <div className="flex justify-between gap-3">
-                <dt className="text-[var(--muted)]">מועד</dt>
-                <dd className="font-semibold text-[var(--ink)]">{formatIsraelDateTime(appointment.scheduledAt)}</dd>
+                <dt className="text-[var(--text-muted)]">מועד</dt>
+                <dd className="font-semibold text-[var(--text-primary)]">{formatIsraelDateTime(appointment.scheduledAt)}</dd>
               </div>
               {appointment.reason && (
                 <div className="flex justify-between gap-3">
-                  <dt className="text-[var(--muted)]">סיבה</dt>
-                  <dd className="font-semibold text-[var(--ink)]">{appointment.reason}</dd>
+                  <dt className="text-[var(--text-muted)]">סיבה</dt>
+                  <dd className="font-semibold text-[var(--text-primary)]">{appointment.reason}</dd>
                 </div>
               )}
               {appointment.notes && (
                 <div className="flex justify-between gap-3">
-                  <dt className="text-[var(--muted)]">הערות</dt>
-                  <dd className="font-semibold text-[var(--ink)]">{appointment.notes}</dd>
+                  <dt className="text-[var(--text-muted)]">הערות</dt>
+                  <dd className="font-semibold text-[var(--text-primary)]">{appointment.notes}</dd>
                 </div>
               )}
             </dl>
 
-            <div className="flex flex-col gap-2 border-t border-[var(--line-2)] pt-4">
-              <Link href={`/dashboard/pets/${appointment.petId}`} className="text-[13px] font-semibold text-[var(--brand-600)] hover:underline">
-                פתח כרטיס מטופל ←
+            <div className="flex flex-col gap-2 border-t border-[var(--border-row)] pt-4">
+              <Link href={`/dashboard/pets/${appointment.petId}`} className="text-[13px] font-semibold text-[var(--accent)] hover:underline">
+                פתח כרטיס מטופל →
               </Link>
               {appointment.status === "in_visit" && (
                 <Link
                   href={`/dashboard/visits/new?appointmentId=${appointment.id}`}
-                  className="text-[13px] font-semibold text-[var(--brand-600)] hover:underline"
+                  className="text-[13px] font-semibold text-[var(--accent)] hover:underline"
                 >
-                  עבור לביקור ←
+                  עבור לביקור →
                 </Link>
               )}
             </div>
 
             {confirmingCancel ? (
-              <div className="space-y-2 border-t border-[var(--line-2)] pt-4">
-                <p className="text-[13px] font-semibold text-[var(--ink)]">
+              <div className="space-y-2 border-t border-[var(--border-row)] pt-4">
+                <p className="text-[13px] font-semibold text-[var(--text-primary)]">
                   {confirmingCancel === "cancelled" ? "לבטל את התור?" : "לסמן כלא הגיע?"}
                 </p>
                 <div className="flex gap-2">
@@ -182,18 +182,18 @@ export function AppointmentDrawer({
                 </div>
               </div>
             ) : appointment.status === "pending_approval" ? (
-              <div className="flex gap-2 border-t border-[var(--line-2)] pt-4">
+              <div className="flex gap-2 border-t border-[var(--border-row)] pt-4">
                 <Btn variant="soft" onClick={() => setApproveRejectMode("approve")}>אשר תור</Btn>
                 <Btn variant="dangerSoft" onClick={() => setApproveRejectMode("reject")}>דחה תור</Btn>
               </div>
             ) : appointment.status === "scheduled" || appointment.status === "confirmed" ? (
-              <div className="flex gap-2 border-t border-[var(--line-2)] pt-4">
+              <div className="flex gap-2 border-t border-[var(--border-row)] pt-4">
                 <Btn variant="soft" size="sm" loading={savingStatus} onClick={checkIn}>צ׳ק־אין</Btn>
                 <Btn variant="dangerSoft" size="sm" onClick={() => setConfirmingCancel("cancelled")}>ביטול תור</Btn>
                 <Btn variant="dangerSoft" size="sm" onClick={() => setConfirmingCancel("no_show")}>סימון כלא הגיע</Btn>
               </div>
             ) : appointment.status === "checked_in" || appointment.status === "in_visit" ? (
-              <div className="flex gap-2 border-t border-[var(--line-2)] pt-4">
+              <div className="flex gap-2 border-t border-[var(--border-row)] pt-4">
                 <Btn variant="primary" size="sm" loading={startingVisit} onClick={openVisit}>פתח ביקור</Btn>
                 {appointment.status === "checked_in" && (
                   <>

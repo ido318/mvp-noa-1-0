@@ -43,7 +43,7 @@ export default async function VisitDetailPage({ params }: Params) {
 
   if (!visit) {
     return (
-      <section className="rounded-[var(--r-lg)] border border-[var(--red-100)] bg-[var(--red-50)] p-6 text-sm text-[var(--red-700)]">
+      <section className="rounded-[var(--radius-3)] border border-[var(--red-100)] bg-[var(--red-50)] p-6 text-sm text-[var(--red-700)]">
         הביקור לא נמצא.
       </section>
     );
@@ -79,40 +79,40 @@ export default async function VisitDetailPage({ params }: Params) {
 
   return (
     <div className="mx-auto w-full max-w-[900px] space-y-5 p-6">
-      <Link href={`/dashboard/pets/${visit.petId}`} className="text-sm font-semibold text-[var(--brand-600)] hover:underline">
+      <Link href={`/dashboard/pets/${visit.petId}`} className="text-sm font-semibold text-[var(--accent)] hover:underline">
         ← חזרה לכרטיס המטופל
       </Link>
 
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--r-lg)] border border-[var(--line)] bg-[var(--surface)] p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-3)] border border-[var(--border-hairline)] bg-[var(--surface-raised)] p-5">
         <div>
-          <h1 className="text-[22px] font-semibold text-[var(--ink)]">מפגש טיפולי</h1>
-          <p className="mt-1 text-sm text-[var(--muted)]">{formatIsraelDateTime(visit.startedAt)}</p>
+          <h1 className="text-[22px] font-semibold text-[var(--text-primary)]">מפגש טיפולי</h1>
+          <p className="mt-1 text-sm text-[var(--text-muted)]">{formatIsraelDateTime(visit.startedAt)}</p>
         </div>
         <div className="flex items-center gap-4">
           <div className="text-end">
-            <p className="text-[11px] text-[var(--muted)]">מטופל</p>
-            <p className="text-sm font-semibold text-[var(--ink)]">{pet?.name ?? visit.petId}</p>
+            <p className="text-[11px] text-[var(--text-muted)]">מטופל</p>
+            <p className="text-sm font-semibold text-[var(--text-primary)]">{pet?.name ?? visit.petId}</p>
           </div>
           <div className="text-end">
-            <p className="text-[11px] text-[var(--muted)]">בעלים</p>
-            <p className="text-sm font-semibold text-[var(--ink)]">{customer?.fullName ?? visit.customerId}</p>
+            <p className="text-[11px] text-[var(--text-muted)]">בעלים</p>
+            <p className="text-sm font-semibold text-[var(--text-primary)]">{customer?.fullName ?? visit.customerId}</p>
           </div>
-          <Badge color={visit.status === "completed" ? "green" : visit.status === "cancelled" ? "muted" : "brand"}>
+          <Badge tone={visit.status === "completed" ? "done" : visit.status === "cancelled" ? "neutral" : "info"}>
             {VISIT_STATUS_LABELS[visit.status]}
           </Badge>
         </div>
       </div>
 
       <Card>
-        <h3 className="text-[15px] font-semibold text-[var(--ink)]">Reason & Pre-Visit</h3>
+        <h3 id="reason-and-pre-visit" className="text-[15px] font-semibold text-[var(--text-primary)]">רקע לביקור</h3>
         <div className="mt-3 grid gap-3 text-sm md:grid-cols-2">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">סיבת הביקור</p>
-            <p className="mt-1 text-[var(--ink)]">{visit.chiefComplaint ?? appointment?.reason ?? "לא צוינה סיבה"}</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">סיבת הביקור</p>
+            <p className="mt-1 text-[var(--text-primary)]">{visit.chiefComplaint ?? appointment?.reason ?? "לא צוינה סיבה"}</p>
           </div>
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">מקור</p>
-            <p className="mt-1 text-[var(--ink)]">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">מקור</p>
+            <p className="mt-1 text-[var(--text-primary)]">
               {appointment
                 ? `${appointment.source} · ${appointment.appointmentType}`
                 : "ביקור ללא תור מקושר"}
@@ -120,9 +120,9 @@ export default async function VisitDetailPage({ params }: Params) {
           </div>
         </div>
         {appointment?.notes && (
-          <div className="mt-3 rounded-[var(--r-md)] bg-[var(--surface-2)] px-3 py-2">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">הערות מהתור</p>
-            <p className="mt-1 whitespace-pre-wrap text-sm text-[var(--ink)]">{appointment.notes}</p>
+          <div className="mt-3 rounded-[var(--radius-2)] bg-[var(--surface-sunken)] px-3 py-2">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">הערות מהתור</p>
+            <p className="mt-1 whitespace-pre-wrap text-sm text-[var(--text-primary)]">{appointment.notes}</p>
           </div>
         )}
       </Card>
@@ -130,7 +130,7 @@ export default async function VisitDetailPage({ params }: Params) {
       <PreVisitBriefCard calls={customerCalls?.items ?? []} />
 
       <Card>
-        <h3 className="text-[15px] font-semibold text-[var(--ink)]">סיכומי ביקור</h3>
+        <h3 className="text-[15px] font-semibold text-[var(--text-primary)]">סיכומי ביקור</h3>
         <div className="mt-3">
           <VisitAiSummarySection
             visitId={visit.id}
@@ -155,7 +155,7 @@ export default async function VisitDetailPage({ params }: Params) {
       />
 
       <Card>
-        <h3 className="text-[15px] font-semibold text-[var(--ink)]">מרשמים</h3>
+        <h3 className="text-[15px] font-semibold text-[var(--text-primary)]">מרשמים</h3>
         <div className="mt-3">
           <VisitPrescriptionsSection
             visitId={visit.id}
@@ -165,7 +165,7 @@ export default async function VisitDetailPage({ params }: Params) {
       </Card>
 
       <Card>
-        <h3 className="text-[15px] font-semibold text-[var(--ink)]">חיסונים</h3>
+        <h3 className="text-[15px] font-semibold text-[var(--text-primary)]">חיסונים</h3>
         <div className="mt-3">
           <VisitVaccinationsSection
             visitId={visit.id}
@@ -178,14 +178,14 @@ export default async function VisitDetailPage({ params }: Params) {
       </Card>
 
       <Card>
-        <h3 className="text-[15px] font-semibold text-[var(--ink)]">חיובי ביקור</h3>
+        <h3 className="text-[15px] font-semibold text-[var(--text-primary)]">חיובי ביקור</h3>
         <div className="mt-3">
-          <VisitChargesPanel visitId={visit.id} charges={chargesData?.items ?? []} />
+          <VisitChargesPanel visitId={visit.id} clinicId={visit.clinicId} charges={chargesData?.items ?? []} />
         </div>
       </Card>
 
       <Card>
-        <h3 className="text-[15px] font-semibold text-[var(--ink)]">שליחה ללקוח</h3>
+        <h3 className="text-[15px] font-semibold text-[var(--text-primary)]">שליחה ללקוח</h3>
         <div className="mt-3">
           <VisitShareSection
             visitId={visit.id}
@@ -198,7 +198,7 @@ export default async function VisitDetailPage({ params }: Params) {
       </Card>
 
       <Card>
-        <h3 className="text-[15px] font-semibold text-[var(--ink)]">פעולות נוספות</h3>
+        <h3 className="text-[15px] font-semibold text-[var(--text-primary)]">פעולות נוספות</h3>
         <div className="mt-3">
           <VisitActions
             visitId={visit.id}

@@ -19,13 +19,14 @@ import type { Invoice, InvoiceLineItem, InvoiceStatus } from "@/types/domain/inv
 import type { InventoryItem } from "@/types/domain/inventory";
 import type { LabOrder, LabOrderStatus } from "@/types/domain/lab-order";
 import type { MedicalNote, MedicalNoteType } from "@/types/domain/medical-note";
-import type { MedicalRecord } from "@/types/domain/medical-record";
+import type { MedicalRecord, ProblemListEntry } from "@/types/domain/medical-record";
 import type { Pet, PetStatus } from "@/types/domain/pet";
 import type { Prescription, PrescriptionStatus } from "@/types/domain/prescription";
 import type { Profile } from "@/types/domain/profile";
 import type { Task, TaskPriority, TaskStatus } from "@/types/domain/task";
 import type { FollowUp } from "@/types/domain/follow-up";
 import type { Payment } from "@/types/domain/payment";
+import type { PriceListItem } from "@/types/domain/price-list-item";
 import type { Vaccination } from "@/types/domain/vaccination";
 import type { Visit, VisitStatus } from "@/types/domain/visit";
 import type { VisitCharge } from "@/types/domain/visit-charge";
@@ -44,6 +45,7 @@ export function mapProfileRow(row: {
   full_name: string | null;
   phone: string | null;
   default_clinic_id: string | null;
+  role: string;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
@@ -53,6 +55,7 @@ export function mapProfileRow(row: {
     fullName: row.full_name,
     phone: row.phone,
     defaultClinicId: row.default_clinic_id,
+    role: row.role === "provider_admin" ? "provider_admin" : "clinic_user",
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     deletedAt: row.deleted_at,
@@ -207,6 +210,7 @@ export function mapCustomerRow(row: {
   preferred_contact_method: PreferredContactMethod;
   notes: string | null;
   status: CustomerStatus;
+  tags: string[] | null;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
@@ -221,6 +225,7 @@ export function mapCustomerRow(row: {
     preferredContactMethod: row.preferred_contact_method,
     notes: row.notes,
     status: row.status,
+    tags: row.tags ?? [],
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     deletedAt: row.deleted_at,
@@ -400,6 +405,7 @@ export function mapMedicalNoteRow(row: {
   objective?: string | null;
   assessment?: string | null;
   plan?: string | null;
+  parent_note_id?: string | null;
   status?: "draft" | "approved" | "archived";
   approved_by_user_id?: string | null;
   approved_at?: string | null;
@@ -419,6 +425,7 @@ export function mapMedicalNoteRow(row: {
     objective: row.objective ?? null,
     assessment: row.assessment ?? null,
     plan: row.plan ?? null,
+    parentNoteId: row.parent_note_id ?? null,
     status: row.status ?? "draft",
     approvedByUserId: row.approved_by_user_id ?? null,
     approvedAt: row.approved_at ?? null,
@@ -446,7 +453,9 @@ export function mapMedicalRecordRow(row: {
     clinicId: row.clinic_id,
     petId: row.pet_id,
     summary: row.summary,
-    activeProblemList: row.active_problem_list ?? [],
+    // The DB CHECK constraint only enforces "is a jsonb array" — actual entry
+    // shape is validated on write via problemListEntrySchema, not by Postgres.
+    activeProblemList: (row.active_problem_list ?? []) as ProblemListEntry[],
     alerts: row.alerts ?? [],
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -629,6 +638,9 @@ export function mapInvoiceRow(row: {
   items: unknown;
   total: number | string;
   notes: string | null;
+  payment_link_url?: string | null;
+  green_invoice_document_id?: string | null;
+  payment_link_sent_at?: string | null;
   created_by_user_id: string | null;
   version: number;
   created_at: string;
@@ -652,6 +664,9 @@ export function mapInvoiceRow(row: {
     items,
     total: typeof row.total === "string" ? parseFloat(row.total) : row.total,
     notes: row.notes,
+    paymentLinkUrl: row.payment_link_url ?? null,
+    greenInvoiceDocumentId: row.green_invoice_document_id ?? null,
+    paymentLinkSentAt: row.payment_link_sent_at ?? null,
     createdByUserId: row.created_by_user_id,
     version: row.version,
     createdAt: row.created_at,
@@ -887,6 +902,22 @@ export function mapVisitChargeRow(row: Record<string, unknown>): VisitCharge {
     createdByUserId: (row["created_by_user_id"] as string | null) ?? null,
     reviewedByUserId: (row["reviewed_by_user_id"] as string | null) ?? null,
     reviewedAt: (row["reviewed_at"] as string | null) ?? null,
+    version: row["version"] as number,
+    createdAt: row["created_at"] as string,
+    updatedAt: row["updated_at"] as string,
+    deletedAt: (row["deleted_at"] as string | null) ?? null,
+  };
+}
+
+export function mapPriceListItemRow(row: Record<string, unknown>): PriceListItem {
+  return {
+    id: row["id"] as string,
+    clinicId: row["clinic_id"] as string,
+    name: row["name"] as string,
+    defaultPrice: Number(row["default_price"]),
+    visitType: (row["visit_type"] as string | null) ?? null,
+    active: row["active"] as boolean,
+    createdByUserId: (row["created_by_user_id"] as string | null) ?? null,
     version: row["version"] as number,
     createdAt: row["created_at"] as string,
     updatedAt: row["updated_at"] as string,

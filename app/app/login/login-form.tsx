@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 type LoginFormProps = {
@@ -93,6 +94,11 @@ export function LoginForm({ nextPath }: LoginFormProps) {
             transition: "var(--transition-color)",
           }}
         />
+        <div className="mt-1.5 flex justify-end">
+          <Link href="/login/forgot-password" className="text-[12px]" style={{ color: "var(--text-link)" }}>
+            שכחתי סיסמה
+          </Link>
+        </div>
       </div>
 
       {error ? (

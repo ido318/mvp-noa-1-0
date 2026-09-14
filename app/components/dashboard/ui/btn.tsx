@@ -1,5 +1,6 @@
 "use client";
 import React from "react";
+import Link from "next/link";
 
 /**
  * Graphite carries the primary action. Hover is a colour step — never a
@@ -40,6 +41,8 @@ interface BtnProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: BtnVariant;
   size?: BtnSize;
   loading?: boolean;
+  /** Renders as a styled link (next/link) instead of a button — for navigation, not submission. */
+  href?: string;
 }
 
 export function Btn({
@@ -49,32 +52,53 @@ export function Btn({
   children,
   className = "",
   disabled,
+  href,
   ...props
 }: BtnProps) {
+  const classes = [
+    "inline-flex items-center justify-center whitespace-nowrap select-none",
+    "font-medium border rounded-[var(--radius-2)]",
+    "disabled:opacity-45 disabled:cursor-not-allowed",
+    variantStyles[variant],
+    sizeStyles[size],
+    className,
+  ].join(" ");
+
+  const spinner = (
+    <span
+      className="h-3 w-3 rounded-full flex-shrink-0"
+      style={{
+        border: "1.5px solid currentColor",
+        borderTopColor: "transparent",
+        animation: "gvSpin .7s linear infinite",
+      }}
+    />
+  );
+
+  if (href) {
+    const isDisabled = disabled || loading;
+    return (
+      <Link
+        href={href}
+        className={[classes, isDisabled ? "opacity-45 pointer-events-none" : ""].join(" ")}
+        style={{ transition: "var(--transition-color)" }}
+        aria-disabled={isDisabled || undefined}
+        tabIndex={isDisabled ? -1 : undefined}
+        onClick={isDisabled ? (e) => e.preventDefault() : undefined}
+      >
+        {loading ? spinner : children}
+      </Link>
+    );
+  }
+
   return (
     <button
       {...props}
       disabled={disabled || loading}
       style={{ transition: "var(--transition-color)", ...props.style }}
-      className={[
-        "inline-flex items-center justify-center whitespace-nowrap select-none",
-        "font-medium border rounded-[var(--radius-2)]",
-        "disabled:opacity-45 disabled:cursor-not-allowed",
-        variantStyles[variant],
-        sizeStyles[size],
-        className,
-      ].join(" ")}
+      className={classes}
     >
-      {loading ? (
-        <span
-          className="h-3 w-3 rounded-full flex-shrink-0"
-          style={{
-            border: "1.5px solid currentColor",
-            borderTopColor: "transparent",
-            animation: "gvSpin .7s linear infinite",
-          }}
-        />
-      ) : children}
+      {loading ? spinner : children}
     </button>
   );
 }
