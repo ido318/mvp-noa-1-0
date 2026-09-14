@@ -30,8 +30,12 @@ export class PromptSuggestionService {
    * Regression-tests the candidate prompt before publishing. Only publishes
    * when every test passed AND the response could be confidently parsed —
    * an ambiguous response leaves the suggestion pending with the raw result
-   * attached, never publishing on an unverified guess. Only category='prompt'
-   * suggestions carry a suggested_prompt at all — everything else is marked
+   * attached, never publishing on an unverified guess. Whether a suggestion
+   * gets auto-published is decided by the presence of suggested_prompt, not
+   * by category — the QA analyzer sometimes attaches a full suggested_prompt
+   * to a non-'prompt' category (e.g. 'conversation_flow') when the fix is in
+   * fact best expressed as a prompt change, and that content should still
+   * reach ElevenLabs. Suggestions with no suggested_prompt at all are marked
    * approved directly, for manual follow-through outside this pipeline.
    */
   async approve(reviewedByUserId: string, id: string): Promise<Result<PromptSuggestion>> {
@@ -44,12 +48,8 @@ export class PromptSuggestionService {
       return err(AppError.conflict(`Prompt suggestion already ${suggestion.status}`));
     }
 
-    if (suggestion.category !== "prompt") {
-      return this.repo.markApproved(id, reviewedByUserId);
-    }
-
     if (!suggestion.suggestedPrompt) {
-      return err(AppError.internal("prompt suggestion is missing suggested_prompt despite category='prompt'"));
+      return this.repo.markApproved(id, reviewedByUserId);
     }
 
     const regression = await runRegressionTests(suggestion.suggestedPrompt).catch((error: unknown) => {
@@ -92,7 +92,8 @@ export class PromptSuggestionService {
   }
 
   /**
-   * Consolidates every pending category='prompt' suggestion into one new
+   * Consolidates every pending suggestion that carries a suggested_prompt
+   * (regardless of category — see approve() for why) into one new
    * meta-suggestion (via an LLM call over the live prompt + all candidates'
    * full content), then marks the originals 'merged'. The new suggestion is
    * a normal pending suggestion afterwards — approving it runs the exact
@@ -102,9 +103,9 @@ export class PromptSuggestionService {
     const pendingResult = await this.repo.listByStatus("pending");
     if (!pendingResult.ok) return pendingResult;
 
-    const candidates = pendingResult.value.filter((s) => s.category === "prompt");
+    const candidates = pendingResult.value.filter((s) => s.suggestedPrompt);
     if (candidates.length < 2) {
-      return err(AppError.conflict("At least 2 pending 'prompt' suggestions are required to consolidate"));
+      return err(AppError.conflict("At least 2 pending suggestions with a suggested_prompt are required to consolidate"));
     }
 
     let livePrompt: string;

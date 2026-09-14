@@ -135,18 +135,36 @@ describe("PromptSuggestionService.approve", () => {
     },
   );
 
-  it("returns an internal error if a 'prompt' category suggestion is somehow missing suggested_prompt", async () => {
+  it("marks a 'prompt' category suggestion approved without publish when it has no suggested_prompt", async () => {
     const { service, repo } = buildService({
       findById: vi.fn().mockResolvedValue(ok(suggestion({ category: "prompt", suggestedPrompt: null }))),
     });
 
     const result = await service.approve(REVIEWER_ID, "sugg-1");
 
-    expect(result.ok).toBe(false);
-    if (result.ok) return;
-    expect(result.error.status).toBe(500);
-    expect(repo.markApproved).not.toHaveBeenCalled();
+    expect(result.ok).toBe(true);
+    expect(repo.markApproved).toHaveBeenCalledWith("sugg-1", REVIEWER_ID);
     expect(mockRunRegressionTests).not.toHaveBeenCalled();
+  });
+
+  it("runs regression and publishes a non-'prompt' category suggestion that carries a suggested_prompt", async () => {
+    mockRunRegressionTests.mockResolvedValue({ allPassed: true, raw: { test_results: [] } });
+    mockGetLiveAgentConfig.mockResolvedValue({ agent: { prompt: { prompt: "old prompt" } } });
+    mockPublishPrompt.mockResolvedValue({ agent_id: "agent_1" });
+
+    const { service, repo } = buildService({
+      findById: vi.fn().mockResolvedValue(
+        ok(suggestion({ category: "conversation_flow", suggestedPrompt: "פרומפט מתוקן לזרימת שיחה" })),
+      ),
+    });
+
+    const result = await service.approve(REVIEWER_ID, "sugg-1");
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.status).toBe("published");
+    expect(mockPublishPrompt).toHaveBeenCalledWith("פרומפט מתוקן לזרימת שיחה");
+    expect(repo.markPublished).toHaveBeenCalledOnce();
   });
 
   it("refuses to re-approve a suggestion that was already reviewed", async () => {
@@ -225,7 +243,7 @@ describe("PromptSuggestionService.approve", () => {
 });
 
 describe("PromptSuggestionService.consolidatePending", () => {
-  it("returns a conflict when fewer than 2 pending 'prompt' suggestions exist", async () => {
+  it("returns a conflict when fewer than 2 pending suggestions with a suggested_prompt exist", async () => {
     const { service } = buildService({
       listByStatus: vi.fn().mockResolvedValue(ok([suggestion({ category: "prompt" })])),
     });
@@ -238,12 +256,12 @@ describe("PromptSuggestionService.consolidatePending", () => {
     expect(mockConsolidatePromptSuggestions).not.toHaveBeenCalled();
   });
 
-  it("ignores non-'prompt' categories when counting candidates", async () => {
+  it("ignores suggestions with no suggested_prompt when counting candidates, regardless of category", async () => {
     const { service } = buildService({
       listByStatus: vi.fn().mockResolvedValue(
         ok([
           suggestion({ id: "s1", category: "prompt" }),
-          suggestion({ id: "s2", category: "knowledge_base" }),
+          suggestion({ id: "s2", category: "knowledge_base", suggestedPrompt: null }),
         ]),
       ),
     });
@@ -253,6 +271,24 @@ describe("PromptSuggestionService.consolidatePending", () => {
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.error.status).toBe(409);
+  });
+
+  it("includes a non-'prompt' category suggestion when it carries a suggested_prompt", async () => {
+    mockGetLiveAgentConfig.mockResolvedValue({ agent: { prompt: { prompt: "live prompt text" } } });
+    mockConsolidatePromptSuggestions.mockResolvedValue({ mergedPrompt: "merged text", summary: "summary text" });
+    const { service } = buildService({
+      listByStatus: vi.fn().mockResolvedValue(
+        ok([
+          suggestion({ id: "s1", category: "prompt" }),
+          suggestion({ id: "s2", category: "conversation_flow", suggestedPrompt: "flow fix prompt" }),
+        ]),
+      ),
+    });
+
+    const result = await service.consolidatePending();
+
+    expect(result.ok).toBe(true);
+    expect(mockConsolidatePromptSuggestions).toHaveBeenCalledOnce();
   });
 
   it("merges 2+ pending prompt suggestions into one new suggestion and marks the originals merged", async () => {
