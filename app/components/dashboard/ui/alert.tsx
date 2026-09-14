@@ -29,7 +29,7 @@ export function Alert({ tone = "info", title, children, className = "" }: AlertP
       {title && (
         <p className="text-[13px]" style={{ fontWeight: "var(--w-semibold)" }}>{title}</p>
       )}
-      <p className="text-[12.5px]" style={{ fontWeight: "var(--w-regular)" }}>{children}</p>
+      <div className="text-[12.5px]" style={{ fontWeight: "var(--w-regular)" }}>{children}</div>
     </div>
   );
 }
