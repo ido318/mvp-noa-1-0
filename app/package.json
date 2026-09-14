@@ -20,7 +20,9 @@
     "db:start": "supabase start",
     "seed:dev-user": "bash scripts/with-supabase-env.sh node scripts/seed-dev-user.mjs",
     "seed:demo": "bash scripts/with-supabase-env.sh node scripts/seed-demo-data.mjs",
-    "seed:all": "npm run seed:dev-user && npm run seed:demo"
+    "seed:all": "npm run seed:dev-user && npm run seed:demo",
+    "reset:clinic-data": "node scripts/reset-clinic-data.mjs",
+    "setup:clinic-users": "node scripts/setup-clinic-users.mjs"
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.66",
