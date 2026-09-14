@@ -29,7 +29,12 @@ supabase/.branches/
 .DS_Store
 
 # Editor
-.cursor/
+# Ignore local Cursor editor state, but keep the committed Cloud Agent
+# environment definition (.cursor/environment.json + its setup scripts).
+.cursor/*
+!.cursor/environment.json
+!.cursor/install.sh
+!.cursor/start.sh
 .idea/
 .vscode/
 *.code-workspace

@@ -1,0 +1,22 @@
+{
+  "name": "Tomer — Voice AI Agent + Vet Dashboard",
+  "user": "ubuntu",
+  "install": "bash .cursor/install.sh",
+  "start": "bash .cursor/start.sh",
+  "terminals": [
+    {
+      "name": "agent-dev",
+      "command": "cd agent && npm run dev"
+    },
+    {
+      "name": "app-dev",
+      "command": "cd app && npm run dev -- -p 3001"
+    }
+  ],
+  "ports": [
+    { "name": "agent", "port": 3000 },
+    { "name": "dashboard", "port": 3001 },
+    { "name": "supabase-api", "port": 54321 },
+    { "name": "supabase-studio", "port": 54323 }
+  ]
+}
