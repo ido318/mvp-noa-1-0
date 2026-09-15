@@ -63,6 +63,7 @@ function buildService(options: {
   const dashboardNotifications = {
     enqueueApprovalNotifications: options.enqueue,
     enqueueRejectionNotification: options.enqueue,
+    enqueueDashboardChangeNotification: options.enqueue,
   };
   const dispatcher = options.dispatch ? { dispatch: options.dispatch } : undefined;
 
@@ -128,12 +129,11 @@ describe("approve/reject SMS status", () => {
     expect(appointmentRepository.updateVersioned).toHaveBeenCalled();
   });
 
-  it("dispatches the row the DB trigger wrote when rejecting, and does not enqueue its own", async () => {
-    // appointments_notify_dashboard_change already inserts cancellation_update
-    // inside the same UPDATE. Enqueueing it again here violated the
-    // (appointment_id, type) unique key, reported the rejection as failed, and
-    // skipped the dispatch — while a valid row sat in the queue.
-    const enqueue = vi.fn();
+  it("enqueues the cancellation_update notification when rejecting, then dispatches it", async () => {
+    // The appointments_notify_dashboard_change trigger no longer writes
+    // cancellation_update itself (see 20260915120000_remove_hardcoded_dashboard_sms.sql)
+    // — rejectPendingAppointment now enqueues it explicitly, same as approve's flow.
+    const enqueue = vi.fn().mockResolvedValue(ok(undefined));
     const dispatch = vi.fn().mockResolvedValue({ dispatched: true });
     const { service } = buildService({ enqueue, dispatch });
 
@@ -142,13 +142,20 @@ describe("approve/reject SMS status", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.smsStatus).toBe("sent");
-    expect(enqueue).not.toHaveBeenCalled();
+    expect(enqueue).toHaveBeenCalledWith(
+      expect.objectContaining({
+        templateKey: "cancellation_update",
+        phone: params.phone,
+        customerName: params.customerName,
+        petName: params.petName,
+      }),
+    );
     expect(dispatch).toHaveBeenCalledWith({ appointmentId: "appt-1" });
   });
 
   it("reports the rejection SMS as queued when the agent could not be reached", async () => {
     const { service } = buildService({
-      enqueue: vi.fn(),
+      enqueue: vi.fn().mockResolvedValue(ok(undefined)),
       dispatch: vi.fn().mockResolvedValue({ dispatched: false, reason: "offline" }),
     });
 
