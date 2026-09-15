@@ -21,6 +21,7 @@ export const DEFAULT_CLINIC_SETTINGS: ClinicSettings = {
     whatsapp: "+972 54-958-1991",
     email: "contact@getavett.com",
   },
+  smsTemplates: {},
 };
 
 export function withClinicSettingsDefaults(
@@ -35,5 +36,6 @@ export function withClinicSettingsDefaults(
       ...DEFAULT_CLINIC_SETTINGS.contact,
       ...stored?.contact,
     },
+    smsTemplates: stored?.smsTemplates ?? DEFAULT_CLINIC_SETTINGS.smsTemplates,
   };
 }
