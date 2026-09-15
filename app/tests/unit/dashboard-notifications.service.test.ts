@@ -96,4 +96,148 @@ describe("DashboardNotificationsService — clinic template overrides", () => {
     const [row] = insert.mock.calls[0] as [{ body: string }];
     expect(row.body).toContain("בשל אילוץ רפואי");
   });
+
+  it("enqueueApprovalNotifications uses the clinic's booking_confirmation override when present", async () => {
+    const single = vi.fn().mockResolvedValue({
+      data: { settings: { smsTemplates: { booking_confirmation: "תור אושר! {{petName}}" } } },
+      error: null,
+    });
+    const insert = vi.fn().mockResolvedValue({ error: null });
+    const client = {
+      from: vi.fn((table: string) =>
+        table === "clinics"
+          ? { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), single }
+          : { insert },
+      ),
+    };
+    const service = new DashboardNotificationsService(client as never);
+
+    await service.enqueueApprovalNotifications({
+      appointmentId: "appt-1", scheduledAt: "2027-01-15T10:00:00.000Z", durationMinutes: 30,
+      visitType: "checkup", clinicId: "clinic-1", customerId: "cust-1", phone: "+972500000000",
+      customerName: "דנה", petName: "מיקה",
+    });
+
+    const [rows] = insert.mock.calls[0] as [{ type: string; body: string }[]];
+    const booking = rows.find((r) => r.type === "booking_confirmation");
+    expect(booking!.body).toBe("תור אושר! מיקה");
+  });
+
+  it("enqueueApprovalNotifications falls back to default wording when there's no override", async () => {
+    const single = vi.fn().mockResolvedValue({ data: { settings: { smsTemplates: {} } }, error: null });
+    const insert = vi.fn().mockResolvedValue({ error: null });
+    const client = {
+      from: vi.fn((table: string) =>
+        table === "clinics"
+          ? { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), single }
+          : { insert },
+      ),
+    };
+    const service = new DashboardNotificationsService(client as never);
+
+    await service.enqueueApprovalNotifications({
+      appointmentId: "appt-1", scheduledAt: "2027-01-15T10:00:00.000Z", durationMinutes: 30,
+      visitType: "checkup", clinicId: "clinic-1", customerId: "cust-1", phone: "+972500000000",
+      customerName: "דנה", petName: "מיקה",
+    });
+
+    const [rows] = insert.mock.calls[0] as [{ type: string; body: string }[]];
+    const booking = rows.find((r) => r.type === "booking_confirmation");
+    expect(booking!.body).toContain("דנה");
+    expect(booking!.body).not.toContain("{{");
+  });
+
+  it("enqueueRejectionNotification uses the clinic's cancellation_update override when present", async () => {
+    const single = vi.fn().mockResolvedValue({
+      data: { settings: { smsTemplates: { cancellation_update: "בוטל תור {{petName}} מ-{{oldDate}}" } } },
+      error: null,
+    });
+    const insert = vi.fn().mockResolvedValue({ error: null });
+    const client = {
+      from: vi.fn((table: string) =>
+        table === "clinics"
+          ? { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), single }
+          : { insert },
+      ),
+    };
+    const service = new DashboardNotificationsService(client as never);
+
+    await service.enqueueRejectionNotification({
+      appointmentId: "appt-1", scheduledAt: "2027-01-15T10:00:00.000Z",
+      clinicId: "clinic-1", customerId: "cust-1", phone: "+972500000000",
+      customerName: "דנה", petName: "מיקה",
+    });
+
+    const [row] = insert.mock.calls[0] as [{ body: string }];
+    expect(row.body).toContain("בוטל תור מיקה מ-");
+    expect(row.body).not.toContain("{{");
+  });
+
+  it("enqueueRejectionNotification falls back to default wording when there's no override", async () => {
+    const single = vi.fn().mockResolvedValue({ data: { settings: { smsTemplates: {} } }, error: null });
+    const insert = vi.fn().mockResolvedValue({ error: null });
+    const client = {
+      from: vi.fn((table: string) =>
+        table === "clinics"
+          ? { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), single }
+          : { insert },
+      ),
+    };
+    const service = new DashboardNotificationsService(client as never);
+
+    await service.enqueueRejectionNotification({
+      appointmentId: "appt-1", scheduledAt: "2027-01-15T10:00:00.000Z",
+      clinicId: "clinic-1", customerId: "cust-1", phone: "+972500000000",
+      customerName: "דנה", petName: "מיקה",
+    });
+
+    const [row] = insert.mock.calls[0] as [{ body: string }];
+    expect(row.body).toContain("בשל אילוץ רפואי");
+  });
+
+  it("enqueueVaccinationReminder uses the clinic's vaccination_reminder override when present", async () => {
+    const single = vi.fn().mockResolvedValue({
+      data: { settings: { smsTemplates: { vaccination_reminder: "תזכורת: {{vaccineName}} ל{{petName}}" } } },
+      error: null,
+    });
+    const upsert = vi.fn().mockResolvedValue({ error: null });
+    const client = {
+      from: vi.fn((table: string) =>
+        table === "clinics"
+          ? { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), single }
+          : { upsert },
+      ),
+    };
+    const service = new DashboardNotificationsService(client as never);
+
+    await service.enqueueVaccinationReminder({
+      vaccinationId: "vac-1", clinicId: "clinic-1", customerId: "cust-1", phone: "+972500000000",
+      customerName: "דנה", petName: "מיקה", vaccineName: "כלבת", nextDueAt: "2027-01-20",
+    });
+
+    const [row] = upsert.mock.calls[0] as [{ body: string }];
+    expect(row.body).toBe("תזכורת: כלבת למיקה");
+  });
+
+  it("enqueueVaccinationReminder falls back to default wording when there's no override", async () => {
+    const single = vi.fn().mockResolvedValue({ data: { settings: { smsTemplates: {} } }, error: null });
+    const upsert = vi.fn().mockResolvedValue({ error: null });
+    const client = {
+      from: vi.fn((table: string) =>
+        table === "clinics"
+          ? { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), single }
+          : { upsert },
+      ),
+    };
+    const service = new DashboardNotificationsService(client as never);
+
+    await service.enqueueVaccinationReminder({
+      vaccinationId: "vac-1", clinicId: "clinic-1", customerId: "cust-1", phone: "+972500000000",
+      customerName: "דנה", petName: "מיקה", vaccineName: "כלבת", nextDueAt: "2027-01-20",
+    });
+
+    const [row] = upsert.mock.calls[0] as [{ body: string }];
+    expect(row.body).not.toContain("{{");
+    expect(row.body).toContain("מיקה");
+  });
 });

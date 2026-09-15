@@ -14,7 +14,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { AppError, err, ok, type Result } from "@/lib/errors/app-error";
 import {
-  smsTemplates,
   resolveSmsTemplate,
   formatAppointmentDateTime,
   israelDateIso,
@@ -104,6 +103,7 @@ export class DashboardNotificationsService {
 
   /** Enqueue booking_confirmation + morning_reminder + post_visit_followup for an approved appointment. */
   async enqueueApprovalNotifications(p: ApproveNotificationParams): Promise<Result<void>> {
+    const overrides = await this.getSmsTemplateOverrides(p.clinicId);
     const now = new Date();
     const { dayName, date, time } = formatAppointmentDateTime(p.scheduledAt);
     const isHome = p.visitType === "home_visit";
@@ -123,7 +123,7 @@ export class DashboardNotificationsService {
       {
         ...shared,
         type:          "booking_confirmation",
-        body:          smsTemplates.booking_confirmation({ customerName: p.customerName, petName: p.petName, dayName, date, time, location, visitType: visitTypeLabel, price }),
+        body:          resolveSmsTemplate("booking_confirmation", overrides.booking_confirmation, { customerName: p.customerName, petName: p.petName, dayName, date, time, location, visitType: visitTypeLabel, price }),
         scheduled_for: now.toISOString(),
       },
     ];
@@ -134,7 +134,7 @@ export class DashboardNotificationsService {
       rows.push({
         ...shared,
         type:          "morning_reminder",
-        body:          smsTemplates.morning_reminder({ customerName: p.customerName, petName: p.petName, time, location, visitType: visitTypeLabel }),
+        body:          resolveSmsTemplate("morning_reminder", overrides.morning_reminder, { customerName: p.customerName, petName: p.petName, time, location, visitType: visitTypeLabel }),
         scheduled_for: morning.toISOString(),
       });
     }
@@ -143,7 +143,7 @@ export class DashboardNotificationsService {
     rows.push({
       ...shared,
       type:          "post_visit_followup",
-      body:          smsTemplates.post_visit_followup({ customerName: p.customerName, petName: p.petName }),
+      body:          resolveSmsTemplate("post_visit_followup", overrides.post_visit_followup, { customerName: p.customerName, petName: p.petName }),
       scheduled_for: followupTime.toISOString(),
     });
 
@@ -154,6 +154,7 @@ export class DashboardNotificationsService {
 
   /** Enqueue cancellation_update for a rejected pending_approval appointment. */
   async enqueueRejectionNotification(p: RejectNotificationParams): Promise<Result<void>> {
+    const overrides = await this.getSmsTemplateOverrides(p.clinicId);
     const { date } = formatAppointmentDateTime(p.scheduledAt);
 
     const { error } = await this.client.from("notifications_log").insert({
@@ -163,7 +164,7 @@ export class DashboardNotificationsService {
       phone:          p.phone,
       status:         "pending",
       type:           "cancellation_update",
-      body:           smsTemplates.cancellation_update({ customerName: p.customerName, petName: p.petName, oldDate: date }),
+      body:           resolveSmsTemplate("cancellation_update", overrides.cancellation_update, { customerName: p.customerName, petName: p.petName, oldDate: date }),
       scheduled_for:  new Date().toISOString(),
     });
 
@@ -175,13 +176,20 @@ export class DashboardNotificationsService {
    * error) if the clinic has no overrides or the row can't be read — the
    * caller always has the hardcoded default to fall back to. */
   async getSmsTemplateOverrides(clinicId: string): Promise<Partial<Record<SmsTemplateKey, string>>> {
-    const { data, error } = await this.client
-      .from("clinics")
-      .select("settings")
-      .eq("id", clinicId)
-      .single();
-    if (error || !data) return {};
-    return (data.settings?.smsTemplates as Partial<Record<SmsTemplateKey, string>> | undefined) ?? {};
+    try {
+      const { data, error } = await this.client
+        .from("clinics")
+        .select("settings")
+        .eq("id", clinicId)
+        .single();
+      if (error || !data) return {};
+      return (data.settings?.smsTemplates as Partial<Record<SmsTemplateKey, string>> | undefined) ?? {};
+    } catch {
+      // A test double (or any client) that doesn't implement the full
+      // clinics-select chain shouldn't crash callers — no overrides is a
+      // safe, expected fallback here, same as a Supabase error above.
+      return {};
+    }
   }
 
   /**
@@ -218,6 +226,7 @@ export class DashboardNotificationsService {
   }
 
   async enqueueVaccinationReminder(p: VaccinationReminderParams): Promise<Result<void>> {
+    const overrides = await this.getSmsTemplateOverrides(p.clinicId);
     const { error } = await this.client.from("notifications_log").upsert(
       {
         clinic_id: p.clinicId,
@@ -226,7 +235,7 @@ export class DashboardNotificationsService {
         phone: p.phone,
         status: "pending",
         type: "vaccination_reminder",
-        body: smsTemplates.vaccination_reminder({ customerName: p.customerName, petName: p.petName, vaccineName: p.vaccineName }),
+        body: resolveSmsTemplate("vaccination_reminder", overrides.vaccination_reminder, { customerName: p.customerName, petName: p.petName, vaccineName: p.vaccineName }),
         scheduled_for: `${p.nextDueAt}T06:00:00.000Z`,
       },
       { onConflict: "vaccination_id,type", ignoreDuplicates: true },
