@@ -64,6 +64,10 @@ export class ClinicSettingsService {
       businessHours: input.businessHours ?? current.businessHours,
       visitPrices: input.visitPrices ?? current.visitPrices,
       contact: { ...current.contact, ...input.contact },
+      // Full replace, not a per-key merge — matches how businessHours/visitPrices
+      // already behave (a whole new array, not merged item-by-item). The settings
+      // UI always sends the complete smsTemplates object it wants to persist.
+      smsTemplates: input.smsTemplates ?? current.smsTemplates,
     });
 
     const updated = await this.clinicRepository.updateSettings(clinicId, merged);
