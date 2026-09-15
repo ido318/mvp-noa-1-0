@@ -18,7 +18,9 @@ import {
 const mockUpsert = vi.fn().mockResolvedValue({ error: null });
 const mockUpdate = vi.fn().mockResolvedValue({ error: null });
 const mockEq = vi.fn();
+const mockIn = vi.fn().mockResolvedValue({ error: null });
 const mockFrom = vi.fn();
+const mockSingle = vi.fn().mockResolvedValue({ data: { settings: { smsTemplates: {} } }, error: null });
 
 vi.mock("../../../src/lib/supabase.js", () => ({
   getSupabase: () => ({
@@ -29,11 +31,21 @@ vi.mock("../../../src/lib/supabase.js", () => ({
 beforeEach(() => {
   vi.clearAllMocks();
 
-  // Chain builder: from(...).upsert() or from(...).update().eq().eq().eq()
-  mockEq.mockReturnValue({ eq: mockEq, error: null });
+  // Chain builder: from(...).upsert() or from(...).update().eq().eq().in()
+  mockIn.mockResolvedValue({ error: null });
+  mockEq.mockReturnValue({ eq: mockEq, in: mockIn, error: null });
   mockUpdate.mockReturnValue({ eq: mockEq });
   mockUpsert.mockResolvedValue({ error: null });
-  mockFrom.mockReturnValue({ upsert: mockUpsert, update: mockUpdate });
+  mockSingle.mockResolvedValue({ data: { settings: { smsTemplates: {} } }, error: null });
+
+  // Branch by table: "clinics" is read for SMS template overrides via
+  // .select().eq().single(); every other table keeps the existing
+  // upsert/update chain used by notifications_log.
+  mockFrom.mockImplementation((table: string) =>
+    table === "clinics"
+      ? { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), single: mockSingle }
+      : { upsert: mockUpsert, update: mockUpdate },
+  );
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -268,7 +280,11 @@ describe("enqueueRescheduleNotification", () => {
     // cancelFutureNotifications chain
     const mockChain = { eq: vi.fn().mockReturnThis() };
     mockChain.eq.mockReturnValueOnce(mockChain).mockReturnValueOnce(mockChain).mockReturnValueOnce({ error: null });
-    mockFrom.mockReturnValue({ update: vi.fn().mockReturnValue(mockChain), upsert: mockUpsert });
+    mockFrom.mockImplementation((table: string) =>
+      table === "clinics"
+        ? { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), single: mockSingle }
+        : { update: vi.fn().mockReturnValue(mockChain), upsert: mockUpsert },
+    );
 
     await enqueueRescheduleNotification({
       appointmentId:   "appt-1",
@@ -300,7 +316,11 @@ describe("enqueueClientCancellationConfirmation", () => {
     // cancelFutureNotifications chain (called first, internally)
     const mockChain: Record<string, unknown> = { in: vi.fn().mockResolvedValue({ error: null }) };
     mockChain.eq = vi.fn().mockReturnValue(mockChain);
-    mockFrom.mockReturnValue({ update: vi.fn().mockReturnValue(mockChain), upsert: mockUpsert });
+    mockFrom.mockImplementation((table: string) =>
+      table === "clinics"
+        ? { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), single: mockSingle }
+        : { update: vi.fn().mockReturnValue(mockChain), upsert: mockUpsert },
+    );
 
     await enqueueClientCancellationConfirmation({
       appointmentId: "appt-1",
@@ -318,5 +338,93 @@ describe("enqueueClientCancellationConfirmation", () => {
     // Uses client-requested wording, NOT the "אילוץ רפואי" dashboard wording
     expect(call.body).toContain("בוטל לבקשתכם");
     expect(call.body).not.toContain("אילוץ רפואי");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Clinic SMS template overrides — resolveSmsTemplate honors clinics.settings.smsTemplates
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("clinic SMS template overrides", () => {
+  it("scheduleBookingNotifications uses the clinic's booking_confirmation override when present", async () => {
+    mockSingle.mockResolvedValue({
+      data: { settings: { smsTemplates: { booking_confirmation: "אישרנו! {{petName}}" } } },
+      error: null,
+    });
+
+    await scheduleBookingNotifications({
+      appointmentId:   "appt-1",
+      scheduledAt:     "2027-01-15T10:00:00.000Z",
+      durationMinutes: 30,
+      visitType:       "checkup",
+      clinicId:        "clinic-1",
+      customerId:      "cust-1",
+      phone:           "+972500000000",
+      customerName:    "דנה",
+      petName:         "מיקה",
+    });
+
+    const bookingCall = mockUpsert.mock.calls.find(([row]) => (row as { type: string }).type === "booking_confirmation");
+    expect((bookingCall![0] as { body: string }).body).toBe("אישרנו! מיקה");
+  });
+
+  it("scheduleBookingNotifications falls back to default wording when the clinic has no override", async () => {
+    await scheduleBookingNotifications({
+      appointmentId:   "appt-1",
+      scheduledAt:     "2027-01-15T10:00:00.000Z",
+      durationMinutes: 30,
+      visitType:       "checkup",
+      clinicId:        "clinic-1",
+      customerId:      "cust-1",
+      phone:           "+972500000000",
+      customerName:    "דנה",
+      petName:         "מיקה",
+    });
+
+    const bookingCall = mockUpsert.mock.calls.find(([row]) => (row as { type: string }).type === "booking_confirmation");
+    expect((bookingCall![0] as { body: string }).body).toContain("נקבע בהצלחה"); // default wording
+  });
+
+  it("enqueueRescheduleNotification uses the clinic's reschedule_update override when present", async () => {
+    mockSingle.mockResolvedValue({
+      data: { settings: { smsTemplates: { reschedule_update: "הועבר ל-{{newDate}}" } } },
+      error: null,
+    });
+
+    await enqueueRescheduleNotification({
+      appointmentId:    "appt-1",
+      oldScheduledAt:   "2027-01-15T10:00:00.000Z",
+      newScheduledAt:   "2027-01-20T12:00:00.000Z",
+      durationMinutes:  30,
+      visitType:        "home_visit",
+      clinicId:         "clinic-1",
+      customerId:       "cust-1",
+      phone:            "+972500000000",
+      customerName:     "דנה",
+      petName:          "מיקה",
+    });
+
+    const [row] = mockUpsert.mock.calls[0] as [{ body: string }];
+    expect(row.body).toContain("הועבר ל-");
+  });
+
+  it("enqueueClientCancellationConfirmation uses the clinic's override when present", async () => {
+    mockSingle.mockResolvedValue({
+      data: { settings: { smsTemplates: { client_cancellation_confirmation: "בוטל, {{customerName}}" } } },
+      error: null,
+    });
+
+    await enqueueClientCancellationConfirmation({
+      appointmentId: "appt-1",
+      scheduledAt:   "2027-01-15T10:00:00.000Z",
+      clinicId:      "clinic-1",
+      customerId:    "cust-1",
+      phone:         "+972500000000",
+      customerName:  "דנה",
+      petName:       "מיקה",
+    });
+
+    const call = mockUpsert.mock.calls.find(([row]) => (row as { type: string }).type === "client_cancellation_confirmation");
+    expect((call![0] as { body: string }).body).toBe("בוטל, דנה");
   });
 });
