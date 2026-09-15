@@ -54,7 +54,11 @@ export class AppointmentRepository {
   async findById(appointmentId: string): Promise<Result<Appointment | null>> {
     const { data, error } = await this.client
       .from("appointments")
-      .select("*")
+      .select(`
+        *,
+        customer:customers!appointments_customer_clinic_fk(full_name, phone),
+        pet:pets!appointments_pet_clinic_fk(name, species)
+      `)
       .eq("id", appointmentId)
       .is("deleted_at", null)
       .maybeSingle();
@@ -97,7 +101,11 @@ export class AppointmentRepository {
       .eq("id", appointmentId)
       .eq("version", payload.expectedVersion)
       .is("deleted_at", null)
-      .select("*")
+      .select(`
+        *,
+        customer:customers!appointments_customer_clinic_fk(full_name, phone),
+        pet:pets!appointments_pet_clinic_fk(name, species)
+      `)
       .single();
 
     if (error) {
