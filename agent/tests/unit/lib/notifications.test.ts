@@ -385,6 +385,102 @@ describe("clinic SMS template overrides", () => {
     expect((bookingCall![0] as { body: string }).body).toContain("נקבע בהצלחה"); // default wording
   });
 
+  it("scheduleBookingNotifications uses the clinic's morning_reminder override when present", async () => {
+    mockSingle.mockResolvedValue({
+      data: { settings: { smsTemplates: { morning_reminder: "תזכורת בוקר: {{time}} ב-{{location}}" } } },
+      error: null,
+    });
+
+    // Far-future appointment so morning_reminder (08:00 Israel day-of) is
+    // still ahead of "now" regardless of when the test runs.
+    await scheduleBookingNotifications({
+      appointmentId:   "appt-1",
+      scheduledAt:     "2027-01-15T10:00:00.000Z",
+      durationMinutes: 30,
+      visitType:       "checkup",
+      clinicId:        "clinic-1",
+      customerId:      "cust-1",
+      phone:           "+972500000000",
+      customerName:    "דנה",
+      petName:         "מיקה",
+    });
+
+    const call = mockUpsert.mock.calls.find(([row]) => (row as { type: string }).type === "morning_reminder");
+    expect(call).toBeDefined();
+    expect((call![0] as { body: string }).body).toContain("תזכורת בוקר:");
+    expect((call![0] as { body: string }).body).not.toContain("{{time}}");
+  });
+
+  it("scheduleBookingNotifications uses the clinic's arrival_reminder override when present", async () => {
+    mockSingle.mockResolvedValue({
+      data: { settings: { smsTemplates: { arrival_reminder: "מגיעים בעוד שעתיים ל-{{location}}" } } },
+      error: null,
+    });
+
+    await scheduleBookingNotifications({
+      appointmentId:   "appt-1",
+      scheduledAt:     "2027-01-15T10:00:00.000Z",
+      durationMinutes: 30,
+      visitType:       "checkup",
+      clinicId:        "clinic-1",
+      customerId:      "cust-1",
+      phone:           "+972500000000",
+      customerName:    "דנה",
+      petName:         "מיקה",
+    });
+
+    const call = mockUpsert.mock.calls.find(([row]) => (row as { type: string }).type === "arrival_reminder");
+    expect(call).toBeDefined();
+    expect((call![0] as { body: string }).body).toContain("מגיעים בעוד שעתיים ל-");
+    expect((call![0] as { body: string }).body).not.toContain("{{location}}");
+  });
+
+  it("scheduleBookingNotifications uses the clinic's post_visit_followup override when present", async () => {
+    mockSingle.mockResolvedValue({
+      data: { settings: { smsTemplates: { post_visit_followup: "מקווים ש{{petName}} מרגיש טוב, {{customerName}}" } } },
+      error: null,
+    });
+
+    await scheduleBookingNotifications({
+      appointmentId:   "appt-1",
+      scheduledAt:     "2027-01-15T10:00:00.000Z",
+      durationMinutes: 30,
+      visitType:       "checkup",
+      clinicId:        "clinic-1",
+      customerId:      "cust-1",
+      phone:           "+972500000000",
+      customerName:    "דנה",
+      petName:         "מיקה",
+    });
+
+    const call = mockUpsert.mock.calls.find(([row]) => (row as { type: string }).type === "post_visit_followup");
+    expect(call).toBeDefined();
+    expect((call![0] as { body: string }).body).toBe("מקווים שמיקה מרגיש טוב, דנה");
+  });
+
+  it("scheduleBookingNotifications falls back to default wording when the clinics lookup errors", async () => {
+    // Simulate a Supabase error reading clinics.settings — getSmsTemplateOverrides
+    // must swallow it and return {}, not throw or block the booking flow.
+    mockSingle.mockResolvedValue({ data: null, error: { message: "not found" } });
+
+    await scheduleBookingNotifications({
+      appointmentId:   "appt-1",
+      scheduledAt:     "2027-01-15T10:00:00.000Z",
+      durationMinutes: 30,
+      visitType:       "checkup",
+      clinicId:        "clinic-1",
+      customerId:      "cust-1",
+      phone:           "+972500000000",
+      customerName:    "דנה",
+      petName:         "מיקה",
+    });
+
+    // All 4 rows still enqueued, with default (non-override) wording.
+    expect(mockUpsert).toHaveBeenCalledTimes(4);
+    const bookingCall = mockUpsert.mock.calls.find(([row]) => (row as { type: string }).type === "booking_confirmation");
+    expect((bookingCall![0] as { body: string }).body).toContain("נקבע בהצלחה");
+  });
+
   it("enqueueRescheduleNotification uses the clinic's reschedule_update override when present", async () => {
     mockSingle.mockResolvedValue({
       data: { settings: { smsTemplates: { reschedule_update: "הועבר ל-{{newDate}}" } } },
