@@ -176,20 +176,13 @@ export class DashboardNotificationsService {
    * error) if the clinic has no overrides or the row can't be read — the
    * caller always has the hardcoded default to fall back to. */
   async getSmsTemplateOverrides(clinicId: string): Promise<Partial<Record<SmsTemplateKey, string>>> {
-    try {
-      const { data, error } = await this.client
-        .from("clinics")
-        .select("settings")
-        .eq("id", clinicId)
-        .single();
-      if (error || !data) return {};
-      return (data.settings?.smsTemplates as Partial<Record<SmsTemplateKey, string>> | undefined) ?? {};
-    } catch {
-      // A test double (or any client) that doesn't implement the full
-      // clinics-select chain shouldn't crash callers — no overrides is a
-      // safe, expected fallback here, same as a Supabase error above.
-      return {};
-    }
+    const { data, error } = await this.client
+      .from("clinics")
+      .select("settings")
+      .eq("id", clinicId)
+      .single();
+    if (error || !data) return {};
+    return (data.settings?.smsTemplates as Partial<Record<SmsTemplateKey, string>> | undefined) ?? {};
   }
 
   /**
