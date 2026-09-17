@@ -1,3 +1,5 @@
+import type { SmsTemplateKey } from "@tomer/shared";
+
 export type ClinicRole = "owner" | "admin" | "staff" | "veterinarian";
 
 export type ClinicBusinessHourEntry = { day: string; hours: string };
@@ -8,6 +10,7 @@ export type ClinicSettings = {
   businessHours: ClinicBusinessHourEntry[];
   visitPrices: ClinicVisitPriceEntry[];
   contact: ClinicContactInfo;
+  smsTemplates: Partial<Record<SmsTemplateKey, string>>;
 };
 
 export type Clinic = {

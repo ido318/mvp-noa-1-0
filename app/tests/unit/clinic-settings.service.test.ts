@@ -98,4 +98,45 @@ describe("ClinicSettingsService", () => {
 
     expect(result.ok).toBe(false);
   });
+
+  it("replaces smsTemplates wholesale (not a per-key merge) when input.smsTemplates is given", async () => {
+    const repository = makeRepository(
+      makeClinic({
+        settings: {
+          ...DEFAULT_CLINIC_SETTINGS,
+          smsTemplates: { booking_confirmation: "old text {{customerName}}" },
+        },
+      }),
+    );
+    const service = new ClinicSettingsService(repository, makeAuditService());
+
+    const result = await service.updateSettings(ownerActor, {
+      smsTemplates: { cancellation_update: "new text {{oldDate}}" },
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.smsTemplates).toEqual({ cancellation_update: "new text {{oldDate}}" });
+  });
+
+  it("keeps the existing smsTemplates unchanged when input.smsTemplates is omitted", async () => {
+    const existing = { booking_confirmation: "old text {{customerName}}" };
+    const repository = makeRepository(
+      makeClinic({
+        settings: {
+          ...DEFAULT_CLINIC_SETTINGS,
+          smsTemplates: existing,
+        },
+      }),
+    );
+    const service = new ClinicSettingsService(repository, makeAuditService());
+
+    const result = await service.updateSettings(ownerActor, {
+      contact: { address: "כתובת חדשה", whatsapp: "", email: "" },
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.smsTemplates).toEqual(existing);
+  });
 });

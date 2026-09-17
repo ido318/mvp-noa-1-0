@@ -12,7 +12,14 @@ function frozenVaccinationReminderBody(customerName: string, petName: string, va
 
 function buildClient() {
   const upsert = vi.fn().mockResolvedValue({ error: null });
-  const client = { from: vi.fn().mockReturnValue({ upsert }) };
+  const single = vi.fn().mockResolvedValue({ data: { settings: { smsTemplates: {} } }, error: null });
+  const client = {
+    from: vi.fn((table: string) =>
+      table === "clinics"
+        ? { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), single }
+        : { upsert },
+    ),
+  };
   return { client, upsert };
 }
 

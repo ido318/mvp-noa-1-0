@@ -1,3 +1,4 @@
+import { CLINIC_LOCATION, HOME_VISIT_LOCATION } from "@tomer/shared";
 import { AppError, err, ok, type Result } from "@/lib/errors/app-error";
 import { isExpectedDuration, toIsraelLocalIso } from "@/lib/appointment-rules";
 import type { AppointmentRepository } from "@/lib/repositories/appointment.repository";
@@ -234,6 +235,24 @@ export class AppointmentService {
       afterPayload: updated.value,
     });
 
+    if (updated.value.scheduledAt !== existing.value.scheduledAt) {
+      const enqueueResult = await this.dashboardNotifications?.enqueueDashboardChangeNotification({
+        clinicId: updated.value.clinicId,
+        customerId: updated.value.customerId,
+        appointmentId: updated.value.id,
+        phone: updated.value.customerPhone ?? "",
+        customerName: updated.value.customerName ?? "",
+        petName: updated.value.petName ?? "",
+        templateKey: "reschedule_update",
+        oldScheduledAt: existing.value.scheduledAt,
+        newScheduledAt: updated.value.scheduledAt,
+        location: updated.value.appointmentType === "home_visit" ? HOME_VISIT_LOCATION : CLINIC_LOCATION,
+      });
+      if (enqueueResult && !enqueueResult.ok) {
+        console.error("[appointment.updateAppointment] reschedule SMS enqueue failed", enqueueResult.error);
+      }
+    }
+
     return updated;
   }
 
@@ -291,6 +310,23 @@ export class AppointmentService {
       beforePayload: existing.value,
       afterPayload: updated.value,
     });
+
+    if (input.status === "cancelled") {
+      const enqueueResult = await this.dashboardNotifications?.enqueueDashboardChangeNotification({
+        clinicId: updated.value.clinicId,
+        customerId: updated.value.customerId,
+        appointmentId: updated.value.id,
+        phone: updated.value.customerPhone ?? "",
+        customerName: updated.value.customerName ?? "",
+        petName: updated.value.petName ?? "",
+        templateKey: "cancellation_update",
+        oldScheduledAt: updated.value.scheduledAt,
+        location: updated.value.appointmentType === "home_visit" ? HOME_VISIT_LOCATION : CLINIC_LOCATION,
+      });
+      if (enqueueResult && !enqueueResult.ok) {
+        console.error("[appointment.changeStatus] cancellation SMS enqueue failed", enqueueResult.error);
+      }
+    }
 
     return updated;
   }
@@ -538,13 +574,24 @@ export class AppointmentService {
     });
     if (!updated.ok) return updated;
 
-    // No enqueue here: the appointments_notify_dashboard_change trigger already
-    // wrote cancellation_update inside the UPDATE above (it fires on any
-    // changed_via='dashboard' transition into cancelled, and upserts on the
-    // (appointment_id, type) unique key). Inserting it again from here hit that
-    // constraint, reported the rejection as failed, and skipped the dispatch —
-    // while a perfectly good row sat in the queue. The row exists by now, so
-    // there is only one thing left to do with it.
+    // The appointments_notify_dashboard_change trigger no longer creates the
+    // cancellation_update row itself (see 20260915120000_remove_hardcoded_dashboard_sms.sql)
+    // — this now enqueues it explicitly, same as changeStatus()'s cancelled branch.
+    const enqueueResult = await this.dashboardNotifications?.enqueueDashboardChangeNotification({
+      clinicId: updated.value.clinicId,
+      customerId: updated.value.customerId,
+      appointmentId: updated.value.id,
+      phone: params.phone,
+      customerName: params.customerName,
+      petName: params.petName,
+      templateKey: "cancellation_update",
+      oldScheduledAt: updated.value.scheduledAt,
+      location: updated.value.appointmentType === "home_visit" ? HOME_VISIT_LOCATION : CLINIC_LOCATION,
+    });
+    if (enqueueResult && !enqueueResult.ok) {
+      console.error("[appointment.rejectPendingAppointment] SMS enqueue failed", enqueueResult.error);
+    }
+
     const dispatched = await this.notificationDispatcher?.dispatch({ appointmentId });
     const smsDispatched = dispatched?.dispatched ?? false;
 
