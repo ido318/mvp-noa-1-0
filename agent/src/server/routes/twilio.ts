@@ -48,22 +48,6 @@ twilioRoutes.post("/twilio/voice", twilioValidate, async (c) => {
 
   logger.info({ caller: maskPhone(callerPhone), callSid }, "twilio: incoming call");
 
-  let signed_url: string;
-  try {
-    const result = await getElevenLabs().conversationalAi.conversations.getSignedUrl({
-      agentId: env.ELEVENLABS_AGENT_ID,
-    });
-    signed_url = result.signedUrl;
-  } catch (err) {
-    logger.error({ err }, "twilio: failed to get ElevenLabs signed URL");
-    return c.text(
-      `<?xml version="1.0" encoding="UTF-8"?>
-<Response><Say language="he-IL">מצטערים, אירעה שגיאה. אנא נסה שוב מאוחר יותר.</Say></Response>`,
-      500,
-      { "Content-Type": "text/xml" },
-    );
-  }
-
   try {
     await saveIncomingVoiceCall({
       twilioCallSid: callSid,
@@ -76,6 +60,44 @@ twilioRoutes.post("/twilio/voice", twilioValidate, async (c) => {
     });
   } catch (err) {
     logger.error({ err, callSid }, "twilio: failed to create live voice call record");
+  }
+
+  // Play the disclaimer first, then redirect to a second webhook that fetches
+  // a FRESH ElevenLabs signed URL right before connecting the media stream.
+  // (Generating the signed URL up front and only using it after the
+  // disclaimer finishes playing was causing it to expire.)
+  const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say language="he-IL" voice="Google.he-IL-Wavenet-A">שיחתך מיד תענה. שימו לב כי השיחות מוקלטות לצורך בקרה ואיכות השירות.</Say>
+  <Redirect method="POST">/twilio/voice-connect</Redirect>
+</Response>`;
+
+  logger.info({ caller: maskPhone(callerPhone) }, "twilio: returning disclaimer + redirect");
+  return c.text(twiml, 200, { "Content-Type": "text/xml" });
+});
+
+twilioRoutes.post("/twilio/voice-connect", twilioValidate, async (c) => {
+  const env = getEnv();
+  const body = await c.req.parseBody();
+  const callerPhone =
+    typeof body["From"] === "string" ? body["From"] : "unknown";
+  const callSid =
+    typeof body["CallSid"] === "string" ? body["CallSid"] : `unknown-${Date.now()}`;
+
+  let signed_url: string;
+  try {
+    const result = await getElevenLabs().conversationalAi.conversations.getSignedUrl({
+      agentId: env.ELEVENLABS_AGENT_ID,
+    });
+    signed_url = result.signedUrl;
+  } catch (err) {
+    logger.error({ err }, "twilio: failed to get ElevenLabs signed URL");
+    return c.text(
+      `<?xml version="1.0" encoding="UTF-8"?>
+<Response><Say language="he-IL" voice="Google.he-IL-Wavenet-A">מצטערים, אירעה שגיאה. אנא נסה שוב מאוחר יותר.</Say></Response>`,
+      500,
+      { "Content-Type": "text/xml" },
+    );
   }
 
   const twiml = `<?xml version="1.0" encoding="UTF-8"?>
