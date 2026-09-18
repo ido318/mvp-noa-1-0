@@ -42,7 +42,17 @@ function makeApp() {
 describe("appointment tools", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(checkAvailability).mockResolvedValue("חלונות פנויים: 09:10, 12:20");
+    // The real format, not "חלונות פנויים: 09:10, 12:20". That invented
+    // shorthand is why the urgent-callback regex bug survived: the code parsed
+    // a time out of this string, and the mock was the only place the parse
+    // ever saw 24-hour, zero-padded times. Production emits a 12-hour spoken
+    // time plus the ISO instant — see formatSlotOptionForTool.
+    vi.mocked(checkAvailability).mockResolvedValue(
+      "חלונות פנויים לבדיקה בקליניקה ב-14/06/2026 (יום ראשון): " +
+        "9:10 בבוקר (scheduled_at=2026-06-14T09:10:00+03:00), " +
+        "12:20 בצהריים (scheduled_at=2026-06-14T12:20:00+03:00). " +
+        "לקביעת תור חובה להשתמש בערך scheduled_at המדויק מאחת האופציות, כולל אזור הזמן.",
+    );
     vi.mocked(bookAppointment).mockResolvedValue("✅ תור נקבע");
     vi.mocked(cancelAppointment).mockResolvedValue("✅ התור בוטל בהצלחה.");
     vi.mocked(rescheduleAppointment).mockResolvedValue("✅ התור הוזז בהצלחה.");

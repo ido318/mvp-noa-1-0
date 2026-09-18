@@ -8,6 +8,7 @@ import {
   findCustomerByPhone,
   addEscalation,
   checkAvailability,
+  getFreeSlots,
   bookAppointment,
   cancelAppointment,
   rescheduleAppointment,
@@ -18,7 +19,7 @@ import {
   getPatientChronicConditions,
   getLastVisitPlan,
 } from "../../lib/store.js";
-import { VISIT_TYPE_VALUES } from "../../lib/appointments.js";
+import { VISIT_TYPE_VALUES, formatSlotSpokenHe } from "../../lib/appointments.js";
 import {
   decideTriage,
   EMERGENCY_SCRIPT,
@@ -277,15 +278,24 @@ toolsRoutes.post("/tools/triage-pet-case", async (c) => {
       break;
 
     case "urgent_callback": {
-      // Try to find a phone_consultation slot today
+      // Try to find a phone_consultation slot today.
+      //
+      // This used to regex a time out of checkAvailability's Hebrew prose,
+      // which is written for the LLM, not for parsing. formatSlotSpokenHe
+      // renders a 12-hour hour with no leading zero ("1:00 בצהריים"), so
+      // \b(\d{2}:\d{2})\b skipped the spoken time and matched the seconds
+      // inside the ISO that follows it — 13:00 was announced as "00:00". On a
+      // Saturday it matched 08:00 out of the opening hours quoted in the
+      // "clinic is closed" message and offered a slot on a closed day.
+      //
+      // getFreeSlots returns the instants themselves, so there is nothing to
+      // parse and a closed day simply yields none.
       let slotSuffix = "";
       try {
         const todayIso = israelDateIso(now);
-        const availability = await checkAvailability(todayIso, "phone_consultation");
-        // If the response contains a time pattern (HH:MM), slots are available
-        const firstSlot = availability.match(/\b(\d{2}:\d{2})\b/)?.[1];
+        const [firstSlot] = await getFreeSlots(todayIso, "phone_consultation");
         if (firstSlot) {
-          slotSuffix = ` מצאתי אפשרות לשיחה עם ד"ר נועה היום ב-${firstSlot} — לקבוע?`;
+          slotSuffix = ` מצאתי אפשרות לשיחה עם ד"ר נועה היום ב-${formatSlotSpokenHe(firstSlot)} — לקבוע?`;
         }
       } catch {
         // slot lookup is best-effort; don't fail the triage call

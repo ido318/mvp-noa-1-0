@@ -248,21 +248,26 @@ async function findCustomerIdByPhone(phone: string): Promise<string | null> {
 // Availability
 // ─────────────────────────────────────────────────────────────────────────────
 
-export async function checkAvailability(
+/**
+ * The free slots for a date and visit type, as ISO instants. Empty when the
+ * date is outside the 14-day window, on a closed day, or fully booked.
+ *
+ * checkAvailability below renders these into one Hebrew string aimed at the
+ * LLM. Code that needs the slots themselves must use this function: the
+ * urgent-callback path used to regex `\b(\d{2}:\d{2})\b` out of that string
+ * and, because formatSlotSpokenHe writes a 12-hour hour with no leading zero,
+ * matched the seconds inside the ISO instead — announcing "היום ב-00:00" for a
+ * 13:00 slot. On a Saturday it matched 08:00 out of the opening-hours sentence
+ * in the "clinic is closed" message and offered a slot on a closed day.
+ */
+export async function getFreeSlots(
   dateIso: string,
   visitType: VisitType,
-): Promise<string> {
-  // 1. 14-day window
-  if (!isWithin14Days(dateIso)) {
-    const maxDate = maxBookingDateIso();
-    return `ניתן לקבוע תורים עד ${formatDateHe(maxDate)} בלבד (14 יום קדימה).`;
-  }
+): Promise<string[]> {
+  if (!isWithin14Days(dateIso)) return [];
 
-  // 2. Closed day (Saturday)
   const hours = getClinicHours(dateIso);
-  if (!hours) {
-    return "המרפאה סגורה בשבת. אפשר לקבוע תור ביום ראשון עד חמישי 08:00-20:00 או ביום שישי 08:30-13:00.";
-  }
+  if (!hours) return [];
 
   const env = getEnv();
 
@@ -307,10 +312,32 @@ export async function checkAvailability(
   });
 
   // 5. Generate free slots for the requested visit type
-  const freeSlots = generateSlotsForVisitType(dateIso, hours, visitType, [
+  return generateSlotsForVisitType(dateIso, hours, visitType, [
     ...bookedRanges,
     ...blockedRanges,
   ]);
+}
+
+/**
+ * The same availability, rendered for the LLM. Wording and the
+ * `scheduled_at=` marker are load-bearing — tomer-system-prompt.md tells the
+ * model to copy that value verbatim when booking — so this string's shape
+ * must not change.
+ */
+export async function checkAvailability(
+  dateIso: string,
+  visitType: VisitType,
+): Promise<string> {
+  if (!isWithin14Days(dateIso)) {
+    const maxDate = maxBookingDateIso();
+    return `ניתן לקבוע תורים עד ${formatDateHe(maxDate)} בלבד (14 יום קדימה).`;
+  }
+
+  if (!getClinicHours(dateIso)) {
+    return "המרפאה סגורה בשבת. אפשר לקבוע תור ביום ראשון עד חמישי 08:00-20:00 או ביום שישי 08:30-13:00.";
+  }
+
+  const freeSlots = await getFreeSlots(dateIso, visitType);
 
   const config = getVisitConfig(visitType);
   const typeLabelHe = config.labelHe;
