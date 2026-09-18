@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Card } from "@/components/dashboard/ui/card";
 import { Badge } from "@/components/dashboard/ui/badge";
@@ -10,6 +10,8 @@ import { InvoiceDraft } from "@/components/dashboard/billing/invoice-draft";
 import { PaymentForm } from "@/components/dashboard/billing/payment-form";
 import { SendPaymentLinkButton } from "@/components/dashboard/billing/send-payment-link-button";
 import type { Invoice, InvoiceStatus } from "@/types/domain/invoice";
+import { Alert } from "@/components/dashboard/ui/alert";
+import { Btn } from "@/components/dashboard/ui/btn";
 
 const STATUS_LABEL: Record<InvoiceStatus, string> = {
   draft: "טיוטה",
@@ -45,17 +47,28 @@ export default function BillingPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<InvoiceStatus | "all">("all");
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const fetchData = useCallback(async () => {
+    setLoadError(null);
+    try {
+      const res = await fetch("/api/invoices");
+      if (!res.ok) {
+        setLoadError("טעינת החשבוניות נכשלה.");
+        return;
+      }
+      const d = await res.json() as { data: { items: Invoice[] } };
+      setInvoices(d.data.items ?? []);
+    } catch {
+      setLoadError("טעינת החשבוניות נכשלה. בדוק/י את החיבור ונסה/י שוב.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    void (async () => {
-      const res = await fetch("/api/invoices");
-      if (res.ok) {
-        const d = await res.json() as { data: { items: Invoice[] } };
-        setInvoices(d.data.items ?? []);
-      }
-      setLoading(false);
-    })();
-  }, []);
+    void fetchData();
+  }, [fetchData]);
 
   const filtered = filter === "all" ? invoices : invoices.filter((inv) => inv.status === filter);
   const totalOutstanding = invoices
@@ -68,7 +81,12 @@ export default function BillingPage() {
         <h1 className="text-[28px] font-semibold text-[var(--ink)]">חיובים</h1>
         <Card className="px-4 py-2.5">
           <p className="text-[11px] text-[var(--muted)]">חוב פתוח (נשלח, טרם שולם)</p>
-          <p className="text-[18px] font-semibold tabular-nums text-[var(--amber-600)]">{fmtMoney(totalOutstanding)}</p>
+          {/* An empty invoice list sums to 0, so a failed load used to state
+              ₪0.00 outstanding as fact — a confident, wrong financial figure.
+              Say we do not know instead. */}
+          <p className="text-[18px] font-semibold tabular-nums text-[var(--amber-600)]">
+            {loading || loadError ? "—" : fmtMoney(totalOutstanding)}
+          </p>
         </Card>
       </div>
 
@@ -90,9 +108,20 @@ export default function BillingPage() {
         ))}
       </div>
 
+      {loadError && (
+        <Alert tone="critical" title="שגיאה בטעינת נתונים">
+          {loadError}
+          <div className="mt-2">
+            <Btn type="button" size="sm" variant="soft" onClick={() => void fetchData()}>
+              נסה שוב
+            </Btn>
+          </div>
+        </Alert>
+      )}
+
       {loading ? (
         <Skeleton className="h-64" />
-      ) : filtered.length === 0 ? (
+      ) : filtered.length === 0 && !loadError ? (
         <EmptyState icon={<CreditCardIcon size={32} />} title="אין חשבוניות" subtitle="חשבוניות שהופקו יופיעו כאן" />
       ) : (
         <Card noPad className="overflow-hidden">
