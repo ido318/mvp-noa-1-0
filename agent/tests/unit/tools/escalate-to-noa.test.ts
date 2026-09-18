@@ -36,7 +36,11 @@ describe("POST /tools/escalate-to-noa", () => {
     const res = await makeApp().request("/tools/escalate-to-noa", {
       method: "POST",
       headers: signedHeaders(),
-      body: JSON.stringify({ reason: "לקוח מבקש שיחה עם נועה", urgency: 3 }),
+      body: JSON.stringify({
+        reason: "לקוח מבקש שיחה עם נועה",
+        urgency: 3,
+        phone: "+972541234567",
+      }),
     });
     expect(res.status).toBe(200);
     const json = await res.json() as { result: string };
@@ -45,11 +49,15 @@ describe("POST /tools/escalate-to-noa", () => {
     expect(vi.mocked(addEscalation)).toHaveBeenCalledWith({
       reason: "לקוח מבקש שיחה עם נועה",
       urgency: 3,
-      notes: null,
+      caller_phone: "+972541234567",
     });
   });
 
-  it("stores caller phone in notes until a dedicated column exists", async () => {
+  // Was: "stores caller phone in notes until a dedicated column exists".
+  // The column exists now (20260918230000), so the phone goes there. It used
+  // to share `notes` with whatever a human typed when resolving the
+  // escalation, which overwrote it.
+  it("passes the caller phone through to its own column, not notes", async () => {
     const res = await makeApp().request("/tools/escalate-to-noa", {
       method: "POST",
       headers: signedHeaders(),
@@ -63,7 +71,27 @@ describe("POST /tools/escalate-to-noa", () => {
     expect(vi.mocked(addEscalation)).toHaveBeenCalledWith({
       reason: "חשבונית",
       urgency: 2,
-      notes: "caller_phone: +972541234567",
+      caller_phone: "+972541234567",
+    });
+    // notes stays free for the human resolving it.
+    expect(vi.mocked(addEscalation).mock.calls[0]?.[0]).not.toHaveProperty("notes");
+  });
+
+  // The tool definition marks phone required so the model always sends
+  // {{system__caller_id}}, but the server must not. A withheld caller id with
+  // no number offered would otherwise drop the escalation entirely — and an
+  // escalation Noa never sees is worse than one without a phone number.
+  it("still records an escalation when the caller id is withheld", async () => {
+    const res = await makeApp().request("/tools/escalate-to-noa", {
+      method: "POST",
+      headers: signedHeaders(),
+      body: JSON.stringify({ reason: "חשבונית", urgency: 2 }),
+    });
+    expect(res.status).toBe(200);
+    expect(vi.mocked(addEscalation)).toHaveBeenCalledWith({
+      reason: "חשבונית",
+      urgency: 2,
+      caller_phone: null,
     });
   });
 

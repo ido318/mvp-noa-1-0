@@ -113,9 +113,13 @@
           "pet_id": {
             "type": "string",
             "description": "מזהה החיה (UUID) מ-lookup-customer או list-customer-pets"
+          },
+          "phone": {
+            "type": "string",
+            "description": "חובה: {{system__caller_id}}. אם חסוי/ריק — המספר שהלקוח מסר. בלעדיו נועה לא תדע למי לחזור."
           }
         },
-        "required": ["symptoms_he", "pet_type"]
+        "required": ["symptoms_he", "pet_type", "phone"]
       }
     }
   },
@@ -341,10 +345,10 @@
           },
           "phone": {
             "type": "string",
-            "description": "טלפון לחזרה. ברירת מחדל {{system__caller_id}}"
+            "description": "חובה: {{system__caller_id}}. אם חסוי/ריק — המספר שהלקוח מסר. בלעדיו נועה לא תדע למי לחזור."
           }
         },
-        "required": ["reason", "urgency"]
+        "required": ["reason", "urgency", "phone"]
       }
     }
   },
@@ -368,9 +372,17 @@
           "emergency": {
             "type": "boolean",
             "description": "true אם מדובר במצב חירום רפואי"
+          },
+          "phone": {
+            "type": "string",
+            "description": "חובה: {{system__caller_id}}. אם חסוי/ריק — המספר שהלקוח מסר. בלעדיו נועה לא תדע למי לחזור."
+          },
+          "conversation_id": {
+            "type": "string",
+            "description": "{{system__conversation_id}} — מקשר את הפנייה להקלטה ולתמלול בדשבורד."
           }
         },
-        "required": []
+        "required": ["phone"]
       }
     }
   },

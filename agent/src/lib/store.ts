@@ -51,7 +51,17 @@ export type EscalationEntry = {
   reason: string;
   urgency: number;
   conversation_id?: string | null;
-  notes?: string | null;
+  /** Who is calling, so the dashboard can show a name and a number to dial. */
+  caller_phone?: string | null;
+  customer_id?: string | null;
+  pet_id?: string | null;
+  /**
+   * Structured triage context — decision, matched_flags, after_hours and the
+   * caller's full symptom description. Kept out of `notes`, which is what a
+   * human types when resolving: the old code wrote this JSON into `notes`, and
+   * resolving the escalation overwrote it.
+   */
+  context?: Record<string, unknown> | null;
 };
 
 /**
@@ -140,12 +150,22 @@ export async function findCustomerByPhone(
 
 export async function addEscalation(entry: EscalationEntry): Promise<void> {
   const env = getEnv();
+  // Resolve the caller to a customer when we can, so the dashboard card can
+  // show a name rather than a bare phone number. Best-effort: an unknown
+  // number still produces a usable escalation.
+  const callerPhone = entry.caller_phone ? normaliseIsraeliPhone(entry.caller_phone) : null;
+  const customerId =
+    entry.customer_id ?? (callerPhone ? await safeFindCustomerIdByPhone(callerPhone) : null);
+
   const { error } = await getSupabase().from("escalations").insert({
     clinic_id: env.AGENT_CLINIC_ID,
     reason: entry.reason,
     urgency: entry.urgency,
     elevenlabs_conversation_id: entry.conversation_id ?? null,
-    notes: entry.notes ?? null,
+    caller_phone: callerPhone,
+    customer_id: customerId,
+    pet_id: entry.pet_id ?? null,
+    context: entry.context ?? {},
   });
   if (error) throw new Error(`supabase escalation insert failed: ${error.message}`);
 }

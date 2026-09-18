@@ -113,7 +113,16 @@ export function buildTodayDashboardModel({
         id: `escalation-${escalation.id}`,
         kind: "escalation",
         title: formatEscalationReason(escalation.reason),
-        subtitle: escalation.afterHours ? "נוצר אחרי שעות הפעילות" : formatIsraelTime(escalation.createdAt),
+        // Used to be the timestamp alone. An escalation card with no name is
+        // the thing the team reported: "דורש תשומת לב" listed a reason string
+        // and nothing that said who it was about.
+        subtitle: [
+          escalation.customerName,
+          escalation.petName,
+          escalation.afterHours ? "אחרי שעות הפעילות" : formatIsraelTime(escalation.createdAt),
+        ]
+          .filter(Boolean)
+          .join(" · "),
         tone: escalation.urgency >= 8 ? "red" : "amber",
         urgency: escalation.urgency,
         escalation,

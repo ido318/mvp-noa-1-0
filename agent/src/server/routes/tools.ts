@@ -125,6 +125,10 @@ toolsRoutes.post("/tools/lookup-customer", async (c) => {
 // POST /tools/escalate-to-noa
 // ─────────────────────────────────────────────────────────────────────────────
 
+// phone is `required` in the ElevenLabs tool definition so the model always
+// sends {{system__caller_id}}, but optional here on purpose: a withheld caller
+// id must not cost us the escalation. An escalation Noa never sees is worse
+// than one without a number.
 const escalateSchema = z.object({
   reason: z.string().min(1),
   urgency: z.number().int().min(1).max(10),
@@ -149,7 +153,7 @@ toolsRoutes.post("/tools/escalate-to-noa", async (c) => {
   await addEscalation({
     reason,
     urgency,
-    notes: phone ? `caller_phone: ${phone}` : null,
+    caller_phone: phone ?? null,
   });
 
   return c.json({ result: `הועברה לנועה (urgency: ${urgency}/10)` });
@@ -165,6 +169,8 @@ toolsRoutes.post("/tools/escalate-to-noa", async (c) => {
 const handoffSchema = z.object({
   reason: z.string().min(1).optional(),
   emergency: z.boolean().optional(),
+  phone: israeliPhone.optional(),
+  conversation_id: z.string().min(1).optional(),
 });
 
 toolsRoutes.post("/tools/request-human-handoff", async (c) => {
@@ -180,9 +186,15 @@ toolsRoutes.post("/tools/request-human-handoff", async (c) => {
   });
 
   if (decision.escalate) {
+    // These used to be written with no phone, no customer and no call id, so
+    // the dashboard showed a request to speak to a human with no way to reach
+    // whoever asked.
     await addEscalation({
       reason: reason ?? "בקשת מעבר לנציג אנושי",
       urgency: decision.urgency ?? 6,
+      caller_phone: parsed.success ? parsed.data.phone ?? null : null,
+      conversation_id: parsed.success ? parsed.data.conversation_id ?? null : null,
+      context: { source: "request-human-handoff", emergency: emergency ?? false },
     });
   }
 
@@ -209,6 +221,7 @@ const triageSchema = z.object({
   pet_age_years:      z.number().positive().optional(),
   pet_weight_kg:      z.number().positive().optional(),
   additional_signs_he: z.array(z.string()).optional(),
+  phone:              israeliPhone.optional(),
   customer_id:        z.string().uuid().optional(),
   pet_id:             z.string().uuid().optional(),
 });
@@ -256,14 +269,23 @@ toolsRoutes.post("/tools/triage-pet-case", async (c) => {
           : triage.urgency;
 
     void addEscalation({
-      reason: `triage: ${triage.decision} — flags: ${triage.matchedFlags.join(", ") || "none"} — "${input.symptoms_he.slice(0, 120)}"`,
+      // reason stays a one-line summary for the card heading. The caller's own
+      // words used to be truncated to 120 characters inside it; they now go to
+      // context.symptoms_he in full, because that is what Noa reads before
+      // calling back.
+      reason: `triage: ${triage.decision} — flags: ${triage.matchedFlags.join(", ") || "none"}`,
       urgency: escalationUrgency,
-      notes: JSON.stringify({
+      caller_phone: input.phone ?? null,
+      customer_id: input.customer_id ?? null,
+      pet_id: input.pet_id ?? null,
+      context: {
+        decision: triage.decision,
         after_hours: !triage.withinBusinessHours,
         matched_flags: triage.matchedFlags,
-        customer_id: input.customer_id ?? null,
-        pet_id: input.pet_id ?? null,
-      }),
+        symptoms_he: input.symptoms_he,
+        duration_he: input.duration_he ?? null,
+        pet_type: input.pet_type,
+      },
     }).catch((err: unknown) =>
       logger.error({ err }, "triage-pet-case: escalation write failed"),
     );

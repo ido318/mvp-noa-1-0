@@ -3,6 +3,11 @@ import { AppError, err, ok, type Result } from "@/lib/errors/app-error";
 import { mapEscalationRow } from "@/lib/repositories/mappers";
 import type { Escalation, EscalationListFilters, ResolveEscalationInput } from "@/types/domain/escalation";
 
+// The card needs a name to show and a number to dial, not just a reason
+// string. customers/pets are joined through the composite FKs added in
+// 20260918230000.
+const SELECT_WITH_JOINS = "*, customers(full_name), pets(name)";
+
 export class EscalationRepository {
   constructor(private readonly client: SupabaseClient) {}
 
@@ -12,7 +17,7 @@ export class EscalationRepository {
 
     let query = this.client
       .from("escalations")
-      .select("*")
+      .select(SELECT_WITH_JOINS)
       .in("clinic_id", filters.clinicIds)
       .order("urgency", { ascending: false })
       .order("created_at", { ascending: false })
@@ -43,7 +48,7 @@ export class EscalationRepository {
   async findById(id: string): Promise<Result<Escalation | null>> {
     const { data, error } = await this.client
       .from("escalations")
-      .select("*")
+      .select(SELECT_WITH_JOINS)
       .eq("id", id)
       .maybeSingle();
 
@@ -57,10 +62,12 @@ export class EscalationRepository {
       .update({
         resolved_at: new Date().toISOString(),
         resolved_by: input.resolvedByUserId,
+        // Safe to write now: the agent's triage context moved to its own
+        // `context` column, so a human's note no longer destroys it.
         notes: input.notes ?? null,
       })
       .eq("id", id)
-      .select("*")
+      .select(SELECT_WITH_JOINS)
       .single();
 
     if (error) {

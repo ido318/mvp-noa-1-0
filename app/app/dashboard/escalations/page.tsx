@@ -11,8 +11,9 @@ import { EmptyState } from "@/components/dashboard/ui/empty-state";
 import { Skeleton } from "@/components/dashboard/ui/skeleton";
 import { useToast } from "@/components/dashboard/ui/toast";
 import { ClockIcon, PhoneIcon } from "@/components/dashboard/icons";
-import type { Escalation } from "@/types/domain/escalation";
+import type { Escalation, EscalationContext } from "@/types/domain/escalation";
 import { formatEscalationReason, parseEscalationReason } from "@/lib/triage-labels";
+import { formatIsraeliPhoneLocal } from "@tomer/shared";
 
 function formatDate(iso: string) {
   return new Intl.DateTimeFormat("he-IL", {
@@ -96,7 +97,39 @@ function EscalationCard({
             {isResolved && <Badge tone="done">טופלה</Badge>}
           </div>
 
-          <EscalationReason reason={escalation.reason} />
+          {/* Who is calling. Until the identity columns existed this card showed
+              a reason string and nothing else — no name, no number, no way to
+              reach whoever raised it. */}
+          {(escalation.customerName || escalation.callerPhone) && (
+            <div className="mb-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+              {escalation.customerName && (
+                <a
+                  href={`/dashboard/clients?customerId=${escalation.customerId}`}
+                  className="text-[14px] font-semibold hover:underline"
+                  style={{ color: "var(--text-primary)" }}
+                >
+                  {escalation.customerName}
+                </a>
+              )}
+              {escalation.petName && (
+                <span className="text-[12px]" style={{ color: "var(--text-secondary)" }}>
+                  · {escalation.petName}
+                </span>
+              )}
+              {escalation.callerPhone && (
+                <a
+                  href={`tel:${escalation.callerPhone}`}
+                  className="text-[12px] hover:underline"
+                  style={{ color: "var(--brand-600)" }}
+                  dir="ltr"
+                >
+                  {formatIsraeliPhoneLocal(escalation.callerPhone)}
+                </a>
+              )}
+            </div>
+          )}
+
+          <EscalationReason reason={escalation.reason} context={escalation.context} />
 
           <div className="mt-2 flex flex-wrap gap-3 text-[11px]" style={{ color: "var(--text-muted)" }}>
             <span className="flex items-center gap-1">
@@ -104,10 +137,14 @@ function EscalationCard({
               {formatDate(escalation.createdAt)}
             </span>
             {escalation.elevenLabsConversationId && (
-              <span className="flex items-center gap-1">
+              <a
+                href={`/dashboard/calls?conversationId=${escalation.elevenLabsConversationId}`}
+                className="flex items-center gap-1 hover:underline"
+                style={{ color: "var(--brand-600)" }}
+              >
                 <PhoneIcon size={11} />
-                שיחה: {escalation.elevenLabsConversationId.slice(-6)}
-              </span>
+                האזן לשיחה
+              </a>
             )}
           </div>
 
@@ -139,8 +176,17 @@ type FilterStatus = "open" | "resolved" | "all";
  * parts, the decision leads, the matched red flags read as chips, and what the
  * caller actually said sits underneath in their own words.
  */
-function EscalationReason({ reason }: { reason: string }) {
+function EscalationReason({
+  reason,
+  context,
+}: {
+  reason: string;
+  context: EscalationContext;
+}) {
   const { decision, flags, quote, raw } = parseEscalationReason(reason);
+  // context.symptoms_he is the caller's full description. The quote embedded in
+  // `reason` was cut at 120 characters, so prefer the column when it is there.
+  const spoken = context.symptoms_he ?? quote;
 
   if (!decision) {
     return (
@@ -158,9 +204,9 @@ function EscalationReason({ reason }: { reason: string }) {
           <Badge key={flag} tone="critical">{flag}</Badge>
         ))}
       </div>
-      {quote && (
+      {spoken && (
         <p className="text-[13px] leading-snug" style={{ color: "var(--text-secondary)" }}>
-          ״{quote}״
+          ״{spoken}״
         </p>
       )}
     </div>
