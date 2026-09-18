@@ -189,23 +189,39 @@ Shared (same Supabase project): `SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_URL`, `SU
 
 ## cron (pg_cron)
 
-**⚠️ סטטוס (עודכן 2026-09-05):** שלושת ה-jobs רשומים ו-`active=true`, אבל **נכשלו בכל הרצה מאז שהוגדרו** — הם קראו ל-`extensions.http_post`, פונקציה שלא קיימת בפרויקט (pg_net מתקין ל-schema בשם `net`). pg_cron רושם את השגיאה ב-`cron.job_run_details` וממשיך, ולכן הם נראו תקינים בזמן ששום דבר לא רץ: כל ה-SMS המתוזמנים נערמו ב-`notifications_log` בסטטוס `pending`, תזכורות חיסון לא נשלחו, וניתוח השיחות השבועי לא רץ. רק `booking_confirmation` עבד — הסוכן שולח אותו ישירות, לא דרך התור.
+**✅ סטטוס (אומת 2026-09-18):** שלושת ה-jobs רצים ומחזירים 200 מהסוכן. שתי תקלות שונות הובילו לכאן, ושתיהן נראו זהות מבחוץ — "job פעיל, אף אחד לא שם לב ששום דבר לא קרה":
 
-**התיקון:** `supabase/scripts/cron-jobs.sql` (רץ ב-SQL editor, עם `net.http_post`). ה-SQL למטה עודכן בהתאם.
+1. **`extensions.http_post` (תוקן 2026-09-05).** הפונקציה לא קיימת בפרויקט — pg_net מתקין ל-schema בשם `net`. pg_cron רשם את השגיאה ב-`cron.job_run_details` והמשיך, ולכן ה-SMS המתוזמנים נערמו ב-`notifications_log` בסטטוס `pending` ותזכורות החיסון לא נשלחו. רק `booking_confirmation` עבד — הסוכן שולח אותו ישירות, לא דרך התור. תוקן ע"י הרצת `supabase/scripts/cron-jobs.sql`.
+2. **timeout של pg_net על `analyze-tomer-conversations` (תוקן 2026-09-18).** ה-job הוגדר עם `timeout_milliseconds := 10000`, אבל `/jobs/analyze-conversations` ממתין לסבב Claude המלא לפני שהוא משיב — ~4.5 דקות במדידה (19 שיחות מסומנות, 38 קבוצות). כל הרצה מאז ההגדרה נקטעה ב-10 שניות. **pg_cron רשם `status='succeeded'`** כי `net.http_post` רק מכניס לתור בהצלחה — הכישלון האמיתי נרשם ב-`net._http_response.error_msg`. תוקן ל-`300000`.
 
-**לא מספיק לבדוק ש-job "פעיל" — צריך לבדוק שהוא מצליח:**
+**לכן לא מספיק לבדוק ש-job "פעיל", ואפילו לא ש-`cron.job_run_details` מראה `succeeded`.** `succeeded` = הבקשה נכנסה לתור. התשובה האמיתית של הסוכן נמצאת ב-`net._http_response`:
+
 ```sql
+-- שלב 1: pg_cron הצליח להריץ את הפקודה?
 select jobid, status, return_message, start_time
 from cron.job_run_details order by start_time desc limit 10;
+
+-- שלב 2: מה הסוכן באמת החזיר? (זו הבדיקה שמגלה timeout)
+select id, status_code, left(content, 300) as content, error_msg, created
+from net._http_response order by id desc limit 10;
+```
+
+⚠️ `net._http_response` נשמר לזמן קצוב (~6 שעות). ל-jobs יומיים/שבועיים השורה כבר תימחק עד שתסתכל. להרצה ידנית מיידית בלי לחשוף את הטוקן מה-Vault:
+
+```sql
+do $$ declare c text; begin select command into c from cron.job where jobid = 4; execute c; end $$;
+-- ואז לחכות ולקרוא את net._http_response
 ```
 
 שלושת ה-jobs, כולם מול `https://voxly-agent.fly.dev`:
 
-| jobid | jobname | schedule | סטטוס |
-|---|---|---|---|
-| 1 | `process-sms-notifications` | `*/15 * * * *` | ⚠️ רשום — דורש הרצה מחדש של `cron-jobs.sql` |
-| 3 | `send-vaccination-reminders` | `0 6 * * *` | ⚠️ רשום — דורש הרצה מחדש של `cron-jobs.sql` |
-| 4 | `analyze-tomer-conversations` | `0 6 * * 0` | ⚠️ רשום — דורש הרצה מחדש של `cron-jobs.sql` |
+| jobid | jobname | schedule | timeout | סטטוס (2026-09-18) |
+|---|---|---|---|---|
+| 1 | `process-sms-notifications` | `*/15 * * * *` | 10s | ✅ 200, `{"processed":0,...}` |
+| 3 | `send-vaccination-reminders` | `0 6 * * *` | 10s | ✅ 200, `{"scanned":0,"enqueued":0,...}` |
+| 4 | `analyze-tomer-conversations` | `0 6 * * 0` | 300s | ✅ 200, `{"ranAnalysis":true,"flaggedCallCount":19,...}` — הרצה מוצלחת ראשונה אי פעם |
+
+הטוקן נשמר ב-Supabase Vault (`tomer_jobs_bearer_token`), לא בטקסט הפקודה.
 
 `ANTHROPIC_API_KEY` מוגדר ב-Fly secrets.
 
@@ -230,7 +246,7 @@ SELECT cron.schedule(
 
 לביטול: `SELECT cron.unschedule('process-sms-notifications');`
 
-**cron שני — לולאת שיפור פרומפט (prompt learning loop), שבועי — רשום כ-jobid 4 (ראה הטבלה למעלה), אך כמו השניים האחרים דורש הרצה מחדש של `cron-jobs.sql`. ה-SQL למטה לתיעוד/שחזור:**
+**cron שני — לולאת שיפור פרומפט (prompt learning loop), שבועי — רשום כ-jobid 4 (ראה הטבלה למעלה), פעיל ומאומת. ה-SQL למטה לתיעוד/שחזור — שים לב ל-`timeout_milliseconds`, בלעדיו pg_net קוטע את הניתוח אחרי 5 שניות:**
 
 ```sql
 SELECT cron.schedule(
@@ -243,7 +259,8 @@ SELECT cron.schedule(
       'Authorization', 'Bearer <JOBS_BEARER_TOKEN>',
       'Content-Type', 'application/json'
     ),
-    body    := '{}'::jsonb
+    body    := '{}'::jsonb,
+    timeout_milliseconds := 300000
   );
   $$
 );

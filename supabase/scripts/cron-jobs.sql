@@ -48,7 +48,8 @@ select cron.schedule(
       'Authorization', 'Bearer <JOBS_BEARER_TOKEN>',
       'Content-Type', 'application/json'
     ),
-    body    := '{}'::jsonb
+    body    := '{}'::jsonb,
+    timeout_milliseconds := 10000
   );
   $$
 );
@@ -66,7 +67,8 @@ select cron.schedule(
       'Authorization', 'Bearer <JOBS_BEARER_TOKEN>',
       'Content-Type', 'application/json'
     ),
-    body    := '{}'::jsonb
+    body    := '{}'::jsonb,
+    timeout_milliseconds := 10000
   );
   $$
 );
@@ -84,7 +86,13 @@ select cron.schedule(
       'Authorization', 'Bearer <JOBS_BEARER_TOKEN>',
       'Content-Type', 'application/json'
     ),
-    body    := '{}'::jsonb
+    body    := '{}'::jsonb,
+    -- 5 minutes, not pg_net's 5s default: /jobs/analyze-conversations awaits the
+    -- full Claude pass over the week's flagged calls before it responds. Measured
+    -- at ~4.5 minutes on 2026-09-18 (19 flagged calls, 38 groups). With a short
+    -- timeout pg_net records "Timeout of N ms reached" while pg_cron still logs
+    -- the job as 'succeeded' — the job looks healthy and its result is invisible.
+    timeout_milliseconds := 300000
   );
   $$
 );
