@@ -3,7 +3,7 @@ import { z } from "zod";
 import { logger, maskPhone } from "../../lib/logger.js";
 import { getEnv } from "../../lib/env.js";
 import { isValidBearerToken } from "../middleware/bearerAuth.js";
-import { israelDateIso } from "@tomer/shared";
+import { israelDateIso, isValidIsraeliPhone } from "@tomer/shared";
 import {
   findCustomerByPhone,
   addEscalation,
@@ -82,7 +82,18 @@ toolsRoutes.post("/tools/conversation-policy", async (c) => {
 // POST /tools/lookup-customer
 // ─────────────────────────────────────────────────────────────────────────────
 
-const lookupSchema = z.object({ phone: z.string().min(5) });
+// Every phone parameter below used to be `z.string().min(5)`, which accepted
+// "aaaaa", "-----" and "unknown". normalisePhone then turned those into the
+// string "+" and stored them as a customer's phone number. A failed safeParse
+// already returns a Hebrew {result}, so tightening the schema is all it takes
+// for Tomer to ask for the number again instead of writing an unreachable one.
+//
+// Validates the raw input; normalisation to E.164 still happens in store.ts.
+const israeliPhone = z
+  .string()
+  .refine(isValidIsraeliPhone, { message: "not a valid Israeli phone number" });
+
+const lookupSchema = z.object({ phone: israeliPhone });
 
 toolsRoutes.post("/tools/lookup-customer", async (c) => {
   const body = await c.req.json().catch(() => ({}));
@@ -116,7 +127,7 @@ toolsRoutes.post("/tools/lookup-customer", async (c) => {
 const escalateSchema = z.object({
   reason: z.string().min(1),
   urgency: z.number().int().min(1).max(10),
-  phone: z.string().min(5).optional(),
+  phone: israeliPhone.optional(),
 });
 
 toolsRoutes.post("/tools/escalate-to-noa", async (c) => {
@@ -325,7 +336,7 @@ toolsRoutes.post("/tools/check-availability", async (c) => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const bookSchema = z.object({
-  phone:         z.string().min(5),
+  phone:         israeliPhone,
   customer_name: z.string().min(1),
   pet_name:      z.string().min(1),
   pet_species:   z.enum(PET_SPECIES_VALUES),
@@ -361,7 +372,7 @@ toolsRoutes.post("/tools/book-appointment", async (c) => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const cancelRescheduleSchema = z.object({
-  phone:                z.string().min(5),
+  phone:                israeliPhone,
   action:               z.enum(["cancel", "reschedule"]),
   current_scheduled_at: z.string().regex(ISO_DATETIME_RE, "Expected ISO8601 datetime"),
   new_scheduled_at:     z.string().regex(ISO_DATETIME_RE, "Expected ISO8601 datetime").optional(),
@@ -401,7 +412,7 @@ toolsRoutes.post("/tools/cancel-or-reschedule", async (c) => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const waitlistSchema = z.object({
-  phone:           z.string().min(5),
+  phone:           israeliPhone,
   customer_name:   z.string().min(1),
   pet_name:        z.string().min(1),
   pet_species:     z.enum(PET_SPECIES_VALUES),
@@ -435,7 +446,7 @@ toolsRoutes.post("/tools/join-waitlist", async (c) => {
 // POST /tools/list-customer-appointments
 // ─────────────────────────────────────────────────────────────────────────────
 
-const listCustomerAppointmentsSchema = z.object({ phone: z.string().min(5) });
+const listCustomerAppointmentsSchema = z.object({ phone: israeliPhone });
 
 toolsRoutes.post("/tools/list-customer-appointments", async (c) => {
   const body = await c.req.json().catch(() => ({}));
@@ -459,7 +470,7 @@ toolsRoutes.post("/tools/list-customer-appointments", async (c) => {
 // POST /tools/list-customer-pets
 // ─────────────────────────────────────────────────────────────────────────────
 
-const listCustomerPetsSchema = z.object({ phone: z.string().min(5) });
+const listCustomerPetsSchema = z.object({ phone: israeliPhone });
 
 toolsRoutes.post("/tools/list-customer-pets", async (c) => {
   const body = await c.req.json().catch(() => ({}));
@@ -494,7 +505,7 @@ toolsRoutes.post("/tools/list-customer-pets", async (c) => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const petLookupSchema = z.object({
-  phone: z.string().min(5),
+  phone: israeliPhone,
   pet_id: z.string().min(1),
 });
 

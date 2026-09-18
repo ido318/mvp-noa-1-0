@@ -1,4 +1,4 @@
-import { CLINIC_LOCATION, HOME_VISIT_LOCATION } from "@tomer/shared";
+import { CLINIC_LOCATION, HOME_VISIT_LOCATION, isValidIsraeliPhone } from "@tomer/shared";
 import { AppError, err, ok, type Result } from "@/lib/errors/app-error";
 import { isExpectedDuration, toIsraelLocalIso } from "@/lib/appointment-rules";
 import type { AppointmentRepository } from "@/lib/repositories/appointment.repository";
@@ -235,7 +235,13 @@ export class AppointmentService {
       afterPayload: updated.value,
     });
 
-    if (updated.value.scheduledAt !== existing.value.scheduledAt) {
+    // A customer with no usable number used to enqueue a row with phone: "",
+    // which Twilio then rejected as "Invalid 'To' Phone Number" — a dead row
+    // in notifications_log with no way to retry. Skip the SMS instead.
+    if (
+      updated.value.scheduledAt !== existing.value.scheduledAt &&
+      isValidIsraeliPhone(updated.value.customerPhone)
+    ) {
       const enqueueResult = await this.dashboardNotifications?.enqueueDashboardChangeNotification({
         clinicId: updated.value.clinicId,
         customerId: updated.value.customerId,
@@ -311,7 +317,7 @@ export class AppointmentService {
       afterPayload: updated.value,
     });
 
-    if (input.status === "cancelled") {
+    if (input.status === "cancelled" && isValidIsraeliPhone(updated.value.customerPhone)) {
       const enqueueResult = await this.dashboardNotifications?.enqueueDashboardChangeNotification({
         clinicId: updated.value.clinicId,
         customerId: updated.value.customerId,

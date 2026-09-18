@@ -80,7 +80,7 @@ async function shouldSkip() {
 const customers = [
   {
     full_name: "שרון לוי",
-    phone: "050-1234567",
+    phone: "+972501234567",
     email: "sharon.levi@example.com",
     address: "רחוב הרצל 14, תל אביב",
     preferred_contact_method: "whatsapp",
@@ -88,7 +88,7 @@ const customers = [
   },
   {
     full_name: "אבי כהן",
-    phone: "052-9876543",
+    phone: "+972529876543",
     email: "avi.cohen@example.com",
     address: "שדרות בן גוריון 27, רמת גן",
     preferred_contact_method: "phone",
@@ -96,7 +96,7 @@ const customers = [
   },
   {
     full_name: "מיכל ברק",
-    phone: "054-2233445",
+    phone: "+972542233445",
     email: "michal.barak@example.com",
     address: "רחוב יפו 80, ירושלים",
     preferred_contact_method: "email",
@@ -104,7 +104,7 @@ const customers = [
   },
   {
     full_name: "יוסי שמש",
-    phone: "053-7711223",
+    phone: "+972537711223",
     email: null,
     address: "רחוב ויצמן 5, חיפה",
     preferred_contact_method: "phone",
@@ -112,7 +112,7 @@ const customers = [
   },
   {
     full_name: "ענת רוזן",
-    phone: "058-4455667",
+    phone: "+972584455667",
     email: "anat.rozen@example.com",
     address: "רחוב סוקולוב 22, הרצליה",
     preferred_contact_method: "sms",
@@ -120,7 +120,7 @@ const customers = [
   },
   {
     full_name: "דני אזולאי",
-    phone: "050-3344556",
+    phone: "+972503344556",
     email: "dani.azoulay@example.com",
     address: "רחוב הגלעד 11, מודיעין",
     preferred_contact_method: "whatsapp",
@@ -128,7 +128,7 @@ const customers = [
   },
   {
     full_name: "רותם פרץ",
-    phone: "052-1122334",
+    phone: "+972521122334",
     email: "rotem.peretz@example.com",
     address: "רחוב הירדן 9, באר שבע",
     preferred_contact_method: "whatsapp",
@@ -136,7 +136,7 @@ const customers = [
   },
   {
     full_name: "נטע גולן",
-    phone: "054-9988776",
+    phone: "+972549988776",
     email: "neta.golan@example.com",
     address: "רחוב התמר 3, פתח תקווה",
     preferred_contact_method: "phone",
