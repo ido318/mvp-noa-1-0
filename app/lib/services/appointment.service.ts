@@ -1,6 +1,6 @@
-import { CLINIC_LOCATION, HOME_VISIT_LOCATION, isValidIsraeliPhone } from "@tomer/shared";
+import { CLINIC_LOCATION, HOME_VISIT_LOCATION, isValidIsraeliPhone, israelDateIso } from "@tomer/shared";
 import { AppError, err, ok, type Result } from "@/lib/errors/app-error";
-import { isExpectedDuration, toIsraelLocalIso } from "@/lib/appointment-rules";
+import { isExpectedDuration, toIsraelLocalIso, BOOKING_WINDOW_DAYS, isWithinBookingWindow } from "@/lib/appointment-rules";
 import type { AppointmentRepository } from "@/lib/repositories/appointment.repository";
 import type { CustomerRepository } from "@/lib/repositories/customer.repository";
 import type { PetRepository } from "@/lib/repositories/pet.repository";
@@ -128,6 +128,22 @@ export class AppointmentService {
     }
     if (!isExpectedDuration(input.appointmentType, input.durationMinutes)) {
       return err(AppError.validation("Duration does not match appointment type"));
+    }
+    // Neither bound existed here or in createAppointmentSchema: the 14-day
+    // window was a list of chips the wizard rendered, and nothing stopped a
+    // booking in the past. The agent has enforced both since #19
+    // (bookingWindowRejection); this closes the same hole on the dashboard.
+    const scheduled = new Date(input.scheduledAt);
+    if (Number.isNaN(scheduled.getTime())) {
+      return err(AppError.validation("Invalid scheduledAt"));
+    }
+    if (scheduled.getTime() < Date.now()) {
+      return err(AppError.validation("לא ניתן לקבוע תור בעבר"));
+    }
+    if (!isWithinBookingWindow(israelDateIso(scheduled))) {
+      return err(
+        AppError.validation(`ניתן לקבוע תורים עד ${BOOKING_WINDOW_DAYS} יום קדימה בלבד`),
+      );
     }
 
     const customer = await this.customerRepository.findById(input.customerId);

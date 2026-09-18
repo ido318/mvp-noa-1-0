@@ -9,6 +9,7 @@ import { formatIsraelDate, formatIsraelTime } from "@/lib/israel-date";
 import type { AppointmentType } from "@/types/domain/appointment";
 import type { Customer } from "@/types/domain/customer";
 import type { Pet } from "@/types/domain/pet";
+import { israelDateIso } from "@/lib/israel-date";
 
 type Step = 1 | 2 | 3 | 4 | 5;
 
@@ -47,7 +48,10 @@ export function NewAppointmentWizard({
   const { toast } = useToast();
   const searchRequestIdRef = useRef(0);
 
-  const bookableDates = useMemo(() => getBookableDates(new Date().toISOString().slice(0, 10)), []);
+  // israelDateIso, not toISOString().slice(0,10): between 21:00/22:00 Israel
+  // time and midnight UTC the latter is yesterday, so the wizard offered a
+  // date already past.
+  const bookableDates = useMemo(() => getBookableDates(israelDateIso(new Date())), []);
 
   useEffect(() => {
     if (!open) {
