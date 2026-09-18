@@ -129,8 +129,9 @@ and does not define a root page. This is expected.
 ## Still Open
 
 - Decide whether to promote the latest Vercel preview to production.
-- Confirm Twilio Voice webhook still points to
-  `https://voxly-agent.fly.dev/twilio/voice`.
+- Confirm Twilio Voice `voice_url` still points to
+  `https://api.elevenlabs.io/twilio/inbound-call` (ElevenLabs native inbound).
+  Do **not** point the live number at `https://voxly-agent.fly.dev/twilio/voice`.
 - Confirm ElevenLabs post-call webhook still points to
   `https://voxly-agent.fly.dev/hooks/call-ended`.
 - Activate or verify scheduled `pg_cron` jobs only after confirming the desired

@@ -53,20 +53,63 @@ export class VisitChargeRepository {
         reviewed_at: new Date().toISOString(),
       })
       .eq("id", chargeId)
+      .eq("status", "pending")
       .in("clinic_id", clinicIds)
       .is("deleted_at", null)
       .select("*")
-      .single();
+      .maybeSingle();
     if (error) return err(AppError.externalProvider("Failed to review visit charge", error));
+    if (!data) return err(AppError.conflict("Visit charge is not pending review"));
     return ok(mapVisitChargeRow(data));
   }
 
-  async markInvoiced(chargeIds: string[], invoiceId: string): Promise<Result<void>> {
-    const { error } = await this.client
+  async markInvoiced(
+    chargeIds: string[],
+    invoiceId: string,
+    clinicId: string,
+  ): Promise<Result<void>> {
+    if (chargeIds.length === 0) return ok(undefined);
+    const { data, error } = await this.client
       .from("visit_charges")
       .update({ status: "invoiced", invoice_id: invoiceId })
-      .in("id", chargeIds);
+      .in("id", chargeIds)
+      .eq("clinic_id", clinicId)
+      .eq("status", "reviewed")
+      .is("deleted_at", null)
+      .select("id");
     if (error) return err(AppError.externalProvider("Failed to mark charges invoiced", error));
+    if ((data ?? []).length !== chargeIds.length) {
+      return err(AppError.conflict("Some charges were not in reviewed status"));
+    }
     return ok(undefined);
+  }
+
+  async createInvoiceFromVisit(input: {
+    visitId: string;
+    notes: string | null;
+    createdByUserId: string;
+  }): Promise<Result<{ id: string }>> {
+    const { data, error } = await this.client.rpc("create_invoice_from_visit", {
+      p_visit_id: input.visitId,
+      p_notes: input.notes,
+      p_created_by_user_id: input.createdByUserId,
+    });
+    if (error) {
+      const message = error.message ?? "";
+      if (message.includes("pending charges remain")) {
+        return err(AppError.validation("All pending charges must be reviewed before invoice creation"));
+      }
+      if (message.includes("no reviewed charges")) {
+        return err(AppError.validation("At least one reviewed charge is required before invoice creation"));
+      }
+      if (message.includes("visit not found")) {
+        return err(AppError.notFound("Visit not found"));
+      }
+      if ((error as { code?: string }).code === "23505") {
+        return err(AppError.conflict("Invoice number was just taken — retry", error));
+      }
+      return err(AppError.externalProvider("Failed to create invoice from visit", error));
+    }
+    return ok({ id: (data as { id: string }).id });
   }
 }

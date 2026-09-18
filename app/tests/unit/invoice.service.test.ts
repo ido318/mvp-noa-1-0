@@ -77,6 +77,10 @@ function buildInvoiceService(
 ) {
   const repository = {
     findById: vi.fn(async () => ok(invoice)),
+    claimPaymentLinkSend: vi.fn(async () =>
+      ok(invoice ? { ...invoice, paymentLinkSentAt: "claimed" } : null),
+    ),
+    releasePaymentLinkClaim: vi.fn(async () => ok(undefined)),
     attachPaymentLink: vi.fn(async () =>
       ok({ ...(invoice as Invoice), paymentLinkUrl: "https://pay.example/doc-1", paymentLinkSentAt: "now" }),
     ),
@@ -108,6 +112,7 @@ describe("InvoiceService.sendPaymentLink", () => {
     const result = await service.sendPaymentLink(actor, "invoice-1");
 
     expect(result.ok).toBe(true);
+    expect(repository.claimPaymentLinkSend).toHaveBeenCalledWith("invoice-1");
     expect(greenInvoiceService.createPaymentDocument).toHaveBeenCalledOnce();
     expect(repository.attachPaymentLink).toHaveBeenCalledWith("invoice-1", {
       paymentLinkUrl: "https://pay.example/doc-1",
@@ -128,6 +133,7 @@ describe("InvoiceService.sendPaymentLink", () => {
 
     expect(result.ok).toBe(false);
     expect(repository.attachPaymentLink).not.toHaveBeenCalled();
+    expect(repository.releasePaymentLinkClaim).toHaveBeenCalledWith("invoice-1");
   });
 
   it("rejects when the invoice is not yet issued (status !== sent)", async () => {
@@ -170,5 +176,20 @@ describe("InvoiceService.sendPaymentLink", () => {
     if (result.ok) return;
     expect(result.error.status).toBe(403);
     expect(greenInvoiceService.createPaymentDocument).not.toHaveBeenCalled();
+  });
+
+  it("rejects a second send when paymentLinkSentAt is already set", async () => {
+    const { service, greenInvoiceService, repository } = buildInvoiceService(
+      makeInvoice({ paymentLinkSentAt: "2026-09-01T10:00:00.000Z" }),
+    );
+
+    const result = await service.sendPaymentLink(actor, "invoice-1");
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.status).toBe(409);
+    expect(repository.claimPaymentLinkSend).not.toHaveBeenCalled();
+    expect(greenInvoiceService.createPaymentDocument).not.toHaveBeenCalled();
+    expect(sendSmsMock).not.toHaveBeenCalled();
   });
 });

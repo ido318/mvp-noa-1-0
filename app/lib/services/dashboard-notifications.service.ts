@@ -39,6 +39,21 @@ const VISIT_LABELS: Record<string, string> = {
 // approval SMS must not name one. Mirrors agent/src/lib/notifications.ts.
 const NO_FIXED_PRICE_TEXT = 'המחיר יימסר על ידי ד"ר נועה';
 
+/** 14-day lead, 08:00 Asia/Jerusalem — matches the agent daily scan window. */
+const VACCINATION_REMINDER_LEAD_DAYS = 14;
+const VACCINATION_REMINDER_LOCAL_HOUR = 8;
+
+export function vaccinationReminderScheduledFor(nextDueAt: string, now = new Date()): string {
+  const dueIso = nextDueAt.slice(0, 10);
+  const [year, month, day] = dueIso.split("-").map(Number);
+  if (!year || !month || !day) return now.toISOString();
+
+  const reminderDate = new Date(Date.UTC(year, month - 1, day - VACCINATION_REMINDER_LEAD_DAYS));
+  const reminderIso = reminderDate.toISOString().slice(0, 10);
+  const scheduled = israelDateAtHour(reminderIso, VACCINATION_REMINDER_LOCAL_HOUR);
+  return scheduled.getTime() < now.getTime() ? now.toISOString() : scheduled.toISOString();
+}
+
 const VISIT_PRICES: Record<string, string> = {
   checkup: "150 ₪",
   vaccination: "150 ₪",
@@ -166,7 +181,7 @@ export class DashboardNotificationsService {
         status: "pending",
         type: "vaccination_reminder",
         body: smsTemplates.vaccination_reminder({ customerName: p.customerName, petName: p.petName, vaccineName: p.vaccineName }),
-        scheduled_for: `${p.nextDueAt}T06:00:00.000Z`,
+        scheduled_for: vaccinationReminderScheduledFor(p.nextDueAt),
       },
       { onConflict: "vaccination_id,type", ignoreDuplicates: true },
     );

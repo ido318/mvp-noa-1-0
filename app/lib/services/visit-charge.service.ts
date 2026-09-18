@@ -1,5 +1,5 @@
 import { AppError, err, ok, type Result } from "@/lib/errors/app-error";
-import type { InvoiceService } from "@/lib/services/invoice.service";
+import type { InvoiceRepository } from "@/lib/repositories/invoice.repository";
 import type { VisitChargeRepository } from "@/lib/repositories/visit-charge.repository";
 import type { VisitRepository } from "@/lib/repositories/visit.repository";
 import type { ServiceActor } from "@/lib/services/service-context";
@@ -7,11 +7,19 @@ import type { CreateVisitChargeInput, VisitCharge } from "@/types/domain/visit-c
 import type { Invoice } from "@/types/domain/invoice";
 import type { Visit } from "@/types/domain/visit";
 
+function canManageInvoices(actor: ServiceActor, clinicId: string): boolean {
+  return actor.memberships.some(
+    (membership) =>
+      membership.clinicId === clinicId &&
+      (membership.role === "owner" || membership.role === "admin"),
+  );
+}
+
 export class VisitChargeService {
   constructor(
     private readonly repository: VisitChargeRepository,
     private readonly visitRepository: VisitRepository,
-    private readonly invoiceService: InvoiceService,
+    private readonly invoiceRepository: InvoiceRepository,
   ) {}
 
   async listForVisit(actor: ServiceActor, visitId: string): Promise<Result<VisitCharge[]>> {
@@ -48,31 +56,22 @@ export class VisitChargeService {
   ): Promise<Result<Invoice>> {
     const visit = await this.loadVisit(actor, visitId);
     if (!visit.ok) return err(visit.error);
-    const charges = await this.repository.listByVisit(visitId);
-    if (!charges.ok) return err(charges.error);
-    const reviewed = charges.value.filter((charge) => charge.status === "reviewed");
-    if (reviewed.length === 0) {
-      return err(AppError.validation("At least one reviewed charge is required before invoice creation"));
-    }
-    if (charges.value.some((charge) => charge.status === "pending")) {
-      return err(AppError.validation("All pending charges must be reviewed before invoice creation"));
+    if (!canManageInvoices(actor, visit.value.clinicId)) {
+      return err(AppError.forbidden("Only owner or admin can manage invoices"));
     }
 
-    const invoice = await this.invoiceService.createInvoice(actor, {
-      clinicId: visit.value.clinicId,
-      customerId: visit.value.customerId,
-      petId: visit.value.petId,
-      items: reviewed.map((charge) => ({
-        description: charge.description,
-        quantity: charge.quantity,
-        unitPrice: charge.unitPrice,
-      })),
+    const created = await this.repository.createInvoiceFromVisit({
+      visitId,
       notes: input.notes ?? null,
+      createdByUserId: actor.userId,
     });
-    if (!invoice.ok) return invoice;
+    if (!created.ok) return err(created.error);
 
-    const marked = await this.repository.markInvoiced(reviewed.map((charge) => charge.id), invoice.value.id);
-    if (!marked.ok) return err(marked.error);
+    const invoice = await this.invoiceRepository.findById(created.value.id);
+    if (!invoice.ok) return invoice;
+    if (!invoice.value) {
+      return err(AppError.externalProvider("Invoice created but could not be re-fetched", created.value));
+    }
     return ok(invoice.value);
   }
 

@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { DashboardNotificationsService } from "@/lib/services/dashboard-notifications.service";
+import {
+  DashboardNotificationsService,
+  vaccinationReminderScheduledFor,
+} from "@/lib/services/dashboard-notifications.service";
 import { smsTemplates } from "../../../agent/src/services/sms.templates";
 
 // Asserts against the real agent template (see sms-template-parity.test.ts
@@ -75,5 +78,43 @@ describe("DashboardNotificationsService.enqueueVaccinationReminder", () => {
 
     const [, options] = upsert.mock.calls[0] as [unknown, { onConflict: string; ignoreDuplicates: boolean }];
     expect(options).toEqual({ onConflict: "vaccination_id,type", ignoreDuplicates: true });
+  });
+
+  it("schedules 14 days before due date at 08:00 Asia/Jerusalem, not on the due date at 06:00 UTC", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-01T00:00:00.000Z"));
+    try {
+      expect(vaccinationReminderScheduledFor("2026-10-01")).toBe(
+        new Date("2026-09-17T08:00:00+03:00").toISOString(),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("writes that 14-day Jerusalem scheduled_for onto the notification row", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-01T00:00:00.000Z"));
+    try {
+      const { client, upsert } = buildClient();
+      const service = new DashboardNotificationsService(client as never);
+
+      await service.enqueueVaccinationReminder({
+        vaccinationId: "vacc-1",
+        clinicId: "clinic-1",
+        customerId: "cust-1",
+        phone: "+972500000000",
+        customerName: "דנה כהן",
+        petName: "מיקה",
+        vaccineName: "כלבת",
+        nextDueAt: "2026-10-01",
+      });
+
+      const [row] = upsert.mock.calls[0] as [{ scheduled_for: string }, unknown];
+      expect(row.scheduled_for).toBe(new Date("2026-09-17T08:00:00+03:00").toISOString());
+      expect(row.scheduled_for).not.toBe("2026-10-01T06:00:00.000Z");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

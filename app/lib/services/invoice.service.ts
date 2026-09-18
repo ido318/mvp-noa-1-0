@@ -137,6 +137,9 @@ export class InvoiceService {
         AppError.validation("ניתן לשלוח קישור תשלום רק לחשבונית שהונפקה (סטטוס 'נשלחה')"),
       );
     }
+    if (invoice.paymentLinkSentAt) {
+      return err(AppError.conflict("קישור תשלום כבר נשלח לחשבונית זו"));
+    }
 
     const customerResult = await this.customerRepository.findById(invoice.customerId);
     if (!customerResult.ok) return customerResult;
@@ -146,21 +149,31 @@ export class InvoiceService {
       return err(AppError.validation("ללקוח אין מספר טלפון לשליחת קישור התשלום"));
     }
 
-    const document = await this.greenInvoiceService.createPaymentDocument(
-      customer,
-      invoice.items,
-      invoice.notes,
-    );
+    const claimed = await this.repository.claimPaymentLinkSend(invoiceId);
+    if (!claimed.ok) return claimed;
+    if (!claimed.value) {
+      return err(AppError.conflict("קישור תשלום כבר נשלח לחשבונית זו"));
+    }
 
-    // Send before persisting: if the SMS fails, nothing gets written, so the
-    // invoice never ends up with a populated payment_link_sent_at for a link
-    // the customer never actually received.
+    let document: { documentId: string; paymentUrl: string };
+    try {
+      document = await this.greenInvoiceService.createPaymentDocument(
+        customer,
+        invoice.items,
+        invoice.notes,
+      );
+    } catch (error) {
+      await this.repository.releasePaymentLinkClaim(invoiceId);
+      return err(AppError.externalProvider("יצירת מסמך התשלום נכשלה", error));
+    }
+
     try {
       await sendSms(
         customer.phone,
         `שלום ${customer.fullName}, מצורף קישור לתשלום עבור חשבונית ${invoice.invoiceNumber} על סך ${invoice.total} ₪:\n${document.paymentUrl}`,
       );
     } catch (error) {
+      await this.repository.releasePaymentLinkClaim(invoiceId);
       return err(AppError.externalProvider("שליחת קישור התשלום נכשלה", error));
     }
 

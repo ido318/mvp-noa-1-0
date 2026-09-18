@@ -3,7 +3,7 @@
  * booking notifications at the time of booking by Tomer.
  * Notifications are created only when Noa approves the appointment in the dashboard.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // vi.hoisted lets us share mocks across the hoisted vi.mock factories
 const { mockSingle, mockMaybeSingle, mockSchedule } = vi.hoisted(() => {
@@ -48,13 +48,18 @@ import { bookAppointment } from "../../../src/lib/store.js";
 describe("bookAppointment — pending_approval (neutering) must not create notifications", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Reset single() to return a valid appointment row each time
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-15T07:00:00Z"));
     mockSingle.mockResolvedValue({
-      data: { id: "appt-123", scheduled_at: "2026-06-20T10:00:00Z" },
+      data: { id: "appt-123", scheduled_at: "2026-06-16T10:00:00+03:00" },
       error: null,
     });
     mockMaybeSingle.mockResolvedValue({ data: null, error: null });
     mockSchedule.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("does NOT call scheduleBookingNotifications when visit_type=neutering", async () => {
@@ -64,7 +69,7 @@ describe("bookAppointment — pending_approval (neutering) must not create notif
       pet_name:      "לונה",
       pet_species:   "dog",
       visit_type:    "neutering",
-      scheduled_at:  "2026-06-20T10:00:00Z",
+      scheduled_at:  "2026-06-16T10:00:00+03:00",
     });
 
     // The booking should succeed and return a pending_approval message
@@ -80,7 +85,7 @@ describe("bookAppointment — pending_approval (neutering) must not create notif
       pet_name:      "לונה",
       pet_species:   "dog",
       visit_type:    "checkup",
-      scheduled_at:  "2026-06-20T10:00:00Z",
+      scheduled_at:  "2026-06-16T10:00:00+03:00",
     });
 
     expect(result).toContain("תור נקבע");
