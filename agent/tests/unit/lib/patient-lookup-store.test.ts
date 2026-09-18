@@ -189,13 +189,14 @@ describe("findCustomerByPhone", () => {
     // expressed through this table-scoped mock at all — the meaningful
     // assertions are the eq/is calls below, proving the query itself filters
     // server-side rather than relying on an embed).
-    setQueue("pets", [{ data: [{ name: PET_NAME, species: PET_SPECIES, breed: null }], error: null }]);
+    setQueue("pets", [{ data: [{ id: VALID_PET_ID, name: PET_NAME, species: PET_SPECIES, breed: null }], error: null }]);
 
     const customer = await findCustomerByPhone(PHONE);
 
     expect(eqCallsFor("pets")).toContainEqual(["customer_id", CUSTOMER_ID]);
     expect(isCallsFor("pets")).toContainEqual(["deleted_at", null]);
-    expect(customer?.pets).toEqual([{ name: PET_NAME, species: PET_SPECIES, breed: null }]);
+    expect(customer?.id).toBe(CUSTOMER_ID);
+    expect(customer?.pets).toEqual([{ id: VALID_PET_ID, name: PET_NAME, species: PET_SPECIES, breed: null }]);
   });
 
   it("reports zero pets for a known customer with none registered (or all soft-deleted)", async () => {
@@ -293,7 +294,7 @@ describe("getPatientReminders", () => {
 });
 
 describe("getPatientChronicConditions", () => {
-  it("combines pets.chronic_conditions and medical_records.active_problem_list with a prioritization instruction", async () => {
+  it("combines pets.chronic_conditions and medical_records.active_problem_list without booking instructions", async () => {
     ownershipQueues(true);
     setQueue("pets", [
       { data: { id: VALID_PET_ID, name: PET_NAME, species: PET_SPECIES }, error: null }, // ownership check
@@ -311,7 +312,8 @@ describe("getPatientChronicConditions", () => {
     expect(result).toContain("אי ספיקת כליות כרונית");
     expect(result).toContain("סוכרת");
     expect(result).toContain("דלקת מפרקים");
-    expect(result).toContain('אם בעל החיה מדווח כרגע על החמרה במצב');
+    expect(result).not.toContain("התור המוקדם ביותר");
+    expect(result).not.toContain("החמרה");
   });
 
   it("returns a plain no-known-conditions message when both sources are empty", async () => {
@@ -384,6 +386,6 @@ describe("getLastVisitPlan", () => {
     ]);
 
     const result = await getLastVisitPlan(PHONE, VALID_PET_ID);
-    expect(result).toContain("לא נמצאה תוכנית המשך רשומה");
+    expect(result).toContain("אין תוכנית טיפול שמורה");
   });
 });

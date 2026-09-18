@@ -25,9 +25,10 @@ import {
 import { processNotifications } from "./notificationProcessor.js";
 import { VALID_CALL_CATEGORIES } from "./callClassifier.js";
 
-export type Pet = { name: string; species: string; breed: string | null };
+export type Pet = { id: string; name: string; species: string; breed: string | null };
 
 export type Customer = {
+  id: string;
   phone: string;
   full_name: string;
   pets: Pet[];
@@ -92,18 +93,32 @@ export async function findCustomerByPhone(
   // was missed when the bug was first found and fixed there.
   const { data: petsData, error: petsErr } = await getSupabase()
     .from("pets")
-    .select("name, species, breed")
+    .select("id, name, species, breed")
     .eq("clinic_id", env.AGENT_CLINIC_ID)
     .eq("customer_id", row.id)
     .is("deleted_at", null);
 
   if (petsErr) throw new Error(`supabase lookup failed: ${petsErr.message}`);
 
+  const pets = (petsData ?? []).flatMap((petRow) => {
+    const id = extractId(petRow);
+    const name = extractString(petRow, "name");
+    const species = extractString(petRow, "species");
+    if (!id || !name || !species) return [];
+    return [{
+      id,
+      name,
+      species,
+      breed: extractString(petRow, "breed"),
+    }];
+  });
+
   return {
+    id: row.id,
     phone: row.phone,
     full_name: row.full_name,
     notes: row.notes,
-    pets: (petsData ?? []) as Pet[],
+    pets,
   };
 }
 
@@ -563,6 +578,73 @@ export async function rescheduleAppointment(
   return `✅ התור הוזז בהצלחה מ-${oldLabel} ל-${formatDateHe(newDate)} בשעה ${newLabel}.`;
 }
 
+const ACTIVE_APPOINTMENT_STATUSES = [
+  "scheduled",
+  "confirmed",
+  "pending_approval",
+  "checked_in",
+  "in_visit",
+] as const;
+
+export type CustomerAppointmentSummary = {
+  scheduled_at: string;
+  visit_type: string;
+  pet_name: string;
+  status: string;
+};
+
+export async function listCustomerAppointments(
+  phone: string,
+): Promise<{ result: string; appointments: CustomerAppointmentSummary[] }> {
+  const env = getEnv();
+  const normalised = normalisePhone(phone);
+  const customerId = await findCustomerIdByPhone(normalised);
+  if (!customerId) {
+    return { result: "לא מצאנו לקוח עם מספר הטלפון הזה.", appointments: [] };
+  }
+
+  const windowStart = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString();
+
+  const { data, error } = await getSupabase()
+    .from("appointments")
+    .select("scheduled_at, appointment_type, status, pets(name)")
+    .eq("clinic_id", env.AGENT_CLINIC_ID)
+    .eq("customer_id", customerId)
+    .in("status", [...ACTIVE_APPOINTMENT_STATUSES])
+    .is("deleted_at", null)
+    .gte("scheduled_at", windowStart)
+    .order("scheduled_at", { ascending: true })
+    .limit(8);
+
+  if (error) throw new Error(`listCustomerAppointments failed: ${error.message}`);
+
+  const appointments: CustomerAppointmentSummary[] = (data ?? []).flatMap((row) => {
+    const scheduled_at = extractString(row, "scheduled_at");
+    if (!scheduled_at) return [];
+    const visit_type = extractString(row, "appointment_type") ?? "other";
+    const status = extractString(row, "status") ?? "scheduled";
+    const pet_name = extractNestedString(row, "pets", "name") ?? "";
+    return [{ scheduled_at, visit_type, pet_name, status }];
+  });
+
+  if (appointments.length === 0) {
+    return { result: "אין תורים פעילים קרובים למספר הזה.", appointments: [] };
+  }
+
+  const lines = appointments.map((appt) => {
+    const dateLabel = formatDateHe(toIsraelDateIso(new Date(appt.scheduled_at)));
+    const timeLabel = formatSlotSpokenHe(appt.scheduled_at);
+    const typeLabel = getVisitConfig(appt.visit_type as VisitType).labelHe;
+    const petBit = appt.pet_name ? ` עבור ${appt.pet_name}` : "";
+    return `${dateLabel} בשעה ${timeLabel} — ${typeLabel}${petBit} (scheduled_at=${appt.scheduled_at})`;
+  });
+
+  return {
+    result: `תורים פעילים: ${lines.join("; ")}`,
+    appointments,
+  };
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Waitlist
 // ─────────────────────────────────────────────────────────────────────────────
@@ -792,9 +874,6 @@ export async function getPatientChronicConditions(phone: string, petId: string):
   if (hasProblems) {
     parts.push(`רשימת בעיות פעילה: ${conditionNames.join(", ")}.`);
   }
-  parts.push(
-    "אם בעל החיה מדווח כרגע על החמרה במצב — יש להתייחס לכך כדגל אזהרה ולהמשיך בבירור הרפואי הרגיל, שכולל בתוכו זיהוי מקרים שדורשים העברה דחופה; מעבר לכך, יש להציע את התור המוקדם ביותר האפשרי.",
-  );
 
   return parts.join(" ");
 }
@@ -854,7 +933,7 @@ export async function getLastVisitPlan(phone: string, petId: string): Promise<st
     return `לא נמצאה תוכנית טיפול מאושרת מהביקור האחרון עבור ${pet.name}. תקציר הביקור האחרון: ${summary.trim()}`;
   }
 
-  return `לא נמצאה תוכנית המשך רשומה עבור ${pet.name}.`;
+  return `אין תוכנית טיפול שמורה עבור ${pet.name}.`;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

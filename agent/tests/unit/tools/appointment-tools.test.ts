@@ -17,6 +17,7 @@ vi.mock("../../../src/lib/store.js", async (importOriginal) => {
     cancelAppointment: vi.fn(),
     rescheduleAppointment: vi.fn(),
     joinWaitlist: vi.fn(),
+    listCustomerAppointments: vi.fn(),
     findCustomerByPhone: vi.fn(),
     addEscalation: vi.fn().mockResolvedValue(undefined),
   };
@@ -28,6 +29,7 @@ import {
   cancelAppointment,
   checkAvailability,
   joinWaitlist,
+  listCustomerAppointments,
   rescheduleAppointment,
 } from "../../../src/lib/store.js";
 
@@ -45,6 +47,15 @@ describe("appointment tools", () => {
     vi.mocked(cancelAppointment).mockResolvedValue("✅ התור בוטל בהצלחה.");
     vi.mocked(rescheduleAppointment).mockResolvedValue("✅ התור הוזז בהצלחה.");
     vi.mocked(joinWaitlist).mockResolvedValue("✅ נרשמ/ה לרשימת ההמתנה.");
+    vi.mocked(listCustomerAppointments).mockResolvedValue({
+      result: "תורים פעילים: 14/06/2026 בשעה 9:10 בבוקר — בדיקה בקליניקה עבור Mika (scheduled_at=2026-06-14T09:10:00+03:00)",
+      appointments: [{
+        scheduled_at: "2026-06-14T09:10:00+03:00",
+        visit_type: "checkup",
+        pet_name: "Mika",
+        status: "scheduled",
+      }],
+    });
   });
 
   it("POST /tools/check-availability returns result string", async () => {
@@ -176,5 +187,22 @@ describe("appointment tools", () => {
 
     expect(res.status).toBe(200);
     expect(vi.mocked(joinWaitlist)).toHaveBeenCalledWith(payload);
+  });
+
+  it("POST /tools/list-customer-appointments returns upcoming active appointments", async () => {
+    const res = await makeApp().request("/tools/list-customer-appointments", {
+      method: "POST",
+      headers: toolHeaders(),
+      body: JSON.stringify({ phone: "+972541234567" }),
+    });
+
+    expect(res.status).toBe(200);
+    const json = await res.json() as {
+      result: string;
+      appointments: Array<{ scheduled_at: string }>;
+    };
+    expect(json.result).toContain("תורים פעילים");
+    expect(json.appointments[0]?.scheduled_at).toBe("2026-06-14T09:10:00+03:00");
+    expect(vi.mocked(listCustomerAppointments)).toHaveBeenCalledWith("+972541234567");
   });
 });
