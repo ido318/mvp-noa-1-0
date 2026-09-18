@@ -9,7 +9,7 @@ Scope: investigation and written report only. No code fixes or refactors were ma
 
 The repository is in much better shape than the older `AUDIT_REPORT.md` suggests: the monorepo builds, typechecks, lints, and unit tests pass; conflict markers were not found; `.env` files are ignored; and the shared package now centralizes critical SMS wording and Jerusalem-time helpers.
 
-The most urgent issue is dependency security: `npm audit` reports a **critical Next.js advisory** against the exact production dashboard version. The next most important findings are correctness/security issues in billing/payment references, login redirect sanitization, concurrent visit opening, vaccination reminder timing, dashboard availability status filters, and a destructive reset script that is not clinic-scoped.
+The most urgent issues are dependency security and database reproducibility: `npm audit` reports a **critical Next.js advisory** against the exact production dashboard version, and the committed `call_reviews` migrations do not match what the current agent/app code expects. The next most important findings are correctness/security issues in billing/payment references, login redirect sanitization, concurrent visit opening, vaccination reminder timing and clinic scoping, dashboard availability status filters, and a destructive reset script that is not clinic-scoped.
 
 ## Verification Commands Run
 
@@ -39,6 +39,13 @@ The most urgent issue is dependency security: `npm audit` reports a **critical N
   - `GHSA-2xp9-vwfh-vxw4`: unauthenticated RCE in Image Optimization API when AVIF files are used.
 - **Why it matters:** Even if the current deployment is Linux/Vercel, this is a production-facing web app dependency with a critical advisory. Audit also says the available fix is `next@16.3.5`.
 - **Suggested fix:** Upgrade `next` and matching `eslint-config-next` to the patched `16.3.5` line, run `npm install`, then rerun typecheck/lint/test/build. Do this in a dedicated fix PR, not as part of this report-only PR.
+
+#### C2. `call_reviews` migrations do not create the schema used by current code
+
+- **Where:** `supabase/migrations/20260828000022_prompt_learning_loop.sql` creates `call_reviews` with `elevenlabs_conversation_id`, `evaluation_results`, and `flagged_criteria`; current code in `agent/src/lib/learning/logConversation.ts`, `agent/src/lib/learning/qaAnalyzer.ts`, and `app/lib/repositories/call-review.repository.ts` uses `conversation_id`, `agent_id`, `version_id`, `evaluation_criteria_results`, `data_collection_results`, `transcript`, `call_duration_secs`, QA scores, `is_exception`, and `problems`.
+- **What is wrong:** Later migrations add some QA fields and `clinic_id`, but there is no committed corrective migration that renames/adds the full schema current code requires or changes the unique key to `conversation_id`.
+- **Why it matters:** A fresh `supabase db reset` / staging / CI database can build a `call_reviews` table that the current webhook, QA analyzer, weekly prompt-learning job, and provider-admin screens cannot write/read correctly. Production may only work because the cloud table was manually repaired.
+- **Suggested fix:** Add one explicit corrective migration that makes `call_reviews` match the current code: rename/backfill legacy columns where possible, add missing columns and constraints, and create the expected `UNIQUE (conversation_id)`.
 
 ### High
 
@@ -96,10 +103,38 @@ The most urgent issue is dependency security: `npm audit` reports a **critical N
 
 #### H8. Production docs still contradict the verified Twilio/ElevenLabs call path
 
-- **Where:** `README.md` still diagrams `Twilio -> POST /twilio/voice -> agent`; `docs/DEPLOYMENT_STATUS.md` and `docs/PRODUCTION_SETUP_CHECKLIST.md` tell operators to point Twilio Voice to `https://voxly-agent.fly.dev/twilio/voice`; `CLAUDE.md` says the verified production path is Twilio's native ElevenLabs inbound-call URL and warns that repointing Twilio at the app broke calls.
+- **Where:** `README.md` and `AGENTS.md` still diagram `Twilio -> POST /twilio/voice -> agent`; `docs/DEPLOYMENT_STATUS.md` and `docs/PRODUCTION_SETUP_CHECKLIST.md` tell operators to point Twilio Voice to `https://voxly-agent.fly.dev/twilio/voice`; `CLAUDE.md` says the verified production path is Twilio's native ElevenLabs inbound-call URL and warns that repointing Twilio at the app broke calls.
 - **What is wrong:** The repo has two live-looking sets of operational instructions for mutually exclusive voice routing.
-- **Why it matters:** Following the stale checklist can reproduce the prior outage class and make Tomer go silent.
+- **Why it matters:** Following the stale checklist can reproduce the prior outage class and make Tomer go silent. `AGENTS.md` is especially risky because it is loaded as Cloud Agent guidance.
 - **Suggested fix:** Update README/deployment/checklist docs so there is one source of truth: current production Twilio `voice_url` should point to ElevenLabs native inbound-call unless there is a deliberate fallback migration plan.
+
+#### H9. Agent booking/reschedule endpoints can bypass the 14-day window and business hours
+
+- **Where:** `agent/src/lib/store.ts#checkAvailability` enforces `isWithin14Days()` and closed-day logic; `agent/src/lib/store.ts#bookAppointment` and `#rescheduleAppointment` insert/update directly without repeating those checks.
+- **What is wrong:** The voice tool contract says Tomer should call `check-availability` first, but the server-side mutation paths still accept any `scheduled_at` supplied by the LLM/tool caller if it does not overlap an existing appointment.
+- **Why it matters:** A skipped tool step, retry with stale data, or crafted request can book outside the binding 14-day window, on Saturday, or outside clinic hours.
+- **Suggested fix:** Enforce the 14-day window, clinic hours, and optionally exact-slot membership inside `bookAppointment` and before the `reschedule_appointment` RPC. Add tests that call mutation functions directly with out-of-window/closed-day slots.
+
+#### H10. Scheduled jobs are not clinic-scoped in a multi-tenant schema
+
+- **Where:** `supabase/scripts/cron-jobs.sql` posts `{}` to `/jobs/process-notifications` and `/jobs/send-vaccination-reminders`; `agent/src/server/routes/jobs.ts` only passes `clinicId` if supplied; `agent/src/lib/notificationProcessor.ts` and `agent/src/lib/vaccinationReminders.ts` do not default to `AGENT_CLINIC_ID`.
+- **What is wrong:** The normal cron path can process/send all pending notifications in the project, and the vaccination reminder scan queries all clinics.
+- **Why it matters:** The database is explicitly multi-tenant. Adding a second clinic would let the Get A Vet agent job process another clinic's SMS queue/reminders.
+- **Suggested fix:** Default job routes to `env.AGENT_CLINIC_ID`, pass clinic id in cron bodies, and assert `.eq("clinic_id", ...)` in notification/vaccination reminder tests.
+
+#### H11. Storage buckets are documented as manual state, not created by migrations
+
+- **Where:** `supabase/migrations/20260612000017_sprint4_dashboard.sql` and `supabase/migrations/20260901224417_soap_recordings_bucket.sql` create storage policies but explicitly say the `call-recordings` and `soap-recordings` buckets themselves must be created via dashboard/API. `supabase/config.toml` does not declare local buckets.
+- **What is wrong:** The schema/migration history alone does not create everything the code needs for recording upload/download paths.
+- **Why it matters:** Fresh local/staging environments can pass SQL migrations but fail at runtime when `/hooks/call-ended` uploads call audio or `/api/visits/[visitId]/soap-recording` uploads dictation audio.
+- **Suggested fix:** Add idempotent bucket creation to migrations or local `config.toml`, and make deployment checklists verify bucket existence.
+
+#### H12. Sending payment links is not idempotent
+
+- **Where:** `app/lib/services/invoice.service.ts#sendPaymentLink` checks only `invoice.status === "sent"`; `app/components/dashboard/billing/send-payment-link-button.tsx` renders the button for every sent invoice.
+- **What is wrong:** The service does not check `paymentLinkSentAt` / existing Green Invoice document before creating a new document and sending another SMS.
+- **Why it matters:** Double-clicks/retries can create multiple Green Invoice payment documents and multiple payment-link SMS messages for one invoice.
+- **Suggested fix:** Treat `payment_link_sent_at` as an atomic claim: update only when null, return the existing link or a 409 once sent, and disable/hide the button after successful send.
 
 ### Medium
 
@@ -187,6 +222,48 @@ The most urgent issue is dependency security: `npm audit` reports a **critical N
 - **Why it matters:** A future Vite/Vitest upgrade can break tests.
 - **Suggested fix:** Replace with `import.meta.dirname` or a `fileURLToPath(import.meta.url)` helper.
 
+#### M12. Voice-call caller extraction is too narrow for the native ElevenLabs path
+
+- **Where:** `agent/src/lib/store.ts#saveVoiceCall` reads only top-level `payload["caller_number"]`, while `extractTwilioCallSid()` already checks top-level, `metadata`, and `conversation_initiation_client_data.dynamic_variables`.
+- **What is wrong:** The production path is Twilio -> ElevenLabs native integration, not the fallback `/twilio/voice` stream that injects custom `<Parameter>` values. Caller phone may arrive under a different metadata/dynamic-variable shape.
+- **Why it matters:** `voice_calls.from_number` can become `"unknown"`, and `customer_id` linkage may be missed for real calls.
+- **Suggested fix:** Add `extractCallerPhone()` that mirrors the SID extraction strategy and add a native-integration payload fixture test.
+
+#### M13. ElevenLabs tool error responses may hide the Hebrew `{ result }` from the model
+
+- **Where:** `agent/src/server/routes/tools.ts` returns `{ result: "..." }` with HTTP 400/500 for validation/internal errors.
+- **What is wrong:** ElevenLabs ConvAI tools generally expect successful 2xx JSON tool output for the model to consume. Non-2xx responses may be treated as tool failures instead of model-visible guidance.
+- **Why it matters:** Tomer may retry, hallucinate success, or fail to say the intended Hebrew error message.
+- **Suggested fix:** Keep 403 for auth, but return 200 with `{ result }` for validation/business failures and reserve 5xx for genuinely unavailable dependencies if ElevenLabs behavior is verified.
+
+#### M14. Notification processor claims an unbounded batch
+
+- **Where:** `agent/src/lib/notificationProcessor.ts#processNotifications`.
+- **What is wrong:** The atomic claim updates every due pending row with no limit.
+- **Why it matters:** After downtime/backlog recovery, one cron tick can claim a very large queue, hit Twilio rate limits, or exceed Fly request timeouts.
+- **Suggested fix:** Add a bounded batch size and loop/paginate, with metrics for remaining due rows.
+
+#### M15. `/jobs/send-vaccination-reminders` lacks the rate-limit/idempotency wrapper used by other job routes
+
+- **Where:** `agent/src/server/routes/vaccinationReminders.ts` has bearer auth only; `agent/src/server/routes/jobs.ts` has in-memory rate limiting and idempotency for the other job endpoints.
+- **What is wrong:** A leaked or misused jobs bearer token can repeatedly trigger full vaccination scans.
+- **Why it matters:** It increases blast radius of the already-powerful job token and can amplify Supabase/Twilio load.
+- **Suggested fix:** Reuse the job security wrapper, or move vaccination reminder triggering into `jobs.ts` behind the same rate-limit/idempotency logic.
+
+#### M16. Production-facing AI artifact endpoints silently return deterministic stubs
+
+- **Where:** `app/lib/services/ai-artifact.service.ts#generateArtifact` returns deterministic text for `patient_summary`, `client_instructions`, and `extracted_tasks`; `#generateSoapDraft` falls back to `deterministic-draft` when OpenAI is not configured.
+- **What is wrong:** Some AI routes can look successful while returning placeholder transformations, unlike `VisitSummaryAssistantService`, which returns `503` when OpenAI is missing.
+- **Why it matters:** Staff may trust "AI" output that is not actually model-generated.
+- **Suggested fix:** Either hide these features until backed by a real provider or return a clear service-unavailable error outside test/dev mode.
+
+#### M17. App security headers are not configured
+
+- **Where:** `app/next.config.ts` is empty.
+- **What is wrong:** No explicit Content-Security-Policy, frame restrictions, referrer policy, or other hardening headers are configured at the app level.
+- **Why it matters:** The dashboard handles clinic/customer/medical data, and defense-in-depth browser headers would reduce impact of future XSS or embedding issues.
+- **Suggested fix:** Add conservative Next.js `headers()` for dashboard/API routes, with a tested CSP that allows required Supabase/Vercel/Twilio/Green Invoice/OpenAI endpoints as needed.
+
 ### Low
 
 #### L1. README and agent docs are stale about monorepo shape and auth mechanics
@@ -236,6 +313,12 @@ The most urgent issue is dependency security: `npm audit` reports a **critical N
 - **Where:** `app/lib/learning/elevenlabsTesting.ts` repeats the same `if (!current.platformSettings)` guard twice; `.air/worktree.json` contains dummy macOS setup with `EXAMPLE_KEY`.
 - **Why it matters:** Low direct risk, but these are signs of cleanup debt.
 - **Suggested fix:** Remove duplicate checks and archive/remove unused local tooling config if it is not part of the project workflow.
+
+#### L9. README links to a missing source-of-truth document
+
+- **Where:** `README.md` links to `docs/VOXLY_SOURCE_OF_TRUTH.md`, but that file is not present.
+- **Why it matters:** New operators lose the supposed canonical reference and may fall back to stale docs.
+- **Suggested fix:** Restore the document or replace the link with the current Notion/source-of-truth location.
 
 ## Notable Non-Findings
 
