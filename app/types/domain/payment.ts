@@ -14,8 +14,8 @@ export type Payment = {
 };
 
 export type RecordPaymentInput = {
-  clinicId: string;
   invoiceId: string;
+  clinicId?: string;
   amount: number;
   method: PaymentMethod;
   paidAt?: string;

@@ -84,9 +84,8 @@ flyctl deploy --app voxly-agent
 [Caller phone]
       ↓
 [Twilio Israeli number]
-      ↓ POST /twilio/voice
-[agent/ — Hono server]
-      ↓ ElevenLabs signed URL
+      ↓ voice_url = https://api.elevenlabs.io/twilio/inbound-call
+        (ElevenLabs native inbound; do NOT point Twilio at /twilio/voice)
 [ElevenLabs Conversational AI — Tomer]
       ↓ Hebrew conversation
       ├── POST /tools/lookup-customer  → customers + pets (Supabase)
@@ -101,6 +100,8 @@ flyctl deploy --app voxly-agent
                                  (/dashboard/voice/[callId] is the single-call view,
                                   opened from the pre-visit brief)
 ```
+
+`agent/src/server/routes/twilio.ts` (`/twilio/voice`, `/twilio/status`) is kept as a fallback only and is **not** wired to the live number. Repointing Twilio at the agent previously silenced Tomer.
 
 ---
 

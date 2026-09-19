@@ -1,8 +1,8 @@
 import { z } from "zod";
 
 export const recordPaymentSchema = z.object({
-  clinicId: z.string().uuid(),
   invoiceId: z.string().uuid(),
+  clinicId: z.string().uuid().optional(),
   amount: z.number().positive(),
   method: z.enum(["cash", "card", "bank_transfer", "bit", "other"]),
   paidAt: z.string().datetime({ offset: true }).optional(),

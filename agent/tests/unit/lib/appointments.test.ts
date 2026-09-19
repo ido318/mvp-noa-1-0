@@ -8,6 +8,7 @@ import {
   formatSlotOptionForTool,
   formatDateHe,
   isWithin14Days,
+  bookingWindowRejection,
   isTooLateToCancel,
   effectiveDuration,
   VISIT_TYPE_CONFIG,
@@ -257,6 +258,36 @@ describe("isWithin14Days", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-06-11T10:00:00Z"));
     expect(isWithin14Days("2026-06-10")).toBe(false);
+  });
+});
+
+describe("bookingWindowRejection", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("rejects Saturday even inside the 14-day window", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-11T10:00:00Z"));
+    expect(bookingWindowRejection("2026-06-20T10:00:00+03:00", "checkup")).toContain("סגורה בשבת");
+  });
+
+  it("rejects a date more than 14 days ahead", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-11T10:00:00Z"));
+    expect(bookingWindowRejection("2026-06-26T10:00:00+03:00", "checkup")).toContain("14 יום");
+  });
+
+  it("rejects a weekday slot after clinic close", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-11T10:00:00Z"));
+    expect(bookingWindowRejection("2026-06-14T20:00:00+03:00", "checkup")).toContain("שעות הפעילות");
+  });
+
+  it("allows a weekday in-hours slot", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-11T10:00:00Z"));
+    expect(bookingWindowRejection("2026-06-14T10:00:00+03:00", "checkup")).toBeNull();
   });
 });
 

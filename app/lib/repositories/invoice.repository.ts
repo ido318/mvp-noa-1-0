@@ -125,7 +125,6 @@ export class InvoiceRepository {
       .update({
         payment_link_url: input.paymentLinkUrl,
         green_invoice_document_id: input.greenInvoiceDocumentId,
-        payment_link_sent_at: new Date().toISOString(),
       })
       .eq("id", invoiceId)
       .select(SELECT_WITH_JOINS)
@@ -133,5 +132,34 @@ export class InvoiceRepository {
 
     if (error) return err(AppError.externalProvider("Failed to attach payment link", error));
     return ok(mapInvoiceRow(data));
+  }
+
+  async claimPaymentLinkSend(invoiceId: string): Promise<Result<Invoice | null>> {
+    const { data, error } = await this.client
+      .from("invoices")
+      .update({ payment_link_sent_at: new Date().toISOString() })
+      .eq("id", invoiceId)
+      .eq("status", "sent")
+      .is("payment_link_sent_at", null)
+      .select(SELECT_WITH_JOINS)
+      .maybeSingle();
+
+    if (error) return err(AppError.externalProvider("Failed to claim payment link send", error));
+    return ok(data ? mapInvoiceRow(data) : null);
+  }
+
+  async releasePaymentLinkClaim(invoiceId: string): Promise<Result<void>> {
+    const { error } = await this.client
+      .from("invoices")
+      .update({
+        payment_link_sent_at: null,
+        payment_link_url: null,
+        green_invoice_document_id: null,
+      })
+      .eq("id", invoiceId)
+      .is("payment_link_url", null);
+
+    if (error) return err(AppError.externalProvider("Failed to release payment link claim", error));
+    return ok(undefined);
   }
 }

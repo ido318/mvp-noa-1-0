@@ -91,6 +91,39 @@ export function isWithin14Days(dateIso: string): boolean {
   return diffDays >= 0 && diffDays <= MAX_BOOKING_DAYS_AHEAD;
 }
 
+/**
+ * Server-side booking/reschedule guard. checkAvailability already rejects
+ * out-of-window and closed-day requests, but book/reschedule must not trust
+ * that the LLM called it first.
+ */
+export function bookingWindowRejection(scheduledAt: string, visitType: VisitType): string | null {
+  const instant = new Date(scheduledAt);
+  if (Number.isNaN(instant.getTime())) {
+    return "מועד התור אינו תקין.";
+  }
+
+  const dateIso = toIsraelDateIso(instant);
+  if (!isWithin14Days(dateIso)) {
+    return `ניתן לקבוע תורים עד ${formatDateHe(maxBookingDateIso())} בלבד (14 יום קדימה).`;
+  }
+
+  const hours = getClinicHours(dateIso);
+  if (!hours) {
+    return "המרפאה סגורה בשבת. אפשר לקבוע תור ביום ראשון עד חמישי 08:00-20:00 או ביום שישי 08:30-13:00.";
+  }
+
+  const { hour, minute } = israelDayHourMinute(instant);
+  const startMin = hour * 60 + minute;
+  const dayStartMin = hours.start.h * 60 + hours.start.m;
+  const dayEndMin = hours.end.h * 60 + hours.end.m;
+  const durationMin = effectiveDuration(visitType);
+  if (startMin < dayStartMin || startMin + durationMin > dayEndMin) {
+    return "השעה שנבחרה מחוץ לשעות הפעילות. אפשר לקבוע תור ביום ראשון עד חמישי 08:00-20:00 או ביום שישי 08:30-13:00.";
+  }
+
+  return null;
+}
+
 /** Returns true if cancelling now is within LATE_CANCEL_HOURS of the appointment. */
 export function isTooLateToCancel(scheduledAtIso: string): boolean {
   const apptMs = new Date(scheduledAtIso).getTime();

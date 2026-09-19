@@ -51,46 +51,46 @@ describe("Phase 10 inventory and billing", () => {
 
   it("requires reviewed charges before creating invoice from visit", async () => {
     const chargeRepository = {
-      listByVisit: vi.fn().mockResolvedValue(ok([
-        { id: "charge1", status: "pending", description: "בדיקה", quantity: 1, unitPrice: 150 },
-      ])),
+      createInvoiceFromVisit: vi.fn().mockResolvedValue({
+        ok: false,
+        error: { status: 400, message: "All pending charges must be reviewed before invoice creation" },
+      }),
     };
     const visitRepository = { findById: vi.fn().mockResolvedValue(ok(visit)) };
-    const invoiceService = { createInvoice: vi.fn() };
+    const invoiceRepository = { findById: vi.fn() };
     const service = new VisitChargeService(
       chargeRepository as never,
       visitRepository as never,
-      invoiceService as never,
+      invoiceRepository as never,
     );
 
     const result = await service.createInvoiceFromVisit(actor, "visit1", {});
 
     expect(result.ok).toBe(false);
-    expect(invoiceService.createInvoice).not.toHaveBeenCalled();
+    expect(invoiceRepository.findById).not.toHaveBeenCalled();
   });
 
-  it("creates invoice from reviewed visit charges", async () => {
+  it("creates invoice from reviewed visit charges via a single RPC", async () => {
     const chargeRepository = {
-      listByVisit: vi.fn().mockResolvedValue(ok([
-        { id: "charge1", status: "reviewed", description: "בדיקה", quantity: 1, unitPrice: 150 },
-      ])),
-      markInvoiced: vi.fn().mockResolvedValue(ok(undefined)),
+      createInvoiceFromVisit: vi.fn().mockResolvedValue(ok({ id: "invoice1" })),
     };
     const visitRepository = { findById: vi.fn().mockResolvedValue(ok(visit)) };
-    const invoiceService = { createInvoice: vi.fn().mockResolvedValue(ok({ id: "invoice1" })) };
+    const invoiceRepository = { findById: vi.fn().mockResolvedValue(ok({ id: "invoice1" })) };
     const service = new VisitChargeService(
       chargeRepository as never,
       visitRepository as never,
-      invoiceService as never,
+      invoiceRepository as never,
     );
 
     const result = await service.createInvoiceFromVisit(actor, "visit1", {});
 
     expect(result.ok).toBe(true);
-    expect(invoiceService.createInvoice).toHaveBeenCalledWith(actor, expect.objectContaining({
-      items: [{ description: "בדיקה", quantity: 1, unitPrice: 150 }],
-    }));
-    expect(chargeRepository.markInvoiced).toHaveBeenCalledWith(["charge1"], "invoice1");
+    expect(chargeRepository.createInvoiceFromVisit).toHaveBeenCalledWith({
+      visitId: "visit1",
+      notes: null,
+      createdByUserId: "owner1",
+    });
+    expect(invoiceRepository.findById).toHaveBeenCalledWith("invoice1");
   });
 
   it("exposes inventory, charge, invoice and payment entry points", () => {
