@@ -20,13 +20,18 @@
  * the database despite being called reset-CLINIC-data. The dry run did not
  * protect against this; it counted globally too. --clinic-id is now required.
  *
+ * Also requires a project-ref confirmation that matches SUPABASE_URL, and
+ * refuses tables that cannot be clinic-scoped (no clinic_id column).
+ *
  * Usage:
- *   node scripts/reset-clinic-data.mjs --clinic-id=<uuid>             # dry run
- *   node scripts/reset-clinic-data.mjs --clinic-id=<uuid> --confirm   # delete
+ *   node scripts/reset-clinic-data.mjs --clinic-id=<uuid> --project-ref=<ref>
+ *   node scripts/reset-clinic-data.mjs --clinic-id=<uuid> --project-ref=<ref> --confirm
  *
  * Env (required, no defaults — this points at production if you point it there):
  *   SUPABASE_URL
  *   SUPABASE_SERVICE_ROLE_KEY
+ *   CLINIC_ID              # optional fallback if --clinic-id= is omitted
+ *   SUPABASE_PROJECT_REF   # optional fallback if --project-ref= is omitted
  */
 import { createClient } from "@supabase/supabase-js";
 
@@ -35,9 +40,12 @@ const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const confirmed = process.argv.includes("--confirm");
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const clinicId = process.argv
-  .find((arg) => arg.startsWith("--clinic-id="))
-  ?.slice("--clinic-id=".length);
+const clinicId =
+  process.argv.find((arg) => arg.startsWith("--clinic-id="))?.slice("--clinic-id=".length) ||
+  process.env.CLINIC_ID;
+const projectRefConfirm =
+  process.argv.find((arg) => arg.startsWith("--project-ref="))?.slice("--project-ref=".length) ||
+  process.env.SUPABASE_PROJECT_REF;
 
 if (!url || !serviceRoleKey) {
   console.error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
@@ -49,6 +57,41 @@ if (!url || !serviceRoleKey) {
 if (!clinicId || !UUID_RE.test(clinicId)) {
   console.error("Missing or malformed --clinic-id=<uuid>.");
   console.error("This script deletes data. It will not run without knowing whose.");
+  process.exit(1);
+}
+
+function extractProjectRef(supabaseUrl) {
+  const host = new URL(supabaseUrl).hostname;
+  const hosted = host.match(/^([a-z0-9]+)\.supabase\.co$/i);
+  return hosted ? hosted[1] : host;
+}
+
+function isMissingClinicIdColumn(message) {
+  return (
+    Boolean(message) &&
+    /clinic_id/i.test(message) &&
+    /(does not exist|schema cache|could not find)/i.test(message)
+  );
+}
+
+let expectedRef;
+try {
+  expectedRef = extractProjectRef(url);
+} catch {
+  console.error(`Invalid SUPABASE_URL: ${url}`);
+  process.exit(1);
+}
+
+if (!projectRefConfirm) {
+  console.error("Missing --project-ref=<ref> (or SUPABASE_PROJECT_REF).");
+  console.error(`This URL's project ref is "${expectedRef}". Pass that value to confirm the target.`);
+  process.exit(1);
+}
+
+if (projectRefConfirm !== expectedRef) {
+  console.error(
+    `Project ref mismatch: confirmed "${projectRefConfirm}" but SUPABASE_URL host is "${expectedRef}".`,
+  );
   process.exit(1);
 }
 
@@ -86,7 +129,14 @@ async function count(table) {
     .from(table)
     .select("*", { count: "exact", head: true })
     .eq("clinic_id", clinicId);
-  return error ? null : n;
+  if (!error) return n;
+  if (isMissingClinicIdColumn(error.message)) {
+    console.error(
+      `REFUSED: ${table} cannot be safely clinic-scoped (no clinic_id): ${error.message}`,
+    );
+    process.exit(1);
+  }
+  return null;
 }
 
 async function clinicName() {
@@ -102,6 +152,7 @@ if (!name) {
 }
 
 console.log(`Target: ${url}`);
+console.log(`Project ref: ${expectedRef}`);
 console.log(`Clinic: ${name} (${clinicId})`);
 console.log(confirmed ? "Mode:   DELETE\n" : "Mode:   dry run (pass --confirm to delete)\n");
 
@@ -133,6 +184,13 @@ console.log("\nDeleting…");
 for (const table of DELETE_ORDER) {
   const { error } = await admin.from(table).delete().eq("clinic_id", clinicId);
   if (error) {
+    if (isMissingClinicIdColumn(error.message)) {
+      console.error(
+        `  ${table.padEnd(20)} REFUSED: ${table} cannot be safely clinic-scoped (no clinic_id)`,
+      );
+      console.error("\nStopped. Nothing after this table was touched.");
+      process.exit(1);
+    }
     if (/does not exist/i.test(error.message)) {
       console.log(`  ${table.padEnd(20)} skipped (${error.message})`);
       continue;

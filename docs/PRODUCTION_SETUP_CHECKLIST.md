@@ -95,6 +95,7 @@ flyctl auth login
 - [ ] **ElevenLabs:** הגדרת transfer-to-number לפיצ׳ר ההעברה לאדם (הכלי החדש `request-human-handoff` יסונכרן ע״י סקריפט הסנכרון)
 - [ ] **Fly.io:** להוסיף כרטיס אשראי אם החשבון עדיין במסלול Trial
 - [ ] **Supabase:** להפעיל pg_cron לתזכורות SMS (ה-SQL קיים ב-CLAUDE.md)
+- [ ] **Supabase Storage:** ה-buckets הפרטיים `call-recordings` ו-`soap-recordings` נוצרים עכשיו במיגרציה `20260919141000_storage_recording_buckets.sql` (וגם ב-`supabase/config.toml` ל-local). אין צורך ליצור אותם ידנית ב-dashboard; אחרי `supabase db reset` / apply migrations כדאי לוודא שהם קיימים (Settings → Storage). ה-RLS policies (`call_recordings_select_member`, `soap_recordings_select_member`) נשארו כפי שהיו.
 
 ---
 

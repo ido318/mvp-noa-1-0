@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { AppError, err, ok, type Result } from "@/lib/errors/app-error";
 import { mapPetRow } from "@/lib/repositories/mappers";
+import { postgrestOrIlikeValue } from "@/lib/search/escape-postgrest";
 import type { CreatePetInput, Pet, PetListFilters, UpdatePetInput } from "@/types/domain/pet";
 
 export class PetRepository {
@@ -19,7 +20,7 @@ export class PetRepository {
     }
 
     if (filters.query) {
-      const value = `%${filters.query}%`;
+      const value = postgrestOrIlikeValue(filters.query);
       query = query.or(`name.ilike.${value},species.ilike.${value},chip_number.ilike.${value}`);
     }
 
