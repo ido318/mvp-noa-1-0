@@ -32,11 +32,6 @@ const schema = z.object({
   // here during business hours; otherwise it records an escalation instead.
   HUMAN_HANDOFF_NUMBER: z.string().startsWith("+").optional(),
 
-  DEMO_MODE: z
-    .enum(["true", "false"])
-    .default("true")
-    .transform((v) => v === "true"),
-
   // Bearer token securing POST /jobs/process-notifications (called by pg_cron)
   JOBS_BEARER_TOKEN: z.string().min(16),
 

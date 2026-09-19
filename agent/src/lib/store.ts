@@ -25,6 +25,7 @@ import {
 } from "./notifications.js";
 import { processNotifications } from "./notificationProcessor.js";
 import { VALID_CALL_CATEGORIES } from "./callClassifier.js";
+import { normaliseIsraeliPhone } from "@tomer/shared";
 
 export type Pet = { id: string; name: string; species: string; breed: string | null };
 
@@ -51,21 +52,46 @@ export type EscalationEntry = {
   reason: string;
   urgency: number;
   conversation_id?: string | null;
-  notes?: string | null;
+  /** Who is calling, so the dashboard can show a name and a number to dial. */
+  caller_phone?: string | null;
+  customer_id?: string | null;
+  pet_id?: string | null;
+  /**
+   * Structured triage context — decision, matched_flags, after_hours and the
+   * caller's full symptom description. Kept out of `notes`, which is what a
+   * human types when resolving: the old code wrote this JSON into `notes`, and
+   * resolving the escalation overwrote it.
+   */
+  context?: Record<string, unknown> | null;
 };
 
-/** Normalise Israeli phone to E.164. 054... → +97254... */
-export function normalisePhone(raw: string): string {
-  const digits = raw.replace(/\D/g, "");
-  if (digits.startsWith("972")) return `+${digits}`;
-  if (digits.startsWith("0")) return `+972${digits.slice(1)}`;
-  return `+${digits}`;
+/**
+ * Normalise an Israeli phone to E.164, or null when the input cannot be one.
+ *
+ * Re-exports the single source of truth in @tomer/shared — kept under this
+ * name so the call sites below (and lookup-customer.test.ts) don't change.
+ *
+ * This used to return `+${digits}`, which meant "", "unknown" and "aaaaa" all
+ * normalised to the string "+" and were stored as real phone numbers. It now
+ * returns null instead, so every caller has to decide what to do with a
+ * number it can neither text nor call back.
+ */
+export function normalisePhone(raw: string): string | null {
+  return normaliseIsraeliPhone(raw);
 }
+
+const INACTIVE_CUSTOMER_RESULT =
+  "מספר הטלפון הזה רשום אצלנו אבל הכרטיס אינו פעיל. ד\"ר נועה תחזור אליכם לבדוק את זה.";
+
+/** What Tomer says when the number he was given is not usable. */
+const INVALID_PHONE_RESULT =
+  "מספר הטלפון שנמסר אינו תקין. אפשר לחזור עליו שוב, ספרה-ספרה?";
 
 export async function findCustomerByPhone(
   phone: string,
 ): Promise<Customer | null> {
   const normalised = normalisePhone(phone);
+  if (!normalised) return null;
   const env = getEnv();
 
   const { data, error } = await getSupabase()
@@ -125,12 +151,22 @@ export async function findCustomerByPhone(
 
 export async function addEscalation(entry: EscalationEntry): Promise<void> {
   const env = getEnv();
+  // Resolve the caller to a customer when we can, so the dashboard card can
+  // show a name rather than a bare phone number. Best-effort: an unknown
+  // number still produces a usable escalation.
+  const callerPhone = entry.caller_phone ? normaliseIsraeliPhone(entry.caller_phone) : null;
+  const customerId =
+    entry.customer_id ?? (callerPhone ? await safeFindCustomerIdByPhone(callerPhone) : null);
+
   const { error } = await getSupabase().from("escalations").insert({
     clinic_id: env.AGENT_CLINIC_ID,
     reason: entry.reason,
     urgency: entry.urgency,
     elevenlabs_conversation_id: entry.conversation_id ?? null,
-    notes: entry.notes ?? null,
+    caller_phone: callerPhone,
+    customer_id: customerId,
+    pet_id: entry.pet_id ?? null,
+    context: entry.context ?? {},
   });
   if (error) throw new Error(`supabase escalation insert failed: ${error.message}`);
 }
@@ -220,6 +256,10 @@ async function findCustomerIdByPhone(phone: string): Promise<string | null> {
     .eq("clinic_id", env.AGENT_CLINIC_ID)
     .eq("phone", phone)
     .is("deleted_at", null)
+    // Matches findCustomerByPhone, which has always filtered on status. Without
+    // it, booking/cancelling/waitlist reached a deactivated customer through
+    // createOrFindCustomer while a lookup on the same number said "unknown".
+    .eq("status", "active")
     .maybeSingle();
   if (error) throw new Error(`findCustomerIdByPhone failed: ${error.message}`);
   return extractId(data);
@@ -229,21 +269,26 @@ async function findCustomerIdByPhone(phone: string): Promise<string | null> {
 // Availability
 // ─────────────────────────────────────────────────────────────────────────────
 
-export async function checkAvailability(
+/**
+ * The free slots for a date and visit type, as ISO instants. Empty when the
+ * date is outside the 14-day window, on a closed day, or fully booked.
+ *
+ * checkAvailability below renders these into one Hebrew string aimed at the
+ * LLM. Code that needs the slots themselves must use this function: the
+ * urgent-callback path used to regex `\b(\d{2}:\d{2})\b` out of that string
+ * and, because formatSlotSpokenHe writes a 12-hour hour with no leading zero,
+ * matched the seconds inside the ISO instead — announcing "היום ב-00:00" for a
+ * 13:00 slot. On a Saturday it matched 08:00 out of the opening-hours sentence
+ * in the "clinic is closed" message and offered a slot on a closed day.
+ */
+export async function getFreeSlots(
   dateIso: string,
   visitType: VisitType,
-): Promise<string> {
-  // 1. 14-day window
-  if (!isWithin14Days(dateIso)) {
-    const maxDate = maxBookingDateIso();
-    return `ניתן לקבוע תורים עד ${formatDateHe(maxDate)} בלבד (14 יום קדימה).`;
-  }
+): Promise<string[]> {
+  if (!isWithin14Days(dateIso)) return [];
 
-  // 2. Closed day (Saturday)
   const hours = getClinicHours(dateIso);
-  if (!hours) {
-    return "המרפאה סגורה בשבת. אפשר לקבוע תור ביום ראשון עד חמישי 08:00-20:00 או ביום שישי 08:30-13:00.";
-  }
+  if (!hours) return [];
 
   const env = getEnv();
 
@@ -288,10 +333,32 @@ export async function checkAvailability(
   });
 
   // 5. Generate free slots for the requested visit type
-  const freeSlots = generateSlotsForVisitType(dateIso, hours, visitType, [
+  return generateSlotsForVisitType(dateIso, hours, visitType, [
     ...bookedRanges,
     ...blockedRanges,
   ]);
+}
+
+/**
+ * The same availability, rendered for the LLM. Wording and the
+ * `scheduled_at=` marker are load-bearing — tomer-system-prompt.md tells the
+ * model to copy that value verbatim when booking — so this string's shape
+ * must not change.
+ */
+export async function checkAvailability(
+  dateIso: string,
+  visitType: VisitType,
+): Promise<string> {
+  if (!isWithin14Days(dateIso)) {
+    const maxDate = maxBookingDateIso();
+    return `ניתן לקבוע תורים עד ${formatDateHe(maxDate)} בלבד (14 יום קדימה).`;
+  }
+
+  if (!getClinicHours(dateIso)) {
+    return "המרפאה סגורה בשבת. אפשר לקבוע תור ביום ראשון עד חמישי 08:00-20:00 או ביום שישי 08:30-13:00.";
+  }
+
+  const freeSlots = await getFreeSlots(dateIso, visitType);
 
   const config = getVisitConfig(visitType);
   const typeLabelHe = config.labelHe;
@@ -333,12 +400,20 @@ export async function bookAppointment(params: BookAppointmentParams): Promise<st
 
   const env = getEnv();
   const phone = normalisePhone(params.phone);
+  if (!phone) return INVALID_PHONE_RESULT;
   const config = getVisitConfig(params.visit_type);
   const durMin = effectiveDuration(params.visit_type);
   const status = config.requiresApproval ? "pending_approval" : "scheduled";
 
-  const { customerId } = await createOrFindCustomer(phone, params.customer_name);
-  const { petId } = await createOrFindPet(customerId, params.pet_name, params.pet_species, params.pet_breed);
+  let customerId: string;
+  let petId: string;
+  try {
+    ({ customerId } = await createOrFindCustomer(phone, params.customer_name));
+    ({ petId } = await createOrFindPet(customerId, params.pet_name, params.pet_species, params.pet_breed));
+  } catch (err) {
+    if (err instanceof InactiveCustomerError) return INACTIVE_CUSTOMER_RESULT;
+    throw err;
+  }
 
   const { data, error } = await getSupabase()
     .from("appointments")
@@ -441,6 +516,7 @@ export async function bookAppointment(params: BookAppointmentParams): Promise<st
 export async function cancelAppointment(phone: string, scheduledAt: string): Promise<string> {
   const env = getEnv();
   const normalised = normalisePhone(phone);
+  if (!normalised) return INVALID_PHONE_RESULT;
 
   const customerId = await findCustomerIdByPhone(normalised);
   if (!customerId) return "לא מצאנו לקוח עם מספר הטלפון הזה.";
@@ -495,6 +571,7 @@ export async function rescheduleAppointment(
 ): Promise<string> {
   const env = getEnv();
   const normalised = normalisePhone(phone);
+  if (!normalised) return INVALID_PHONE_RESULT;
 
   const customerId = await findCustomerIdByPhone(normalised);
   if (!customerId) return "לא מצאנו לקוח עם מספר הטלפון הזה.";
@@ -605,6 +682,7 @@ export async function listCustomerAppointments(
 ): Promise<{ result: string; appointments: CustomerAppointmentSummary[] }> {
   const env = getEnv();
   const normalised = normalisePhone(phone);
+  if (!normalised) return { result: INVALID_PHONE_RESULT, appointments: [] };
   const customerId = await findCustomerIdByPhone(normalised);
   if (!customerId) {
     return { result: "לא מצאנו לקוח עם מספר הטלפון הזה.", appointments: [] };
@@ -671,9 +749,17 @@ export type JoinWaitlistParams = {
 export async function joinWaitlist(params: JoinWaitlistParams): Promise<string> {
   const env = getEnv();
   const phone = normalisePhone(params.phone);
+  if (!phone) return INVALID_PHONE_RESULT;
 
-  const { customerId } = await createOrFindCustomer(phone, params.customer_name);
-  const { petId } = await createOrFindPet(customerId, params.pet_name, params.pet_species, params.pet_breed);
+  let customerId: string;
+  let petId: string;
+  try {
+    ({ customerId } = await createOrFindCustomer(phone, params.customer_name));
+    ({ petId } = await createOrFindPet(customerId, params.pet_name, params.pet_species, params.pet_breed));
+  } catch (err) {
+    if (err instanceof InactiveCustomerError) return INACTIVE_CUSTOMER_RESULT;
+    throw err;
+  }
 
   const { error } = await getSupabase().from("waitlist").insert({
     clinic_id:       env.AGENT_CLINIC_ID,
@@ -712,6 +798,7 @@ const REMINDER_WINDOW_DAYS = 60;
 
 export async function listCustomerPets(phone: string): Promise<ListCustomerPetsResult> {
   const normalised = normalisePhone(phone);
+  if (!normalised) return { result: INVALID_PHONE_RESULT, pets: [] };
   const env = getEnv();
 
   const { data: customerRow, error: customerErr } = await getSupabase()
@@ -996,8 +1083,9 @@ export async function saveVoiceCall(
     typeof payload["caller_number"] === "string"
       ? payload["caller_number"]
       : "unknown";
-  const customerId = callerNumber !== "unknown"
-    ? await safeFindCustomerIdByPhone(normalisePhone(callerNumber))
+  const normalisedCaller = callerNumber !== "unknown" ? normalisePhone(callerNumber) : null;
+  const customerId = normalisedCaller
+    ? await safeFindCustomerIdByPhone(normalisedCaller)
     : null;
 
   const payloadStatus =
@@ -1103,6 +1191,7 @@ async function verifyPetOwnership(phone: string, petId: string): Promise<PetSumm
   if (!UUID_RE.test(petId)) return null;
 
   const normalised = normalisePhone(phone);
+  if (!normalised) return null;
   const customerId = await findCustomerIdByPhone(normalised);
   if (!customerId) return null;
 
@@ -1226,10 +1315,43 @@ async function linkVoiceCall(params: {
   }
 }
 
+/**
+ * Raised when the number belongs to a customer Noa deactivated. Reactivating
+ * someone from a phone call is a decision for the clinic, not for Tomer, so
+ * the callers turn this into a spoken answer rather than booking.
+ */
+export class InactiveCustomerError extends Error {
+  constructor() {
+    super("customer exists but is not active");
+    this.name = "InactiveCustomerError";
+  }
+}
+
+/** Ignores `status` — used only to tell "no such customer" from "deactivated". */
+async function findAnyCustomerIdByPhone(phone: string): Promise<string | null> {
+  const env = getEnv();
+  const { data, error } = await getSupabase()
+    .from("customers")
+    .select("id")
+    .eq("clinic_id", env.AGENT_CLINIC_ID)
+    .eq("phone", phone)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (error) throw new Error(`findAnyCustomerIdByPhone failed: ${error.message}`);
+  return extractId(data);
+}
+
 async function createOrFindCustomer(
   phone: string,
   name: string,
 ): Promise<{ customerId: string }> {
+  // Every caller already rejects an unusable number, but this is the function
+  // that actually inserts the row — and the one that created the phone = "+"
+  // customer that then absorbed every later junk call, because the find-step
+  // below matched it. Refuse here too rather than trust the callers.
+  if (!normaliseIsraeliPhone(phone)) {
+    throw new Error(`createOrFindCustomer: refusing to store unusable phone ${JSON.stringify(phone)}`);
+  }
   const existingId = await findCustomerIdByPhone(phone);
   if (existingId) return { customerId: existingId };
 
@@ -1248,6 +1370,11 @@ async function createOrFindCustomer(
     if (error.code === "23505") {
       const raceId = await findCustomerIdByPhone(phone);
       if (raceId) return { customerId: raceId };
+      // Not a race: customers_clinic_phone_unique_idx is held by a row the
+      // find-step skipped, which (given the deleted_at filter matches) means
+      // an inactive customer. Since findCustomerIdByPhone started filtering on
+      // status, this is the path a deactivated client's call now takes.
+      if (await findAnyCustomerIdByPhone(phone)) throw new InactiveCustomerError();
     }
     throw new Error(`createOrFindCustomer failed: ${error.message}`);
   }

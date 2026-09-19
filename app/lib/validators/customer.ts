@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isValidIsraeliPhone } from "@tomer/shared";
 
 export const customerStatusSchema = z.enum(["active", "inactive"]);
 export const preferredContactMethodSchema = z.enum([
@@ -10,6 +11,13 @@ export const preferredContactMethodSchema = z.enum([
 
 const nullableTrimmed = z.string().trim().min(1).optional().nullable();
 
+const israeliPhoneField = z
+  .string()
+  .trim()
+  .refine(isValidIsraeliPhone, { message: "מספר טלפון ישראלי לא תקין" })
+  .optional()
+  .nullable();
+
 export const customerTagsSchema = z
   .array(z.string().trim().min(1).max(30))
   .max(10);
@@ -17,7 +25,10 @@ export const customerTagsSchema = z
 export const createCustomerSchema = z.object({
   clinicId: z.string().uuid(),
   fullName: z.string().trim().min(2).max(120),
-  phone: nullableTrimmed,
+  // Was `nullableTrimmed`, i.e. any non-empty string. A dashboard-created
+  // customer could be saved with a number Tomer can never match and Twilio
+  // can never text.
+  phone: israeliPhoneField,
   email: z.string().email().optional().nullable(),
   address: z.string().trim().max(300).optional().nullable(),
   preferredContactMethod: preferredContactMethodSchema.optional(),

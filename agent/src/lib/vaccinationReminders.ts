@@ -2,6 +2,7 @@ import { getSupabase } from "./supabase.js";
 import { resolveSmsTemplate, type SmsTemplateKey } from "@tomer/shared";
 import { logger } from "./logger.js";
 import { israelDateIso } from "./notifications.js";
+import { getEnv } from "./env.js";
 
 const REMINDER_WINDOW_DAYS = 14;
 
@@ -41,6 +42,10 @@ export async function enqueueDueVaccinationReminders(): Promise<EnqueueVaccinati
       pet:pets!vaccinations_pet_clinic_fk(name),
       customer:customers!vaccinations_customer_clinic_fk(id, full_name, phone)
     `)
+    // This agent serves one clinic. Without the filter the daily scan walked
+    // every tenant's vaccinations and enqueued SMS on their behalf, from this
+    // clinic's number.
+    .eq("clinic_id", getEnv().AGENT_CLINIC_ID)
     .gte("next_due_at", todayIso)
     .lte("next_due_at", windowEndIso)
     .is("deleted_at", null)

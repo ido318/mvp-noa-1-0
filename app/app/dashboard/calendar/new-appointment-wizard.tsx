@@ -9,6 +9,7 @@ import { formatIsraelDate, formatIsraelTime } from "@/lib/israel-date";
 import type { AppointmentType } from "@/types/domain/appointment";
 import type { Customer } from "@/types/domain/customer";
 import type { Pet } from "@/types/domain/pet";
+import { israelDateIso } from "@/lib/israel-date";
 
 type Step = 1 | 2 | 3 | 4 | 5;
 
@@ -41,13 +42,17 @@ export function NewAppointmentWizard({
   const [visitType, setVisitType] = useState<AppointmentType>("checkup");
   const [date, setDate] = useState<string | null>(null);
   const [slots, setSlots] = useState<string[]>([]);
+  const [slotsError, setSlotsError] = useState<string | null>(null);
   const [slot, setSlot] = useState<string | null>(null);
   const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const { toast } = useToast();
   const searchRequestIdRef = useRef(0);
 
-  const bookableDates = useMemo(() => getBookableDates(new Date().toISOString().slice(0, 10)), []);
+  // israelDateIso, not toISOString().slice(0,10): between 21:00/22:00 Israel
+  // time and midnight UTC the latter is yesterday, so the wizard offered a
+  // date already past.
+  const bookableDates = useMemo(() => getBookableDates(israelDateIso(new Date())), []);
 
   useEffect(() => {
     if (!open) {
@@ -94,16 +99,28 @@ export function NewAppointmentWizard({
     if (trimmed.length < 2) { setCustomerResults([]); return; }
     const t = setTimeout(() => {
       void (async () => {
-        const res = await fetch(`/api/search?entity=customers&q=${encodeURIComponent(trimmed)}`);
-        if (searchRequestIdRef.current !== requestId) return; // superseded by a newer keystroke
-        if (!res.ok) return;
-        const data = await res.json() as { data: { customers: Customer[] } };
-        if (searchRequestIdRef.current !== requestId) return;
-        setCustomerResults(data.data.customers);
+        try {
+          const res = await fetch(`/api/search?entity=customers&q=${encodeURIComponent(trimmed)}`);
+          if (searchRequestIdRef.current !== requestId) return; // superseded by a newer keystroke
+          if (!res.ok) {
+            // Was a bare `return`, so a 403 or a 500 rendered as an empty
+            // result list — indistinguishable from "no customer by that name".
+            setCustomerResults([]);
+            toast("חיפוש הלקוחות נכשל", "error");
+            return;
+          }
+          const data = await res.json() as { data: { customers: Customer[] } };
+          if (searchRequestIdRef.current !== requestId) return;
+          setCustomerResults(data.data.customers);
+        } catch {
+          if (searchRequestIdRef.current !== requestId) return;
+          setCustomerResults([]);
+          toast("חיפוש הלקוחות נכשל. בדוק/י את החיבור", "error");
+        }
       })();
     }, 300);
     return () => clearTimeout(t);
-  }, [customerQuery]);
+  }, [customerQuery, toast]);
 
   useEffect(() => {
     // Selecting a different customer invalidates any pet chosen for the previous one -
@@ -123,16 +140,26 @@ export function NewAppointmentWizard({
   }, [customer, toast]);
 
   useEffect(() => {
-    if (!date) { setSlots([]); return; }
+    if (!date) { setSlots([]); setSlotsError(null); return; }
     setSlot(null);
+    setSlotsError(null);
     void (async () => {
       const res = await fetch(
         `/api/calendar/availability?clinicId=${encodeURIComponent(clinicId)}&date=${encodeURIComponent(date)}&visitType=${encodeURIComponent(visitType)}`,
       );
-      if (!res.ok) { setSlots([]); return; }
+      if (!res.ok) {
+        setSlots([]);
+        // Without this the empty slot list renders as "אין תורים פנויים
+        // בתאריך זה" — a server error telling the team the day is fully booked.
+        setSlotsError("טעינת התורים הפנויים נכשלה");
+        return;
+      }
       const data = await res.json() as { data: { availableSlots: string[] } };
       setSlots(data.data.availableSlots);
-    })();
+    })().catch(() => {
+      setSlots([]);
+      setSlotsError("טעינת התורים הפנויים נכשלה. בדוק/י את החיבור");
+    });
   }, [date, visitType, clinicId]);
 
   async function submit() {
@@ -282,7 +309,9 @@ export function NewAppointmentWizard({
             </div>
             {date && (
               <div className="flex flex-wrap gap-1.5">
-                {slots.length === 0 ? (
+                {slotsError ? (
+                  <p className="text-sm text-[var(--status-critical-text)]">{slotsError}</p>
+                ) : slots.length === 0 ? (
                   <p className="text-sm text-[var(--text-muted)]">אין תורים פנויים בתאריך זה.</p>
                 ) : slots.map((s) => (
                   <button

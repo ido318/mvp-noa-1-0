@@ -4,6 +4,7 @@ import {
   effectiveDuration,
   getClinicHoursForDate,
   toIsraelLocalIso,
+  occupiesSlot,
 } from "@/lib/appointment-rules";
 import type { CalendarBlockRepository } from "@/lib/repositories/calendar-block.repository";
 import type { AppointmentRepository } from "@/lib/repositories/appointment.repository";
@@ -95,12 +96,9 @@ export class CalendarService {
       : { ok: true as const, value: [] };
     if (!blocksResult.ok) return blocksResult;
 
-    const active = appointmentsResult.value.filter(
-      (row) =>
-        row.status === "scheduled" ||
-        row.status === "confirmed" ||
-        row.status === "pending_approval",
-    );
+    // Was a local three-status list that omitted checked_in and in_visit, so a
+    // patient already in the room did not block their own slot.
+    const active = appointmentsResult.value.filter((row) => occupiesSlot(row.status));
 
     const slots: string[] = [];
     for (

@@ -65,12 +65,26 @@ hooksRoutes.post("/hooks/call-ended", async (c) => {
 
   logger.info({ conversationId, durationSec, success, callCategory }, "hook: call ended");
 
-  // Save to DB first (fast path)
-  await saveVoiceCall(conversationId, durationSec, success, payload, {
-    transcript,
-    aiSummary,
-    callCategory,
-  });
+  // Save to DB first (fast path).
+  //
+  // Best-effort: a throw here used to escape the handler and return 500 to
+  // ElevenLabs, which then retries the whole webhook — so a transient Supabase
+  // error turned into repeated delivery, and the recording upload and
+  // prompt-learning work below never ran at all for that call. Losing one
+  // voice_calls row is recoverable from the transcript ElevenLabs keeps;
+  // losing the recording is not.
+  try {
+    await saveVoiceCall(conversationId, durationSec, success, payload, {
+      transcript,
+      aiSummary,
+      callCategory,
+    });
+  } catch (err: unknown) {
+    logger.error(
+      { errMsg: err instanceof Error ? err.message : String(err), conversationId },
+      "hook: saveVoiceCall failed — continuing so the recording is not lost",
+    );
+  }
 
   // Prompt learning loop: log evaluation-criteria results, then run per-call QA
   // scoring (fire-and-forget; non-blocking). Chained, not parallel — analyzeCallQuality

@@ -5,6 +5,7 @@ import { Modal } from "@/components/dashboard/ui/modal";
 import { Btn } from "@/components/dashboard/ui/btn";
 import { Field, Textarea } from "@/components/dashboard/ui/field";
 import { useToast } from "@/components/dashboard/ui/toast";
+import { toWhatsAppPhone } from "@tomer/shared";
 
 /**
  * Sending a message to a client used to mean an `sms:` link — which opens the
@@ -33,11 +34,6 @@ export const CLIENT_MESSAGE_TEMPLATES: MessageTemplate[] = [
   },
 ];
 
-function waPhone(phone: string): string {
-  const digits = phone.replace(/\D/g, "");
-  return digits.startsWith("0") ? `972${digits.slice(1)}` : digits;
-}
-
 export function SendMessageModal({
   customerId,
   customerName,
@@ -55,9 +51,15 @@ export function SendMessageModal({
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
+  // A fourth private phone normaliser used to live here. It now shares the
+  // one in @tomer/shared, which returns null for a number that cannot be
+  // reached — so a broken number produces no link instead of a wa.me link
+  // that silently goes nowhere.
   const whatsappHref = useMemo(() => {
+    const waNumber = toWhatsAppPhone(phone);
+    if (!waNumber) return null;
     const text = body.trim();
-    const base = `https://wa.me/${waPhone(phone)}`;
+    const base = `https://wa.me/${waNumber}`;
     return text ? `${base}?text=${encodeURIComponent(text)}` : base;
   }, [body, phone]);
 
@@ -116,8 +118,9 @@ export function SendMessageModal({
         <Btn
           variant="soft"
           size="sm"
-          disabled={!body.trim()}
-          onClick={() => window.open(whatsappHref, "_blank", "noopener,noreferrer")}
+          disabled={!body.trim() || !whatsappHref}
+          title={whatsappHref ? undefined : "מספר הטלפון של הלקוח אינו תקין"}
+          onClick={() => whatsappHref && window.open(whatsappHref, "_blank", "noopener,noreferrer")}
         >
           פתח ב-WhatsApp
         </Btn>

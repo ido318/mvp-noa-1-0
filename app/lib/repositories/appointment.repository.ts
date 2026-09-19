@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { AppError, err, ok, type Result } from "@/lib/errors/app-error";
+import { SLOT_BLOCKING_STATUSES } from "@/lib/appointment-rules";
 import { mapAppointmentRow } from "@/lib/repositories/mappers";
 import type {
   Appointment,
@@ -137,7 +138,7 @@ export class AppointmentRepository {
       .from("appointments")
       .select("*")
       .eq("clinic_id", clinicId)
-      .in("status", ["scheduled", "confirmed", "pending_approval", "checked_in", "in_visit"])
+      .in("status", [...SLOT_BLOCKING_STATUSES])
       .is("deleted_at", null)
       .lt("scheduled_at", endIso);
 

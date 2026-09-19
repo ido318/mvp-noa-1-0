@@ -1,16 +1,15 @@
+import { normaliseIsraeliPhone } from "@tomer/shared";
 import { AppError } from "@/lib/errors/app-error";
 import { getTwilioSmsConfig, missingTwilioSmsEnvVars } from "@/lib/integrations/twilio/config";
 
-/** Convert an Israeli or raw phone string to E.164 (+972...). */
-export function toE164Israel(raw: string): string {
-  const trimmed = raw.trim();
-  if (trimmed.startsWith("+")) {
-    return `+${trimmed.slice(1).replace(/\D/g, "")}`;
-  }
-  const digits = trimmed.replace(/\D/g, "");
-  if (digits.startsWith("972")) return `+${digits}`;
-  if (digits.startsWith("0")) return `+972${digits.slice(1)}`;
-  return `+${digits}`;
+/**
+ * Convert an Israeli phone string to E.164 (+972...), or null when it cannot
+ * be one. Delegates to @tomer/shared — this was a near-copy of the agent's
+ * normalisePhone, and both ended with `return "+" + digits`, so junk input
+ * produced the string "+" and Twilio answered "Invalid 'To' Phone Number".
+ */
+export function toE164Israel(raw: string): string | null {
+  return normaliseIsraeliPhone(raw);
 }
 
 export type SendSmsResult = { sid: string | null };
@@ -30,9 +29,16 @@ export async function sendSms(to: string, body: string): Promise<SendSmsResult> 
     );
   }
 
+  const recipient = toE164Israel(to);
+  if (!recipient) {
+    // Twilio would answer "Invalid 'To' Phone Number" — a provider error for
+    // what is really bad data on our side. Say so plainly instead.
+    throw AppError.validation(`מספר הטלפון ${to} אינו מספר ישראלי תקין — לא נשלח SMS`);
+  }
+
   const auth = Buffer.from(`${config.accountSid}:${config.authToken}`).toString("base64");
   const params = new URLSearchParams({
-    To: toE164Israel(to),
+    To: recipient,
     From: config.fromNumber,
     Body: body,
   });

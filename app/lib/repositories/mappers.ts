@@ -37,7 +37,7 @@ import type {
   VoiceCallStatus,
   TranscriptItem,
 } from "@/types/domain/voice-call";
-import type { Escalation } from "@/types/domain/escalation";
+import type { Escalation, EscalationContext } from "@/types/domain/escalation";
 import type { WaitlistEntry } from "@/types/domain/waitlist";
 
 export function mapProfileRow(row: {
@@ -528,30 +528,34 @@ export function mapVoiceCallRow(row: Record<string, unknown>): VoiceCall {
 }
 
 export function mapEscalationRow(row: Record<string, unknown>): Escalation {
-  let afterHours: boolean | undefined;
-  try {
-    const notes = row["notes"] as string | null;
-    if (notes) {
-      const parsed = JSON.parse(notes) as Record<string, unknown>;
-      afterHours = parsed["after_hours"] === true;
-    }
-  } catch {
-    // notes is plain text, not JSON
-  }
+  // Reads the `context` column (20260918230000). This used to JSON.parse the
+  // `notes` column for after_hours and throw the customer_id/pet_id it found
+  // there away — and `notes` is also what a human types when resolving, so
+  // resolving an escalation destroyed the context.
+  const context = (row["context"] as EscalationContext | null) ?? {};
+
+  const customer = row["customers"] as { full_name?: string } | null | undefined;
+  const pet = row["pets"] as { name?: string } | null | undefined;
 
   return {
     id: row["id"] as string,
     clinicId: row["clinic_id"] as string,
     voiceCallId: (row["voice_call_id"] as string | null) ?? null,
     elevenLabsConversationId: (row["elevenlabs_conversation_id"] as string | null) ?? null,
+    callerPhone: (row["caller_phone"] as string | null) ?? null,
+    customerId: (row["customer_id"] as string | null) ?? null,
+    customerName: customer?.full_name ?? null,
+    petId: (row["pet_id"] as string | null) ?? null,
+    petName: pet?.name ?? null,
     reason: row["reason"] as string,
     urgency: row["urgency"] as number,
+    context,
     resolvedAt: (row["resolved_at"] as string | null) ?? null,
     resolvedBy: (row["resolved_by"] as string | null) ?? null,
     notes: (row["notes"] as string | null) ?? null,
     createdAt: row["created_at"] as string,
     updatedAt: row["updated_at"] as string,
-    afterHours,
+    afterHours: context.after_hours,
   };
 }
 

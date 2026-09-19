@@ -28,10 +28,11 @@ function makeVaccinationRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
-/** Chainable mock for `.from("vaccinations").select().gte().lte().is().returns()` */
+/** Chainable mock for `.from("vaccinations").select().eq().gte().lte().is().returns()` */
 function vaccinationsChain(resolveValue: { data: unknown; error: unknown }) {
   const chain: Record<string, unknown> = {};
   chain["select"] = vi.fn().mockReturnValue(chain);
+  chain["eq"] = vi.fn().mockReturnValue(chain);
   chain["gte"] = vi.fn().mockReturnValue(chain);
   chain["lte"] = vi.fn().mockReturnValue(chain);
   chain["is"] = vi.fn().mockReturnValue(chain);
@@ -67,6 +68,12 @@ describe("enqueueDueVaccinationReminders", () => {
     await enqueueDueVaccinationReminders();
 
     expect(mockFrom).toHaveBeenCalledWith("vaccinations");
+    // Without this filter the daily scan walked every tenant's vaccinations
+    // and enqueued SMS on their behalf, from this clinic's Twilio number.
+    expect(chain["eq"]).toHaveBeenCalledWith(
+      "clinic_id",
+      "00000000-0000-4000-8000-000000000001",
+    );
     expect(chain["gte"]).toHaveBeenCalledWith(
       "next_due_at",
       expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),

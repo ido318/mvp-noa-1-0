@@ -184,7 +184,10 @@ describe("POST /jobs/process-notifications", () => {
     );
   });
 
-  it("passes clinicId from body to processNotifications", async () => {
+  // Was "passes clinicId from body to processNotifications". JOBS_BEARER_TOKEN
+  // is one shared secret, so honouring a caller-supplied clinic meant anyone
+  // holding it could have this agent process another tenant's queue.
+  it("ignores a caller-supplied clinicId and uses its own", async () => {
     const app = makeApp();
     await app.request("/jobs/process-notifications", {
       method:  "POST",
@@ -192,7 +195,7 @@ describe("POST /jobs/process-notifications", () => {
       body:    JSON.stringify({ clinicId: "clinic-456" }),
     });
     expect(processNotifications).toHaveBeenCalledWith(
-      expect.objectContaining({ clinicId: "clinic-456" }),
+      expect.objectContaining({ clinicId: "00000000-0000-4000-8000-000000000001" }),
     );
   });
 
@@ -239,14 +242,14 @@ describe("POST /jobs/analyze-conversations", () => {
     expect(analyzeConversations).toHaveBeenCalledOnce();
   });
 
-  it("passes clinicId from body to analyzeConversations", async () => {
+  it("ignores a caller-supplied clinicId and analyses its own", async () => {
     const app = makeApp();
     await app.request("/jobs/analyze-conversations", {
       method:  "POST",
       headers: { Authorization: `Bearer ${VALID_TOKEN}`, "Content-Type": "application/json" },
       body:    JSON.stringify({ clinicId: "clinic-456" }),
     });
-    expect(analyzeConversations).toHaveBeenCalledWith("clinic-456");
+    expect(analyzeConversations).toHaveBeenCalledWith("00000000-0000-4000-8000-000000000001");
   });
 
   it("returns 500 when analyzeConversations throws", async () => {

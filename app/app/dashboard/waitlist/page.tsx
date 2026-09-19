@@ -1,11 +1,13 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Card } from "@/components/dashboard/ui/card";
 import { EmptyState } from "@/components/dashboard/ui/empty-state";
 import { Skeleton } from "@/components/dashboard/ui/skeleton";
 import { TypePill } from "@/components/dashboard/ui/type-pill";
 import { ClockIcon, PhoneIcon } from "@/components/dashboard/icons";
 import type { WaitlistEntry } from "@/types/domain/waitlist";
+import { Alert } from "@/components/dashboard/ui/alert";
+import { Btn } from "@/components/dashboard/ui/btn";
 
 const TZ = "Asia/Jerusalem";
 function fmtDate(iso: string | null) {
@@ -53,26 +55,55 @@ function WaitlistRow({ entry }: { entry: WaitlistEntry }) {
 export default function WaitlistPage() {
   const [items, setItems] = useState<WaitlistEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  // Was an inline effect with `if (res.ok)` and no else and no catch: a failed
+  // load rendered "אין ממתינים כרגע" — the queue looks empty when it is not —
+  // and a network throw left an unhandled rejection with loading stuck true,
+  // i.e. a skeleton forever. Extracted so the retry button has something to
+  // call. Mirrors the pattern on the today screen.
+  const fetchData = useCallback(async () => {
+    setLoadError(null);
+    try {
+      const res = await fetch("/api/waitlist");
+      if (!res.ok) {
+        setLoadError("טעינת רשימת ההמתנה נכשלה.");
+        return;
+      }
+      const d = await res.json() as { data: { items: WaitlistEntry[] } };
+      setItems(d.data.items ?? []);
+    } catch {
+      setLoadError("טעינת רשימת ההמתנה נכשלה. בדוק/י את החיבור ונסה/י שוב.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    void (async () => {
-      const res = await fetch("/api/waitlist");
-      if (res.ok) {
-        const d = await res.json() as { data: { items: WaitlistEntry[] } };
-        setItems(d.data.items ?? []);
-      }
-      setLoading(false);
-    })();
-  }, []);
+    void fetchData();
+  }, [fetchData]);
 
   return (
     <div className="p-6 space-y-5">
       <div className="flex items-center justify-between">
         <div className="flex items-baseline gap-2">
           <h1 className="text-xl font-semibold text-[var(--text-primary)]">המתנה</h1>
-          <span className="text-sm text-[var(--text-muted)]">{items.length} רשומים</span>
+          {!loadError && (
+            <span className="text-sm text-[var(--text-muted)]">{items.length} רשומים</span>
+          )}
         </div>
       </div>
+
+      {loadError && (
+        <Alert tone="critical" title="שגיאה בטעינת נתונים">
+          {loadError}
+          <div className="mt-2">
+            <Btn type="button" size="sm" variant="soft" onClick={() => void fetchData()}>
+              נסה שוב
+            </Btn>
+          </div>
+        </Alert>
+      )}
 
       {loading ? (
         <div className="space-y-3">
@@ -80,7 +111,7 @@ export default function WaitlistPage() {
           <Skeleton className="h-16" />
           <Skeleton className="h-16" />
         </div>
-      ) : items.length === 0 ? (
+      ) : items.length === 0 && !loadError ? (
         <EmptyState
           icon={<ClockIcon size={32} />}
           title="אין ממתינים כרגע"

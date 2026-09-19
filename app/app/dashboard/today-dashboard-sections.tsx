@@ -243,6 +243,21 @@ export function AttentionPanel({
                   </Btn>
                 </div>
               )}
+              {/* Only appointments had actions here, so an escalation was a
+                  dead card: nothing to click, no number to call. */}
+              {item.escalation && (
+                <div className="mt-3 flex gap-1.5">
+                  {item.escalation.callerPhone && (
+                    <Btn size="sm" variant="soft" href={`tel:${item.escalation.callerPhone}`}>
+                      <PhoneIcon size={12} />
+                      חייג
+                    </Btn>
+                  )}
+                  <Btn size="sm" variant="ghost" href="/dashboard/escalations">
+                    פתח
+                  </Btn>
+                </div>
+              )}
             </div>
           ))}
           {items.length > ATTENTION_VISIBLE_COUNT && (

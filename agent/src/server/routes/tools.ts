@@ -3,11 +3,12 @@ import { z } from "zod";
 import { logger, maskPhone } from "../../lib/logger.js";
 import { getEnv } from "../../lib/env.js";
 import { isValidBearerToken } from "../middleware/bearerAuth.js";
-import { israelDateIso } from "@tomer/shared";
+import { israelDateIso, isValidIsraeliPhone } from "@tomer/shared";
 import {
   findCustomerByPhone,
   addEscalation,
   checkAvailability,
+  getFreeSlots,
   bookAppointment,
   cancelAppointment,
   rescheduleAppointment,
@@ -18,7 +19,7 @@ import {
   getPatientChronicConditions,
   getLastVisitPlan,
 } from "../../lib/store.js";
-import { VISIT_TYPE_VALUES } from "../../lib/appointments.js";
+import { VISIT_TYPE_VALUES, formatSlotSpokenHe } from "../../lib/appointments.js";
 import {
   decideTriage,
   EMERGENCY_SCRIPT,
@@ -82,7 +83,18 @@ toolsRoutes.post("/tools/conversation-policy", async (c) => {
 // POST /tools/lookup-customer
 // ─────────────────────────────────────────────────────────────────────────────
 
-const lookupSchema = z.object({ phone: z.string().min(5) });
+// Every phone parameter below used to be `z.string().min(5)`, which accepted
+// "aaaaa", "-----" and "unknown". normalisePhone then turned those into the
+// string "+" and stored them as a customer's phone number. A failed safeParse
+// already returns a Hebrew {result}, so tightening the schema is all it takes
+// for Tomer to ask for the number again instead of writing an unreachable one.
+//
+// Validates the raw input; normalisation to E.164 still happens in store.ts.
+const israeliPhone = z
+  .string()
+  .refine(isValidIsraeliPhone, { message: "not a valid Israeli phone number" });
+
+const lookupSchema = z.object({ phone: israeliPhone });
 
 toolsRoutes.post("/tools/lookup-customer", async (c) => {
   const body = await c.req.json().catch(() => ({}));
@@ -93,30 +105,44 @@ toolsRoutes.post("/tools/lookup-customer", async (c) => {
 
   logger.info({ phone: maskPhone(parsed.data.phone) }, "tool: lookup-customer");
 
-  const customer = await findCustomerByPhone(parsed.data.phone);
+  // Same try/catch shape as book/cancel. Without it a Supabase error escaped
+  // as a raw 500 with no {result}, which the model cannot say out loud — the
+  // caller heard silence instead of "אסוף פרטים בעצמך".
+  try {
+    const customer = await findCustomerByPhone(parsed.data.phone);
 
-  if (!customer) {
+    if (!customer) {
+      return c.json({ result: "לקוח לא מוכר. אסוף פרטים בעצמך." });
+    }
+
+    const petList = customer.pets
+      .map((p) => [p.name, p.species, p.breed].filter(Boolean).join(" - "))
+      .join(", ");
+    return c.json({
+      result: `שם: ${customer.full_name}, חיות: ${petList}`,
+      customer_id: customer.id,
+      pets: customer.pets.map((p) => ({ id: p.id, name: p.name, species: p.species })),
+    });
+  } catch (err) {
+    logger.error({ err }, "tool: lookup-customer — internal error");
+    // Degrade to the unknown-customer script rather than to silence: Tomer can
+    // still take the details by hand.
     return c.json({ result: "לקוח לא מוכר. אסוף פרטים בעצמך." });
   }
-
-  const petList = customer.pets
-    .map((p) => [p.name, p.species, p.breed].filter(Boolean).join(" - "))
-    .join(", ");
-  return c.json({
-    result: `שם: ${customer.full_name}, חיות: ${petList}`,
-    customer_id: customer.id,
-    pets: customer.pets.map((p) => ({ id: p.id, name: p.name, species: p.species })),
-  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /tools/escalate-to-noa
 // ─────────────────────────────────────────────────────────────────────────────
 
+// phone is `required` in the ElevenLabs tool definition so the model always
+// sends {{system__caller_id}}, but optional here on purpose: a withheld caller
+// id must not cost us the escalation. An escalation Noa never sees is worse
+// than one without a number.
 const escalateSchema = z.object({
   reason: z.string().min(1),
   urgency: z.number().int().min(1).max(10),
-  phone: z.string().min(5).optional(),
+  phone: israeliPhone.optional(),
 });
 
 toolsRoutes.post("/tools/escalate-to-noa", async (c) => {
@@ -134,11 +160,19 @@ toolsRoutes.post("/tools/escalate-to-noa", async (c) => {
     logger.info({ urgency, reason }, "tool: escalate-to-noa");
   }
 
-  await addEscalation({
-    reason,
-    urgency,
-    notes: phone ? `caller_phone: ${phone}` : null,
-  });
+  try {
+    await addEscalation({
+      reason,
+      urgency,
+      caller_phone: phone ?? null,
+    });
+  } catch (err) {
+    logger.error({ err, urgency }, "tool: escalate-to-noa — write failed");
+    // Never claim it reached Noa when it did not; tell the caller to phone in.
+    return c.json({
+      result: "לא הצלחתי לרשום את הפנייה. אנא התקשרו שוב מאוחר יותר או פנו ישירות למרפאה.",
+    });
+  }
 
   return c.json({ result: `הועברה לנועה (urgency: ${urgency}/10)` });
 });
@@ -153,6 +187,8 @@ toolsRoutes.post("/tools/escalate-to-noa", async (c) => {
 const handoffSchema = z.object({
   reason: z.string().min(1).optional(),
   emergency: z.boolean().optional(),
+  phone: israeliPhone.optional(),
+  conversation_id: z.string().min(1).optional(),
 });
 
 toolsRoutes.post("/tools/request-human-handoff", async (c) => {
@@ -168,9 +204,15 @@ toolsRoutes.post("/tools/request-human-handoff", async (c) => {
   });
 
   if (decision.escalate) {
+    // These used to be written with no phone, no customer and no call id, so
+    // the dashboard showed a request to speak to a human with no way to reach
+    // whoever asked.
     await addEscalation({
       reason: reason ?? "בקשת מעבר לנציג אנושי",
       urgency: decision.urgency ?? 6,
+      caller_phone: parsed.success ? parsed.data.phone ?? null : null,
+      conversation_id: parsed.success ? parsed.data.conversation_id ?? null : null,
+      context: { source: "request-human-handoff", emergency: emergency ?? false },
     });
   }
 
@@ -197,6 +239,7 @@ const triageSchema = z.object({
   pet_age_years:      z.number().positive().optional(),
   pet_weight_kg:      z.number().positive().optional(),
   additional_signs_he: z.array(z.string()).optional(),
+  phone:              israeliPhone.optional(),
   customer_id:        z.string().uuid().optional(),
   pet_id:             z.string().uuid().optional(),
 });
@@ -244,14 +287,23 @@ toolsRoutes.post("/tools/triage-pet-case", async (c) => {
           : triage.urgency;
 
     void addEscalation({
-      reason: `triage: ${triage.decision} — flags: ${triage.matchedFlags.join(", ") || "none"} — "${input.symptoms_he.slice(0, 120)}"`,
+      // reason stays a one-line summary for the card heading. The caller's own
+      // words used to be truncated to 120 characters inside it; they now go to
+      // context.symptoms_he in full, because that is what Noa reads before
+      // calling back.
+      reason: `triage: ${triage.decision} — flags: ${triage.matchedFlags.join(", ") || "none"}`,
       urgency: escalationUrgency,
-      notes: JSON.stringify({
+      caller_phone: input.phone ?? null,
+      customer_id: input.customer_id ?? null,
+      pet_id: input.pet_id ?? null,
+      context: {
+        decision: triage.decision,
         after_hours: !triage.withinBusinessHours,
         matched_flags: triage.matchedFlags,
-        customer_id: input.customer_id ?? null,
-        pet_id: input.pet_id ?? null,
-      }),
+        symptoms_he: input.symptoms_he,
+        duration_he: input.duration_he ?? null,
+        pet_type: input.pet_type,
+      },
     }).catch((err: unknown) =>
       logger.error({ err }, "triage-pet-case: escalation write failed"),
     );
@@ -266,15 +318,24 @@ toolsRoutes.post("/tools/triage-pet-case", async (c) => {
       break;
 
     case "urgent_callback": {
-      // Try to find a phone_consultation slot today
+      // Try to find a phone_consultation slot today.
+      //
+      // This used to regex a time out of checkAvailability's Hebrew prose,
+      // which is written for the LLM, not for parsing. formatSlotSpokenHe
+      // renders a 12-hour hour with no leading zero ("1:00 בצהריים"), so
+      // \b(\d{2}:\d{2})\b skipped the spoken time and matched the seconds
+      // inside the ISO that follows it — 13:00 was announced as "00:00". On a
+      // Saturday it matched 08:00 out of the opening hours quoted in the
+      // "clinic is closed" message and offered a slot on a closed day.
+      //
+      // getFreeSlots returns the instants themselves, so there is nothing to
+      // parse and a closed day simply yields none.
       let slotSuffix = "";
       try {
         const todayIso = israelDateIso(now);
-        const availability = await checkAvailability(todayIso, "phone_consultation");
-        // If the response contains a time pattern (HH:MM), slots are available
-        const firstSlot = availability.match(/\b(\d{2}:\d{2})\b/)?.[1];
+        const [firstSlot] = await getFreeSlots(todayIso, "phone_consultation");
         if (firstSlot) {
-          slotSuffix = ` מצאתי אפשרות לשיחה עם ד"ר נועה היום ב-${firstSlot} — לקבוע?`;
+          slotSuffix = ` מצאתי אפשרות לשיחה עם ד"ר נועה היום ב-${formatSlotSpokenHe(firstSlot)} — לקבוע?`;
         }
       } catch {
         // slot lookup is best-effort; don't fail the triage call
@@ -325,7 +386,7 @@ toolsRoutes.post("/tools/check-availability", async (c) => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const bookSchema = z.object({
-  phone:         z.string().min(5),
+  phone:         israeliPhone,
   customer_name: z.string().min(1),
   pet_name:      z.string().min(1),
   pet_species:   z.enum(PET_SPECIES_VALUES),
@@ -361,7 +422,7 @@ toolsRoutes.post("/tools/book-appointment", async (c) => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const cancelRescheduleSchema = z.object({
-  phone:                z.string().min(5),
+  phone:                israeliPhone,
   action:               z.enum(["cancel", "reschedule"]),
   current_scheduled_at: z.string().regex(ISO_DATETIME_RE, "Expected ISO8601 datetime"),
   new_scheduled_at:     z.string().regex(ISO_DATETIME_RE, "Expected ISO8601 datetime").optional(),
@@ -401,7 +462,7 @@ toolsRoutes.post("/tools/cancel-or-reschedule", async (c) => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const waitlistSchema = z.object({
-  phone:           z.string().min(5),
+  phone:           israeliPhone,
   customer_name:   z.string().min(1),
   pet_name:        z.string().min(1),
   pet_species:     z.enum(PET_SPECIES_VALUES),
@@ -435,7 +496,7 @@ toolsRoutes.post("/tools/join-waitlist", async (c) => {
 // POST /tools/list-customer-appointments
 // ─────────────────────────────────────────────────────────────────────────────
 
-const listCustomerAppointmentsSchema = z.object({ phone: z.string().min(5) });
+const listCustomerAppointmentsSchema = z.object({ phone: israeliPhone });
 
 toolsRoutes.post("/tools/list-customer-appointments", async (c) => {
   const body = await c.req.json().catch(() => ({}));
@@ -459,7 +520,7 @@ toolsRoutes.post("/tools/list-customer-appointments", async (c) => {
 // POST /tools/list-customer-pets
 // ─────────────────────────────────────────────────────────────────────────────
 
-const listCustomerPetsSchema = z.object({ phone: z.string().min(5) });
+const listCustomerPetsSchema = z.object({ phone: israeliPhone });
 
 toolsRoutes.post("/tools/list-customer-pets", async (c) => {
   const body = await c.req.json().catch(() => ({}));
@@ -494,7 +555,7 @@ toolsRoutes.post("/tools/list-customer-pets", async (c) => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const petLookupSchema = z.object({
-  phone: z.string().min(5),
+  phone: israeliPhone,
   pet_id: z.string().min(1),
 });
 
