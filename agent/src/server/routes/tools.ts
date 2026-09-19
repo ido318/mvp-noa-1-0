@@ -13,10 +13,12 @@ import {
   rescheduleAppointment,
   joinWaitlist,
   listCustomerPets,
+  listCustomerAppointments,
   getPatientReminders,
   getPatientChronicConditions,
   getLastVisitPlan,
 } from "../../lib/store.js";
+import { VISIT_TYPE_VALUES } from "../../lib/appointments.js";
 import {
   decideTriage,
   EMERGENCY_SCRIPT,
@@ -46,17 +48,7 @@ toolsRoutes.use("/tools/*", async (c, next) => {
 });
 
 // Shared visit type enum — mirrors public.appointment_type (Sprint 1 values)
-const VISIT_TYPE_VALUES = [
-  "checkup",
-  "home_visit",
-  "vaccination",
-  "phone_consultation",
-  "neutering",
-  "consultation",
-  "urgent",
-  "follow_up",
-  "other",
-] as const;
+const PET_SPECIES_VALUES = ["כלב", "חתול", "אחר"] as const;
 
 // ISO8601 datetime — requires timezone (Z or ±HH:MM) to avoid ambiguous local times
 const ISO_DATETIME_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?(Z|[+-]\d{2}:\d{2})$/;
@@ -67,7 +59,7 @@ const ISO_DATETIME_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?(Z|[+-]\d{2}:\d{
 
 const conversationPolicySchema = z.object({
   user_utterance_he: z.string().min(1),
-  known_pet_type: z.enum(["כלב", "חתול", "אחר"]).optional(),
+  known_pet_type: z.enum(PET_SPECIES_VALUES).optional(),
   known_symptoms_he: z.string().optional(),
   known_duration_he: z.string().optional(),
   red_flag_answers_he: z.array(z.string()).optional(),
@@ -112,6 +104,8 @@ toolsRoutes.post("/tools/lookup-customer", async (c) => {
     .join(", ");
   return c.json({
     result: `שם: ${customer.full_name}, חיות: ${petList}`,
+    customer_id: customer.id,
+    pets: customer.pets.map((p) => ({ id: p.id, name: p.name, species: p.species })),
   });
 });
 
@@ -122,6 +116,7 @@ toolsRoutes.post("/tools/lookup-customer", async (c) => {
 const escalateSchema = z.object({
   reason: z.string().min(1),
   urgency: z.number().int().min(1).max(10),
+  phone: z.string().min(5).optional(),
 });
 
 toolsRoutes.post("/tools/escalate-to-noa", async (c) => {
@@ -131,7 +126,7 @@ toolsRoutes.post("/tools/escalate-to-noa", async (c) => {
     return c.json({ result: "פרמטרים חסרים: reason, urgency (1-10)." }, 400);
   }
 
-  const { reason, urgency } = parsed.data;
+  const { reason, urgency, phone } = parsed.data;
 
   if (urgency >= 7) {
     logger.warn({ urgency, reason }, "tool: escalate-to-noa — HIGH URGENCY");
@@ -139,7 +134,11 @@ toolsRoutes.post("/tools/escalate-to-noa", async (c) => {
     logger.info({ urgency, reason }, "tool: escalate-to-noa");
   }
 
-  await addEscalation({ reason, urgency });
+  await addEscalation({
+    reason,
+    urgency,
+    notes: phone ? `caller_phone: ${phone}` : null,
+  });
 
   return c.json({ result: `הועברה לנועה (urgency: ${urgency}/10)` });
 });
@@ -194,7 +193,7 @@ toolsRoutes.post("/tools/request-human-handoff", async (c) => {
 const triageSchema = z.object({
   symptoms_he:        z.string().min(1),
   duration_he:        z.string().optional(),
-  pet_type:           z.enum(["כלב", "חתול", "אחר"]),
+  pet_type:           z.enum(PET_SPECIES_VALUES),
   pet_age_years:      z.number().positive().optional(),
   pet_weight_kg:      z.number().positive().optional(),
   additional_signs_he: z.array(z.string()).optional(),
@@ -329,7 +328,7 @@ const bookSchema = z.object({
   phone:         z.string().min(5),
   customer_name: z.string().min(1),
   pet_name:      z.string().min(1),
-  pet_species:   z.string().min(1),
+  pet_species:   z.enum(PET_SPECIES_VALUES),
   pet_breed:     z.string().min(1).optional().nullable(),
   scheduled_at:  z.string().regex(ISO_DATETIME_RE, "Expected ISO8601 datetime"),
   visit_type:    z.enum(VISIT_TYPE_VALUES),
@@ -405,7 +404,7 @@ const waitlistSchema = z.object({
   phone:           z.string().min(5),
   customer_name:   z.string().min(1),
   pet_name:        z.string().min(1),
-  pet_species:     z.string().min(1),
+  pet_species:     z.enum(PET_SPECIES_VALUES),
   pet_breed:       z.string().min(1).optional().nullable(),
   visit_type:      z.enum(VISIT_TYPE_VALUES),
   preferred_start: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
@@ -429,6 +428,30 @@ toolsRoutes.post("/tools/join-waitlist", async (c) => {
   } catch (err) {
     logger.error({ err }, "tool: join-waitlist — internal error");
     return c.json({ result: "שגיאה פנימית ברישום לרשימת ההמתנה. נסה שוב." }, 500);
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /tools/list-customer-appointments
+// ─────────────────────────────────────────────────────────────────────────────
+
+const listCustomerAppointmentsSchema = z.object({ phone: z.string().min(5) });
+
+toolsRoutes.post("/tools/list-customer-appointments", async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const parsed = listCustomerAppointmentsSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ result: "פרמטר phone חסר או שגוי." }, 400);
+  }
+
+  logger.info({ phone: maskPhone(parsed.data.phone) }, "tool: list-customer-appointments");
+
+  try {
+    const { result, appointments } = await listCustomerAppointments(parsed.data.phone);
+    return c.json({ result, appointments });
+  } catch (err) {
+    logger.error({ err }, "tool: list-customer-appointments — internal error");
+    return c.json({ result: "שגיאה פנימית באחזור התורים. נסה שוב." }, 500);
   }
 });
 

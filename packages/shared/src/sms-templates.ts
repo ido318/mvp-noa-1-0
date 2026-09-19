@@ -1,7 +1,8 @@
 // The 8 approved Hebrew SMS templates for Tomer — wording frozen, do not
-// change without Noa's approval. Single source of truth for both agent/
-// (which sends these via the notification processor) and app/ (whose
-// dashboard approve/reject flow enqueues the same templates directly).
+// change without Noa's approval, UNLESS changed through the /dashboard/settings
+// UI (owner/admin only), which is exactly the sanctioned way to change it now.
+// Single source of truth for both agent/ (sends via the notification
+// processor) and app/ (dashboard approve/reject/reschedule flows).
 
 export interface SmsTemplateData {
   customerName: string;
@@ -23,6 +24,16 @@ export interface SmsTemplateData {
 export const CLINIC_LOCATION = 'הקליניקה, גרציאני 6 ת"א';
 export const HOME_VISIT_LOCATION = "ביקור בית בכתובתכם";
 
+export type SmsTemplateKey =
+  | "booking_confirmation"
+  | "morning_reminder"
+  | "arrival_reminder"
+  | "post_visit_followup"
+  | "reschedule_update"
+  | "cancellation_update"
+  | "client_cancellation_confirmation"
+  | "vaccination_reminder";
+
 // Per-template required-field types — callers get compile-time errors for missing fields.
 type Require<T, K extends keyof T> = T & Required<Pick<T, K>>;
 
@@ -32,6 +43,74 @@ export type RescheduleUpdateData    = Require<SmsTemplateData, "oldDate" | "newD
 export type CancellationUpdateData  = Require<SmsTemplateData, "oldDate">;
 export type VaccinationReminderData = Require<SmsTemplateData, "vaccineName" | "petName">;
 
+/** The default, factory wording for each template — {{key}} placeholders, byte-identical
+ * in rendered output to the pre-refactor hardcoded template literals. */
+export const DEFAULT_SMS_TEMPLATE_TEXT: Record<SmsTemplateKey, string> = {
+  booking_confirmation:
+    'שלום {{customerName}}, כאן תומר ממרפאת Get A Vet של ד"ר נועה כבשני.\n' +
+    'התור של {{petName}} נקבע בהצלחה ✅\n' +
+    '📅 {{dayName}}, {{date}} | 🕒 {{time}} | 📍 {{location}}\n' +
+    '🩺 {{visitType}} | 💳 {{price}}\n' +
+    'לשינוי או ביטול (חינם עד 4 שעות לפני התור) — חייגו אלינו.\n' +
+    'מאחלים ל{{petName}} בריאות שלמה 🐾',
+
+  morning_reminder:
+    'בוקר טוב {{customerName}} ☀️ תזכורת מ-Get A Vet:\n' +
+    'היום 🕒 {{time}} | {{visitType}} ל{{petName}} | 📍 {{location}}\n' +
+    'אם משהו השתנה — חייגו אלינו בהקדם האפשרי.\n' +
+    'מחכים לכם, תומר וד"ר נועה 🐾',
+
+  arrival_reminder:
+    'שלום {{customerName}}, כאן תומר מ-Get A Vet ⏰\n' +
+    'מזכירים: התור של {{petName}} היום בשעה {{time}} | {{visitType}} | 📍 {{location}}\n' +
+    'אם לא תוכלו להגיע — חייגו אלינו בהקדם.\n' +
+    'נתראה בקרוב 🐾',
+
+  post_visit_followup:
+    'שלום {{customerName}}, כאן תומר מ-Get A Vet 🐾\n' +
+    'רצינו לשאול מה שלום {{petName}} אחרי הביקור אצל ד"ר נועה — האם המצב משתפר?\n' +
+    'אם יש שאלות, החמרה או כל דבר אחר — אנחנו זמינים בטלפון.\n' +
+    'החלמה מהירה ל{{petName}} ❤️',
+
+  reschedule_update:
+    'שלום {{customerName}}, עדכון מ-Get A Vet:\n' +
+    'בשל אילוץ רפואי, התור של {{petName}} מיום {{oldDate}} עודכן:\n' +
+    '📅 מועד חדש: {{newDate}} | 🕒 {{newTime}} | 📍 {{location}}\n' +
+    'המועד לא מתאים? חייגו אלינו ונמצא זמן אחר.\n' +
+    'מתנצלים על אי הנוחות 🙏 תומר, Get A Vet',
+
+  cancellation_update:
+    'שלום {{customerName}}, עדכון מ-Get A Vet:\n' +
+    'בשל אילוץ רפואי, התור של {{petName}} מיום {{oldDate}} בוטל.\n' +
+    'נשמח לתאם מועד חדש — חייגו אלינו ונמצא זמן שנוח לכם.\n' +
+    'מתנצלים על אי הנוחות 🙏 תומר, Get A Vet',
+
+  client_cancellation_confirmation:
+    'שלום {{customerName}}, מאשרים: התור של {{petName}} מיום {{oldDate}} בוטל לבקשתכם.\n' +
+    'נשמח לראותכם שוב — לקביעת תור חדש חייגו אלינו בכל עת.\n' +
+    'תומר, Get A Vet 🐾',
+
+  vaccination_reminder:
+    'שלום {{customerName}}, כאן תומר מ-Get A Vet 💉\n' +
+    'הגיע הזמן לחיסון הבא של {{petName}} ({{vaccineName}}) — מומלץ לתאם בקרוב לשמירה על הבריאות.\n' +
+    'לתיאום תור נוח — חייגו אלינו בכל עת.\n' +
+    'בריאות ל{{petName}} 🐾 תומר, Get A Vet',
+};
+
+/** Placeholders each template's DEFAULT wording requires — used to validate a custom
+ * override (does the edited text still reference every field the caller will supply?)
+ * and, before that, to throw before sending a malformed SMS built from missing data. */
+export const SMS_TEMPLATE_REQUIRED_FIELDS: Record<SmsTemplateKey, (keyof SmsTemplateData)[]> = {
+  booking_confirmation: ["dayName", "date", "time", "location", "visitType", "price"],
+  morning_reminder: ["time", "location", "visitType"],
+  arrival_reminder: ["time", "location", "visitType"],
+  post_visit_followup: [],
+  reschedule_update: ["oldDate", "newDate", "newTime", "location"],
+  cancellation_update: ["oldDate"],
+  client_cancellation_confirmation: ["oldDate"],
+  vaccination_reminder: ["vaccineName", "petName"],
+};
+
 // Runtime guard — throws before a malformed SMS is sent.
 function requireFields<T extends SmsTemplateData>(d: T, fields: (keyof T)[], template: string): void {
   const missing = fields.filter((f) => d[f] === undefined || d[f] === "");
@@ -40,82 +119,49 @@ function requireFields<T extends SmsTemplateData>(d: T, fields: (keyof T)[], tem
   }
 }
 
-export const smsTemplates = {
-  booking_confirmation: (d: BookingConfirmationData) => {
-    requireFields(d, ["dayName", "date", "time", "location", "visitType", "price"], "booking_confirmation");
-    return (
-      `שלום ${d.customerName}, כאן תומר ממרפאת Get A Vet של ד"ר נועה כבשני.\n` +
-      `התור של ${d.petName} נקבע בהצלחה ✅\n` +
-      `📅 ${d.dayName}, ${d.date} | 🕒 ${d.time} | 📍 ${d.location}\n` +
-      `🩺 ${d.visitType} | 💳 ${d.price}\n` +
-      `לשינוי או ביטול (חינם עד 4 שעות לפני התור) — חייגו אלינו.\n` +
-      `מאחלים ל${d.petName} בריאות שלמה 🐾`
-    );
-  },
+/** Replaces every {{key}} in `templateText` with the matching field of `data`,
+ * or an empty string if that field is missing. */
+export function renderSmsTemplate(templateText: string, data: SmsTemplateData): string {
+  return templateText.replace(/\{\{(\w+)\}\}/g, (_match, key: string) => {
+    const value = (data as unknown as Record<string, unknown>)[key];
+    return value === undefined || value === null ? "" : String(value);
+  });
+}
 
-  morning_reminder: (d: MorningReminderData) => {
-    requireFields(d, ["time", "location", "visitType"], "morning_reminder");
-    return (
-      `בוקר טוב ${d.customerName} ☀️ תזכורת מ-Get A Vet:\n` +
-      `היום 🕒 ${d.time} | ${d.visitType} ל${d.petName} | 📍 ${d.location}\n` +
-      `אם משהו השתנה — חייגו אלינו בהקדם האפשרי.\n` +
-      `מחכים לכם, תומר וד"ר נועה 🐾`
-    );
-  },
+/** The distinct {{key}} names referenced anywhere in a template's text. */
+export function extractPlaceholders(templateText: string): Set<string> {
+  const matches = templateText.matchAll(/\{\{(\w+)\}\}/g);
+  return new Set(Array.from(matches, (m) => m[1] as string));
+}
 
-  arrival_reminder: (d: MorningReminderData) => {
-    requireFields(d, ["time", "location", "visitType"], "arrival_reminder");
-    return (
-      `שלום ${d.customerName}, כאן תומר מ-Get A Vet ⏰\n` +
-      `מזכירים: התור של ${d.petName} היום בשעה ${d.time} | ${d.visitType} | 📍 ${d.location}\n` +
-      `אם לא תוכלו להגיע — חייגו אלינו בהקדם.\n` +
-      `נתראה בקרוב 🐾`
-    );
-  },
+/** Renders `key`'s template using `customText` if given, else the default wording. */
+export function resolveSmsTemplate(
+  key: SmsTemplateKey,
+  customText: string | undefined,
+  data: SmsTemplateData,
+): string {
+  const text = customText ?? DEFAULT_SMS_TEMPLATE_TEXT[key];
+  return renderSmsTemplate(text, data);
+}
 
-  post_visit_followup: (d: SmsTemplateData) =>
-    `שלום ${d.customerName}, כאן תומר מ-Get A Vet 🐾\n` +
-    `רצינו לשאול מה שלום ${d.petName} אחרי הביקור אצל ד"ר נועה — האם המצב משתפר?\n` +
-    `אם יש שאלות, החמרה או כל דבר אחר — אנחנו זמינים בטלפון.\n` +
-    `החלמה מהירה ל${d.petName} ❤️`,
-
-  reschedule_update: (d: RescheduleUpdateData) => {
-    requireFields(d, ["oldDate", "newDate", "newTime", "location"], "reschedule_update");
-    return (
-      `שלום ${d.customerName}, עדכון מ-Get A Vet:\n` +
-      `בשל אילוץ רפואי, התור של ${d.petName} מיום ${d.oldDate} עודכן:\n` +
-      `📅 מועד חדש: ${d.newDate} | 🕒 ${d.newTime} | 📍 ${d.location}\n` +
-      `המועד לא מתאים? חייגו אלינו ונמצא זמן אחר.\n` +
-      `מתנצלים על אי הנוחות 🙏 תומר, Get A Vet`
-    );
-  },
-
-  cancellation_update: (d: CancellationUpdateData) => {
-    requireFields(d, ["oldDate"], "cancellation_update");
-    return (
-      `שלום ${d.customerName}, עדכון מ-Get A Vet:\n` +
-      `בשל אילוץ רפואי, התור של ${d.petName} מיום ${d.oldDate} בוטל.\n` +
-      `נשמח לתאם מועד חדש — חייגו אלינו ונמצא זמן שנוח לכם.\n` +
-      `מתנצלים על אי הנוחות 🙏 תומר, Get A Vet`
-    );
-  },
-
-  client_cancellation_confirmation: (d: CancellationUpdateData) => {
-    requireFields(d, ["oldDate"], "client_cancellation_confirmation");
-    return (
-      `שלום ${d.customerName}, מאשרים: התור של ${d.petName} מיום ${d.oldDate} בוטל לבקשתכם.\n` +
-      `נשמח לראותכם שוב — לקביעת תור חדש חייגו אלינו בכל עת.\n` +
-      `תומר, Get A Vet 🐾`
-    );
-  },
-
-  vaccination_reminder: (d: VaccinationReminderData) => {
-    requireFields(d, ["vaccineName", "petName"], "vaccination_reminder");
-    return (
-      `שלום ${d.customerName}, כאן תומר מ-Get A Vet 💉\n` +
-      `הגיע הזמן לחיסון הבא של ${d.petName} (${d.vaccineName}) — מומלץ לתאם בקרוב לשמירה על הבריאות.\n` +
-      `לתיאום תור נוח — חייגו אלינו בכל עת.\n` +
-      `בריאות ל${d.petName} 🐾 תומר, Get A Vet`
-    );
-  },
+/** Backward-compatible external API: smsTemplates.xxx(data) throws on missing
+ * required fields, then renders the DEFAULT wording. Existing call sites that
+ * don't yet pass a clinic override keep working unchanged via this object. */
+export const smsTemplates = Object.fromEntries(
+  (Object.keys(DEFAULT_SMS_TEMPLATE_TEXT) as SmsTemplateKey[]).map((key) => [
+    key,
+    (d: SmsTemplateData) => {
+      requireFields(d, SMS_TEMPLATE_REQUIRED_FIELDS[key], key);
+      return renderSmsTemplate(DEFAULT_SMS_TEMPLATE_TEXT[key], d);
+    },
+  ]),
+) as {
+  booking_confirmation: (d: BookingConfirmationData) => string;
+  morning_reminder: (d: MorningReminderData) => string;
+  arrival_reminder: (d: MorningReminderData) => string;
+  post_visit_followup: (d: SmsTemplateData) => string;
+  reschedule_update: (d: RescheduleUpdateData) => string;
+  cancellation_update: (d: CancellationUpdateData) => string;
+  client_cancellation_confirmation: (d: CancellationUpdateData) => string;
+  vaccination_reminder: (d: VaccinationReminderData) => string;
 };

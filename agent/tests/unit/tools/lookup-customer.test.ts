@@ -26,9 +26,10 @@ vi.mock("../../../src/lib/store.js", async (importOriginal) => {
 import { findCustomerByPhone, normalisePhone } from "../../../src/lib/store.js";
 
 const mockCustomer = {
+  id: "11111111-1111-4111-8111-111111111111",
   phone: "+972541234567",
   full_name: "עידו אמסלם",
-  pets: [{ name: "בורבי", species: "כלב", breed: "פודל" }],
+  pets: [{ id: "22222222-2222-4222-8222-222222222222", name: "בורבי", species: "כלב", breed: "פודל" }],
   notes: "אלרגיה לעוף ידועה",
 };
 
@@ -52,9 +53,15 @@ describe("POST /tools/lookup-customer", () => {
       body: JSON.stringify({ phone: "+972541234567" }),
     });
     expect(res.status).toBe(200);
-    const json = await res.json() as { result: string };
+    const json = await res.json() as {
+      result: string;
+      customer_id: string;
+      pets: Array<{ id: string; name: string; species: string }>;
+    };
     expect(json.result).toContain("עידו אמסלם");
     expect(json.result).toContain("בורבי");
+    expect(json.customer_id).toBe(mockCustomer.id);
+    expect(json.pets).toEqual([{ id: mockCustomer.pets[0]!.id, name: "בורבי", species: "כלב" }]);
   });
 
   it("normalises 05x prefix to E.164 and finds customer", async () => {

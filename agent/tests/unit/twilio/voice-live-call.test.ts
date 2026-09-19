@@ -42,7 +42,7 @@ describe("POST /twilio/voice live call tracking", () => {
     });
   });
 
-  it("creates an in-progress voice call before returning TwiML", async () => {
+  it("creates an in-progress voice call and returns the disclaimer + redirect", async () => {
     const body = new URLSearchParams({
       CallSid: "CA1234567890",
       From: "+972541234567",
@@ -67,6 +67,27 @@ describe("POST /twilio/voice live call tracking", () => {
         To: "+972535648742",
       },
     });
+
+    const xml = await res.text();
+    expect(xml).toContain("<Say");
+    expect(xml).toContain('<Redirect method="POST">/twilio/voice-connect</Redirect>');
+  });
+
+  it("returns the Connect/Stream TwiML with caller params from /twilio/voice-connect", async () => {
+    const body = new URLSearchParams({
+      CallSid: "CA1234567890",
+      From: "+972541234567",
+      To: "+972535648742",
+    });
+
+    const res = await makeApp().request("/twilio/voice-connect", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body,
+    });
+
+    expect(res.status).toBe(200);
+    expect(mockGetSignedUrl).toHaveBeenCalled();
 
     const xml = await res.text();
     expect(xml).toContain('name="caller_number" value="+972541234567"');

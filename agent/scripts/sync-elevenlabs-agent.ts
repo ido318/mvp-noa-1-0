@@ -4,6 +4,10 @@
  * Syncs the Tomer agent config to ElevenLabs Conversational AI.
  *   --dry-run   Show what would be sent; do NOT call the API.
  *
+ * Authorization is a ConvAI Secret header (`{ secret_id }`), never a plaintext
+ * Bearer Value. On a live run the workspace secret `tomer-tools-bearer` is
+ * created/updated from TOOLS_BEARER_TOKEN so Fly and ElevenLabs stay aligned.
+ *
  * Usage:
  *   cd agent
  *   node --env-file=.env --import tsx/esm scripts/sync-elevenlabs-agent.ts [--dry-run]
@@ -12,6 +16,18 @@
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { join, dirname } from "path";
+import {
+  TOOLS_SECRET_NAME,
+  applyResponseFilters,
+  assertNoPlaintextToolSecrets,
+  bearerSecretValue,
+  buildBuiltInTools,
+  parseWebhookTools,
+  preserveUnmanagedSystemTools,
+  substitutePublicUrl,
+  substituteSecretId,
+  type WebhookTool,
+} from "../src/lib/elevenlabs-agent-sync.js";
 
 const isDryRun = process.argv.includes("--dry-run");
 
@@ -19,10 +35,11 @@ const isDryRun = process.argv.includes("--dry-run");
 
 const ELEVENLABS_API_KEY  = process.env["ELEVENLABS_API_KEY"]  ?? "";
 const ELEVENLABS_AGENT_ID = process.env["ELEVENLABS_AGENT_ID"] ?? "";
-// Accept either AGENT_PUBLIC_URL (production) or PUBLIC_BASE_URL (existing .env convention)
 const AGENT_PUBLIC_URL =
   process.env["AGENT_PUBLIC_URL"] ?? process.env["PUBLIC_BASE_URL"] ?? "";
 const TOOLS_BEARER_TOKEN = process.env["TOOLS_BEARER_TOKEN"] ?? "";
+const ELEVENLABS_TOOLS_SECRET_ID = process.env["ELEVENLABS_TOOLS_SECRET_ID"] ?? "";
+const HUMAN_HANDOFF_NUMBER = process.env["HUMAN_HANDOFF_NUMBER"] ?? "";
 
 const missing: string[] = [];
 if (!ELEVENLABS_API_KEY)  missing.push("ELEVENLABS_API_KEY");
@@ -33,6 +50,92 @@ if (!TOOLS_BEARER_TOKEN)  missing.push("TOOLS_BEARER_TOKEN");
 if (missing.length > 0) {
   console.error(`[sync] Missing required env vars: ${missing.join(", ")}`);
   process.exit(1);
+}
+
+const EL_HEADERS = { "xi-api-key": ELEVENLABS_API_KEY, "Content-Type": "application/json" };
+
+async function elFetch(path: string, init?: RequestInit): Promise<Response> {
+  return fetch(`https://api.elevenlabs.io${path}`, {
+    ...init,
+    headers: { ...EL_HEADERS, ...(init?.headers ?? {}) },
+  });
+}
+
+type StoredSecret = { secret_id: string; name: string };
+
+async function listSecretsByName(name: string): Promise<StoredSecret[]> {
+  const res = await elFetch(`/v1/convai/secrets?search=${encodeURIComponent(name)}`);
+  if (!res.ok) {
+    throw new Error(`list secrets failed: ${res.status} ${await res.text()}`);
+  }
+  const body = await res.json() as { secrets?: StoredSecret[] };
+  return (body.secrets ?? []).filter((s) => s.name === name);
+}
+
+async function createToolsSecret(token: string): Promise<StoredSecret> {
+  const res = await elFetch("/v1/convai/secrets", {
+    method: "POST",
+    body: JSON.stringify({
+      type: "new",
+      name: TOOLS_SECRET_NAME,
+      value: bearerSecretValue(token),
+    }),
+  });
+  if (!res.ok) {
+    throw new Error(`create secret failed: ${res.status} ${await res.text()}`);
+  }
+  return await res.json() as StoredSecret;
+}
+
+async function updateToolsSecret(secretId: string, token: string): Promise<void> {
+  const res = await elFetch(`/v1/convai/secrets/${secretId}`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      type: "update",
+      name: TOOLS_SECRET_NAME,
+      value: bearerSecretValue(token),
+    }),
+  });
+  if (!res.ok) {
+    throw new Error(`update secret failed: ${res.status} ${await res.text()}`);
+  }
+}
+
+/**
+ * Resolve the workspace secret id and, on a live run, write the current Fly
+ * TOOLS_BEARER_TOKEN into it. One-sided rotation (Fly or ElevenLabs alone)
+ * breaks every webhook tool.
+ */
+async function resolveToolsSecretId(): Promise<string> {
+  if (isDryRun && ELEVENLABS_TOOLS_SECRET_ID) {
+    return ELEVENLABS_TOOLS_SECRET_ID;
+  }
+
+  if (isDryRun) {
+    try {
+      if (ELEVENLABS_TOOLS_SECRET_ID) return ELEVENLABS_TOOLS_SECRET_ID;
+      const existing = await listSecretsByName(TOOLS_SECRET_NAME);
+      if (existing[0]) return existing[0].secret_id;
+    } catch (err) {
+      console.warn(`[sync] dry-run: could not list secrets (${err instanceof Error ? err.message : String(err)})`);
+    }
+    return "sec_dry_run";
+  }
+
+  if (ELEVENLABS_TOOLS_SECRET_ID) {
+    await updateToolsSecret(ELEVENLABS_TOOLS_SECRET_ID, TOOLS_BEARER_TOKEN);
+    return ELEVENLABS_TOOLS_SECRET_ID;
+  }
+
+  const existing = await listSecretsByName(TOOLS_SECRET_NAME);
+  if (existing[0]) {
+    await updateToolsSecret(existing[0].secret_id, TOOLS_BEARER_TOKEN);
+    return existing[0].secret_id;
+  }
+
+  const created = await createToolsSecret(TOOLS_BEARER_TOKEN);
+  console.log(`[sync] Created workspace secret ${TOOLS_SECRET_NAME} (${created.secret_id})`);
+  return created.secret_id;
 }
 
 // ── Load knowledge files ──────────────────────────────────────────────────────
@@ -49,30 +152,22 @@ const toolsTemplate = readFileSync(
   "utf-8",
 );
 
-// Substitute placeholders
-const toolsJson = toolsTemplate
-  .replaceAll("{{AGENT_PUBLIC_URL}}", AGENT_PUBLIC_URL)
-  .replaceAll("{{AGENT_TOOLS_BEARER_TOKEN}}", TOOLS_BEARER_TOKEN);
+const secretId = await resolveToolsSecretId();
+const toolsJson = substituteSecretId(
+  substitutePublicUrl(toolsTemplate, AGENT_PUBLIC_URL),
+  secretId,
+);
+const tools: WebhookTool[] = applyResponseFilters(parseWebhookTools(toolsJson));
+assertNoPlaintextToolSecrets(tools, TOOLS_BEARER_TOKEN);
 
-type ElevenLabsTool = {
-  name: string;
-  description: string;
-  type: string;
-  api: { url: string; method: string; headers: unknown[] };
-  parameters: Record<string, unknown>;
-};
-
-const tools: ElevenLabsTool[] = JSON.parse(toolsJson) as ElevenLabsTool[];
+if (!HUMAN_HANDOFF_NUMBER) {
+  console.warn(
+    "[sync] HUMAN_HANDOFF_NUMBER is unset — transfer_to_number will stay disabled; handoff will only escalate.",
+  );
+}
 
 // ── Fetch current config (to preserve fields this script doesn't own) ─────────
-// The ElevenLabs PATCH endpoint's merge semantics for nested objects like
-// conversation_config.agent.prompt are undocumented. To avoid silently wiping
-// knowledge_base/rag (owned by sync-elevenlabs-knowledge-base.ts) when this
-// script replaces `prompt`, always fetch-then-merge instead of trusting the API.
-const currentConfigRes = await fetch(
-  `https://api.elevenlabs.io/v1/convai/agents/${ELEVENLABS_AGENT_ID}`,
-  { headers: { "xi-api-key": ELEVENLABS_API_KEY } },
-);
+const currentConfigRes = await elFetch(`/v1/convai/agents/${ELEVENLABS_AGENT_ID}`);
 if (!currentConfigRes.ok) {
   console.error(`[sync] Failed to fetch current agent config: ${currentConfigRes.status}`);
   process.exit(1);
@@ -91,21 +186,18 @@ const currentConfig = await currentConfigRes.json() as {
 const existingKnowledgeBase = currentConfig.conversation_config?.agent?.prompt?.knowledge_base ?? [];
 const existingRag = currentConfig.conversation_config?.agent?.prompt?.rag ?? { enabled: false };
 
-// ElevenLabs built-in tools (end_call, language_detection, voicemail_detection, …) have
-// type "system" and aren't defined in tomer-tools.json — they only exist on the live
-// agent. Preserve any non-webhook tool so this script's `tools` replace doesn't
-// silently delete them (same undocumented-merge risk as knowledge_base/rag above).
-const existingSystemTools = (currentConfig.conversation_config?.agent?.prompt?.tools ?? [])
-  .filter((t) => t.type !== "webhook");
+const existingSystemTools = preserveUnmanagedSystemTools(
+  currentConfig.conversation_config?.agent?.prompt?.tools ?? [],
+);
 
-// Short Hebrew acknowledgements a caller drops in while Tomer is still talking.
-// Listed here rather than inline so the set is reviewable in one place.
 const HEBREW_BACKCHANNEL_TERMS = [
   "אהה", "אה", "כן", "אוקיי", "או קיי", "אוקי",
   "נכון", "בסדר", "הבנתי", "ברור", "מממ", "אמממ", "יופי",
 ];
 
-// ── Payload ───────────────────────────────────────────────────────────────────
+const builtInTools = buildBuiltInTools({
+  handoffNumber: HUMAN_HANDOFF_NUMBER || null,
+});
 
 const patchPayload = {
   conversation_config: {
@@ -115,21 +207,16 @@ const patchPayload = {
       prompt: {
         prompt: systemPrompt,
         tools: [...tools, ...existingSystemTools],
+        built_in_tools: builtInTools,
         knowledge_base: existingKnowledgeBase,
         rag: existingRag,
       },
     },
     turn: {
-      // 4s + "neutral" rather than 3s + "eager": eager made Tomer jump in
-      // mid-sentence on the smallest pause, which reads as being cut off.
       turn_timeout: 4,
       turn_eagerness: "neutral",
-      // Hebrew backchannel — a caller saying "אהה" or "כן" while Tomer speaks is
-      // acknowledgement, not a turn, so it must not interrupt him.
       interruption_ignore_terms: HEBREW_BACKCHANNEL_TERMS,
       merge_with_default_ignore_terms: true,
-      // The filler ("אני איתך.") was itself one of the repeated stock phrases
-      // callers hear; silence during a tool call is less robotic than a canned line.
       soft_timeout_config: {
         timeout_seconds: 3,
         message: "",
@@ -138,8 +225,6 @@ const patchPayload = {
         max_soft_timeouts_per_generation: 1,
       },
     },
-    // Without this, ElevenLabs counts any background voice (a TV, someone else
-    // in the room, street noise) as the caller speaking and stops Tomer.
     vad: {
       background_voice_detection: true,
     },
@@ -154,47 +239,29 @@ const patchPayload = {
   },
 };
 
-// ── Dry-run ───────────────────────────────────────────────────────────────────
-
 if (isDryRun) {
   console.log("=== DRY RUN — no changes will be sent to ElevenLabs ===\n");
 
-  // Fetch current config for comparison
   let currentPrompt = "(failed to fetch)";
   let currentToolNames: string[] = [];
   try {
-    const res = await fetch(
-      `https://api.elevenlabs.io/v1/convai/agents/${ELEVENLABS_AGENT_ID}`,
-      { headers: { "xi-api-key": ELEVENLABS_API_KEY } },
-    );
-    if (res.ok) {
-      const data = await res.json() as {
-        conversation_config?: {
-          agent?: {
-            first_message?: string;
-            prompt?: { prompt?: string; tools?: Array<{ name?: string }> };
-          };
-          turn?: {
-            turn_timeout?: number;
-            turn_eagerness?: string;
-            soft_timeout_config?: { timeout_seconds?: number };
-          };
-          tts?: { speed?: number; stability?: number; optimize_streaming_latency?: number };
+    const data = currentConfig as {
+      conversation_config?: {
+        agent?: {
+          prompt?: { prompt?: string; tools?: Array<{ name?: string }> };
         };
       };
-      currentPrompt =
-        data.conversation_config?.agent?.prompt?.prompt ?? "(empty)";
-      currentToolNames = (data.conversation_config?.agent?.prompt?.tools ?? [])
-        .map((t) => t.name ?? "?");
-    } else {
-      currentPrompt = `(ElevenLabs returned ${res.status})`;
-    }
+    };
+    currentPrompt = data.conversation_config?.agent?.prompt?.prompt ?? "(empty)";
+    currentToolNames = (data.conversation_config?.agent?.prompt?.tools ?? [])
+      .map((t) => t.name ?? "?");
   } catch (err) {
     currentPrompt = `(fetch error: ${err instanceof Error ? err.message : String(err)})`;
   }
 
   console.log(`Agent ID : ${ELEVENLABS_AGENT_ID}`);
-  console.log(`Base URL : ${AGENT_PUBLIC_URL}\n`);
+  console.log(`Base URL : ${AGENT_PUBLIC_URL}`);
+  console.log(`Auth     : Secret locator ${TOOLS_SECRET_NAME} (${secretId}) — not a Value header\n`);
 
   console.log("── SYSTEM PROMPT ─────────────────────────────────────────────");
   console.log(`Current : ${currentPrompt.length} chars`);
@@ -211,14 +278,24 @@ if (isDryRun) {
   const proposedTools = patchPayload.conversation_config.agent.prompt.tools;
   console.log(`Proposed (${proposedTools.length}):`);
   for (const t of proposedTools) {
-    const apiUrl = (t.api as { url?: string } | undefined)?.url
-      ?? (t as unknown as { api_schema?: { url?: string } }).api_schema?.url
-      ?? "(unknown)";
-    const reqBody = (t as unknown as { api_schema?: { request_body_schema?: { required?: string[] } } }).api_schema?.request_body_schema;
-    console.log(`  • ${t.name}`);
+    const webhook = t as WebhookTool;
+    const apiUrl = webhook.api_schema?.url ?? "(system/other)";
+    const reqBody = webhook.api_schema?.request_body_schema as { required?: string[] } | undefined;
+    const auth = webhook.api_schema?.request_headers?.["Authorization"];
+    const authLabel = typeof auth === "object" && auth
+      ? `{ secret_id: ${auth.secret_id} }`
+      : "(none)";
+    console.log(`  • ${webhook.name ?? (t as { name?: string }).name}`);
     console.log(`    URL: ${apiUrl}`);
+    console.log(`    Auth: ${authLabel}`);
     console.log(`    Required: ${JSON.stringify(reqBody?.required ?? [])}`);
   }
+
+  console.log("\n── BUILT-IN SYSTEM TOOLS ─────────────────────────────────────");
+  console.log(`transfer_to_number : ${HUMAN_HANDOFF_NUMBER ? "enabled → Noa mobile" : "disabled (HUMAN_HANDOFF_NUMBER unset)"}`);
+  console.log("voicemail_detection: enabled with Hebrew message");
+  console.log("language_detection : disabled");
+  console.log("end_call           : custom description (no hangup while write tools pending)");
 
   console.log("\n── VOICE TURN SETTINGS ────────────────────────────────────────");
   console.log(`First message: ${patchPayload.conversation_config.agent.first_message}`);
@@ -231,21 +308,12 @@ if (isDryRun) {
   process.exit(0);
 }
 
-// ── Live push ─────────────────────────────────────────────────────────────────
-
 console.log(`[sync] Updating agent ${ELEVENLABS_AGENT_ID} …`);
 
-const res = await fetch(
-  `https://api.elevenlabs.io/v1/convai/agents/${ELEVENLABS_AGENT_ID}`,
-  {
-    method: "PATCH",
-    headers: {
-      "xi-api-key": ELEVENLABS_API_KEY,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(patchPayload),
-  },
-);
+const res = await elFetch(`/v1/convai/agents/${ELEVENLABS_AGENT_ID}`, {
+  method: "PATCH",
+  body: JSON.stringify(patchPayload),
+});
 
 if (!res.ok) {
   const body = await res.text();
@@ -256,3 +324,4 @@ if (!res.ok) {
 console.log(`[sync] Agent updated successfully.`);
 console.log(`[sync] System prompt: ${systemPrompt.length} chars`);
 console.log(`[sync] Tools synced: ${tools.map((t) => t.name).join(", ")}`);
+console.log(`[sync] Authorization: Secret ${TOOLS_SECRET_NAME} (${secretId})`);

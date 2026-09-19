@@ -1,6 +1,6 @@
 import { getSupabase } from "./supabase.js";
 import {
-  smsTemplates,
+  resolveSmsTemplate,
   formatAppointmentDateTime,
   israelDateIso,
   israelDateAtHour,
@@ -9,6 +9,7 @@ import {
   HOME_VISIT_LOCATION,
   type BookingConfirmationData,
   type MorningReminderData,
+  type SmsTemplateKey,
 } from "@tomer/shared";
 import { getVisitConfig, type VisitType } from "./appointments.js";
 
@@ -115,6 +116,18 @@ type EnqueueParams = {
   scheduledFor: Date;
 };
 
+/** Reads clinics.settings.smsTemplates for one clinic. Empty object if there's
+ * no override or the row can't be read — callers always have the default text. */
+async function getSmsTemplateOverrides(clinicId: string): Promise<Partial<Record<SmsTemplateKey, string>>> {
+  const { data, error } = await getSupabase()
+    .from("clinics")
+    .select("settings")
+    .eq("id", clinicId)
+    .single();
+  if (error || !data) return {};
+  return (data.settings?.smsTemplates as Partial<Record<SmsTemplateKey, string>> | undefined) ?? {};
+}
+
 export async function enqueueNotification(params: EnqueueParams): Promise<void> {
   const { error } = await getSupabase()
     .from("notifications_log")
@@ -153,6 +166,7 @@ export type BookingNotificationParams = {
 /** Enqueue booking_confirmation (now), morning_reminder (08:00 day-of), post_visit_followup (end+24h). */
 export async function scheduleBookingNotifications(p: BookingNotificationParams): Promise<void> {
   const now = new Date();
+  const overrides = await getSmsTemplateOverrides(p.clinicId);
   const base = buildBaseParams(p.scheduledAt, p.visitType, p.customerName, p.petName);
   const shared = {
     clinicId:      p.clinicId,
@@ -164,7 +178,7 @@ export async function scheduleBookingNotifications(p: BookingNotificationParams)
   await enqueueNotification({
     ...shared,
     type:         "booking_confirmation",
-    body:         smsTemplates.booking_confirmation(base),
+    body:         resolveSmsTemplate("booking_confirmation", overrides.booking_confirmation, base),
     scheduledFor: now,
   });
 
@@ -174,7 +188,7 @@ export async function scheduleBookingNotifications(p: BookingNotificationParams)
     await enqueueNotification({
       ...shared,
       type:         "morning_reminder",
-      body:         smsTemplates.morning_reminder(base),
+      body:         resolveSmsTemplate("morning_reminder", overrides.morning_reminder, base),
       scheduledFor: morning,
     });
   }
@@ -184,7 +198,7 @@ export async function scheduleBookingNotifications(p: BookingNotificationParams)
     await enqueueNotification({
       ...shared,
       type:         "arrival_reminder",
-      body:         smsTemplates.arrival_reminder(base),
+      body:         resolveSmsTemplate("arrival_reminder", overrides.arrival_reminder, base),
       scheduledFor: arrivalReminderTime,
     });
   }
@@ -195,7 +209,10 @@ export async function scheduleBookingNotifications(p: BookingNotificationParams)
   await enqueueNotification({
     ...shared,
     type:         "post_visit_followup",
-    body:         smsTemplates.post_visit_followup({ customerName: p.customerName, petName: p.petName }),
+    body:         resolveSmsTemplate("post_visit_followup", overrides.post_visit_followup, {
+      customerName: p.customerName,
+      petName:      p.petName,
+    }),
     scheduledFor: followupTime,
   });
 }
@@ -257,6 +274,7 @@ export type RescheduleNotificationParams = {
 export async function enqueueRescheduleNotification(
   p: RescheduleNotificationParams,
 ): Promise<void> {
+  const overrides = await getSmsTemplateOverrides(p.clinicId);
   const { date: oldDate } = formatAppointmentDateTime(p.oldScheduledAt);
   const { date: newDate, time: newTime } = formatAppointmentDateTime(p.newScheduledAt);
   const location = p.visitType === "home_visit" ? HOME_VISIT_LOCATION : CLINIC_LOCATION;
@@ -267,7 +285,7 @@ export async function enqueueRescheduleNotification(
     appointmentId: p.appointmentId,
     phone:         p.phone,
     type:          "reschedule_update",
-    body:          smsTemplates.reschedule_update({
+    body:          resolveSmsTemplate("reschedule_update", overrides.reschedule_update, {
       customerName: p.customerName,
       petName:      p.petName,
       oldDate,
@@ -285,6 +303,7 @@ export async function enqueueClientCancellationConfirmation(
 ): Promise<void> {
   await cancelFutureNotifications(p.appointmentId, p.clinicId);
 
+  const overrides = await getSmsTemplateOverrides(p.clinicId);
   const { date } = formatAppointmentDateTime(p.scheduledAt);
   await enqueueNotification({
     clinicId:      p.clinicId,
@@ -292,7 +311,7 @@ export async function enqueueClientCancellationConfirmation(
     appointmentId: p.appointmentId,
     phone:         p.phone,
     type:          "client_cancellation_confirmation",
-    body:          smsTemplates.client_cancellation_confirmation({
+    body:          resolveSmsTemplate("client_cancellation_confirmation", overrides.client_cancellation_confirmation, {
       customerName: p.customerName,
       petName:      p.petName,
       oldDate:      date,

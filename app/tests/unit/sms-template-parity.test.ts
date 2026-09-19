@@ -23,7 +23,14 @@ import { smsTemplates } from "../../../agent/src/services/sms.templates";
 function buildClient() {
   const insert = vi.fn().mockResolvedValue({ error: null });
   const upsert = vi.fn().mockResolvedValue({ error: null });
-  const client = { from: vi.fn().mockReturnValue({ insert, upsert }) };
+  const single = vi.fn().mockResolvedValue({ data: { settings: { smsTemplates: {} } }, error: null });
+  const client = {
+    from: vi.fn((table: string) =>
+      table === "clinics"
+        ? { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), single }
+        : { insert, upsert },
+    ),
+  };
   return { client, insert, upsert };
 }
 

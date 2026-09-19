@@ -45,6 +45,25 @@ describe("POST /tools/escalate-to-noa", () => {
     expect(vi.mocked(addEscalation)).toHaveBeenCalledWith({
       reason: "לקוח מבקש שיחה עם נועה",
       urgency: 3,
+      notes: null,
+    });
+  });
+
+  it("stores caller phone in notes until a dedicated column exists", async () => {
+    const res = await makeApp().request("/tools/escalate-to-noa", {
+      method: "POST",
+      headers: signedHeaders(),
+      body: JSON.stringify({
+        reason: "חשבונית",
+        urgency: 2,
+        phone: "+972541234567",
+      }),
+    });
+    expect(res.status).toBe(200);
+    expect(vi.mocked(addEscalation)).toHaveBeenCalledWith({
+      reason: "חשבונית",
+      urgency: 2,
+      notes: "caller_phone: +972541234567",
     });
   });
 

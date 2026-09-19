@@ -9,7 +9,14 @@ import { DashboardNotificationsService } from "@/lib/services/dashboard-notifica
 
 function buildClient() {
   const insert = vi.fn().mockResolvedValue({ error: null });
-  const client = { from: vi.fn().mockReturnValue({ insert }) };
+  const single = vi.fn().mockResolvedValue({ data: { settings: { smsTemplates: {} } }, error: null });
+  const client = {
+    from: vi.fn((table: string) =>
+      table === "clinics"
+        ? { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), single }
+        : { insert },
+    ),
+  };
   return { client, insert };
 }
 

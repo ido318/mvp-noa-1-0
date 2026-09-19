@@ -1,5 +1,5 @@
 import { getSupabase } from "./supabase.js";
-import { smsTemplates } from "../services/sms.templates.js";
+import { resolveSmsTemplate, type SmsTemplateKey } from "@tomer/shared";
 import { logger } from "./logger.js";
 import { israelDateIso } from "./notifications.js";
 
@@ -51,6 +51,16 @@ export async function enqueueDueVaccinationReminders(): Promise<EnqueueVaccinati
 
   result.scanned = data.length;
 
+  const overridesCache = new Map<string, Partial<Record<SmsTemplateKey, string>>>();
+
+  async function getOverridesFor(clinicId: string): Promise<Partial<Record<SmsTemplateKey, string>>> {
+    if (overridesCache.has(clinicId)) return overridesCache.get(clinicId)!;
+    const { data, error } = await getSupabase().from("clinics").select("settings").eq("id", clinicId).single();
+    const overrides = (!error && data) ? ((data.settings?.smsTemplates as Partial<Record<SmsTemplateKey, string>> | undefined) ?? {}) : {};
+    overridesCache.set(clinicId, overrides);
+    return overrides;
+  }
+
   for (const row of data) {
     const pet = Array.isArray(row.pet) ? row.pet[0] : row.pet;
     const customer = Array.isArray(row.customer) ? row.customer[0] : row.customer;
@@ -62,7 +72,8 @@ export async function enqueueDueVaccinationReminders(): Promise<EnqueueVaccinati
       continue;
     }
 
-    const body = smsTemplates.vaccination_reminder({
+    const overrides = await getOverridesFor(row.clinic_id);
+    const body = resolveSmsTemplate("vaccination_reminder", overrides.vaccination_reminder, {
       customerName: customer.full_name,
       petName: pet.name,
       vaccineName: row.vaccine_name,

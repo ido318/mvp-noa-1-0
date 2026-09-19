@@ -12,16 +12,19 @@ export type DayHours = {
   end: { h: number; m: number };
 };
 
-export type VisitType =
-  | "checkup"
-  | "home_visit"
-  | "vaccination"
-  | "phone_consultation"
-  | "neutering"
-  | "consultation"
-  | "urgent"
-  | "follow_up"
-  | "other";
+export const VISIT_TYPE_VALUES = [
+  "checkup",
+  "home_visit",
+  "vaccination",
+  "phone_consultation",
+  "neutering",
+  "consultation",
+  "urgent",
+  "follow_up",
+  "other",
+] as const;
+
+export type VisitType = (typeof VISIT_TYPE_VALUES)[number];
 
 export type VisitTypeConfig = {
   durationMin: number;

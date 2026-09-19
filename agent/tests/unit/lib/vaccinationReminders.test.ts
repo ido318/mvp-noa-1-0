@@ -2,11 +2,13 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { enqueueDueVaccinationReminders } from "../../../src/lib/vaccinationReminders.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Mock Supabase — "vaccinations" select chain + "notifications_log" upsert
+// Mock Supabase — "vaccinations" select chain, "clinics" override lookup,
+// "notifications_log" upsert
 // ─────────────────────────────────────────────────────────────────────────────
 
 const mockUpsert = vi.fn().mockResolvedValue({ error: null });
 const mockFrom = vi.fn();
+const mockSingle = vi.fn().mockResolvedValue({ data: { settings: { smsTemplates: {} } }, error: null });
 
 vi.mock("../../../src/lib/supabase.js", () => ({
   getSupabase: () => ({
@@ -37,11 +39,17 @@ function vaccinationsChain(resolveValue: { data: unknown; error: unknown }) {
   return chain;
 }
 
+function clinicsChain() {
+  return { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), single: mockSingle };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   mockUpsert.mockResolvedValue({ error: null });
+  mockSingle.mockResolvedValue({ data: { settings: { smsTemplates: {} } }, error: null });
   mockFrom.mockImplementation((table: string) => {
     if (table === "notifications_log") return { upsert: mockUpsert };
+    if (table === "clinics") return clinicsChain();
     throw new Error(`unexpected table in default mockFrom: ${table}`);
   });
 });
@@ -52,6 +60,7 @@ describe("enqueueDueVaccinationReminders", () => {
     mockFrom.mockImplementation((table: string) => {
       if (table === "vaccinations") return chain;
       if (table === "notifications_log") return { upsert: mockUpsert };
+      if (table === "clinics") return clinicsChain();
       throw new Error(`unexpected table: ${table}`);
     });
 
@@ -76,12 +85,13 @@ describe("enqueueDueVaccinationReminders", () => {
     expect(diffDays).toBe(14);
   });
 
-  it("builds the SMS body via smsTemplates.vaccination_reminder and upserts with vaccination_id", async () => {
+  it("builds the SMS body via resolveSmsTemplate (default wording) and upserts with vaccination_id", async () => {
     const row = makeVaccinationRow();
     const chain = vaccinationsChain({ data: [row], error: null });
     mockFrom.mockImplementation((table: string) => {
       if (table === "vaccinations") return chain;
       if (table === "notifications_log") return { upsert: mockUpsert };
+      if (table === "clinics") return clinicsChain();
       throw new Error(`unexpected table: ${table}`);
     });
 
@@ -113,6 +123,7 @@ describe("enqueueDueVaccinationReminders", () => {
     mockFrom.mockImplementation((table: string) => {
       if (table === "vaccinations") return chain;
       if (table === "notifications_log") return { upsert: mockUpsert };
+      if (table === "clinics") return clinicsChain();
       throw new Error(`unexpected table: ${table}`);
     });
 
@@ -129,6 +140,7 @@ describe("enqueueDueVaccinationReminders", () => {
     mockFrom.mockImplementation((table: string) => {
       if (table === "vaccinations") return chain;
       if (table === "notifications_log") return { upsert: mockUpsert };
+      if (table === "clinics") return clinicsChain();
       throw new Error(`unexpected table: ${table}`);
     });
 
@@ -143,6 +155,7 @@ describe("enqueueDueVaccinationReminders", () => {
     mockFrom.mockImplementation((table: string) => {
       if (table === "vaccinations") return chain;
       if (table === "notifications_log") return { upsert: mockUpsert };
+      if (table === "clinics") return clinicsChain();
       throw new Error(`unexpected table: ${table}`);
     });
 
@@ -156,6 +169,7 @@ describe("enqueueDueVaccinationReminders", () => {
     mockFrom.mockImplementation((table: string) => {
       if (table === "vaccinations") return chain;
       if (table === "notifications_log") return { upsert: mockUpsert };
+      if (table === "clinics") return clinicsChain();
       throw new Error(`unexpected table: ${table}`);
     });
 
@@ -163,5 +177,86 @@ describe("enqueueDueVaccinationReminders", () => {
 
     expect(mockUpsert).not.toHaveBeenCalled();
     expect(result).toEqual({ scanned: 0, enqueued: 0, skippedNoPhone: 0, failed: 0 });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Clinic SMS template overrides — resolveSmsTemplate honors clinics.settings.smsTemplates
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("enqueueDueVaccinationReminders — clinic SMS template overrides", () => {
+  it("uses the clinic's vaccination_reminder override when present", async () => {
+    mockSingle.mockResolvedValue({
+      data: { settings: { smsTemplates: { vaccination_reminder: "תזכורת: {{petName}} צריך {{vaccineName}}" } } },
+      error: null,
+    });
+    const row = makeVaccinationRow();
+    const chain = vaccinationsChain({ data: [row], error: null });
+    mockFrom.mockImplementation((table: string) => {
+      if (table === "vaccinations") return chain;
+      if (table === "notifications_log") return { upsert: mockUpsert };
+      if (table === "clinics") return clinicsChain();
+      throw new Error(`unexpected table: ${table}`);
+    });
+
+    await enqueueDueVaccinationReminders();
+
+    expect(mockUpsert).toHaveBeenCalledTimes(1);
+    const [payload] = mockUpsert.mock.calls[0]!;
+    expect(payload.body).toBe("תזכורת: ביסלי צריך משושה");
+  });
+
+  it("falls back to default wording when the clinic has no override", async () => {
+    const row = makeVaccinationRow();
+    const chain = vaccinationsChain({ data: [row], error: null });
+    mockFrom.mockImplementation((table: string) => {
+      if (table === "vaccinations") return chain;
+      if (table === "notifications_log") return { upsert: mockUpsert };
+      if (table === "clinics") return clinicsChain();
+      throw new Error(`unexpected table: ${table}`);
+    });
+
+    await enqueueDueVaccinationReminders();
+
+    const [payload] = mockUpsert.mock.calls[0]!;
+    expect(payload.body).toContain("הגיע הזמן לחיסון הבא");
+  });
+
+  it("falls back to default wording when the clinics lookup errors (does not throw)", async () => {
+    mockSingle.mockResolvedValue({ data: null, error: { message: "not found" } });
+    const row = makeVaccinationRow();
+    const chain = vaccinationsChain({ data: [row], error: null });
+    mockFrom.mockImplementation((table: string) => {
+      if (table === "vaccinations") return chain;
+      if (table === "notifications_log") return { upsert: mockUpsert };
+      if (table === "clinics") return clinicsChain();
+      throw new Error(`unexpected table: ${table}`);
+    });
+
+    const result = await enqueueDueVaccinationReminders();
+
+    expect(mockUpsert).toHaveBeenCalledTimes(1);
+    const [payload] = mockUpsert.mock.calls[0]!;
+    expect(payload.body).toContain("הגיע הזמן לחיסון הבא");
+    expect(result).toEqual({ scanned: 1, enqueued: 1, skippedNoPhone: 0, failed: 0 });
+  });
+
+  it("only fetches clinic overrides once per clinic across multiple due vaccinations (per-run cache)", async () => {
+    const row1 = makeVaccinationRow({ id: "vacc-1" });
+    const row2 = makeVaccinationRow({ id: "vacc-2", customer: { id: "cust-2", full_name: "דני", phone: "+972509999999" } });
+    const chain = vaccinationsChain({ data: [row1, row2], error: null });
+    mockFrom.mockImplementation((table: string) => {
+      if (table === "vaccinations") return chain;
+      if (table === "notifications_log") return { upsert: mockUpsert };
+      if (table === "clinics") return clinicsChain();
+      throw new Error(`unexpected table: ${table}`);
+    });
+
+    await enqueueDueVaccinationReminders();
+
+    expect(mockUpsert).toHaveBeenCalledTimes(2);
+    // Both rows share clinic_id "clinic-1" — the clinics lookup should be
+    // memoized per run rather than re-fetched per row.
+    expect(mockSingle).toHaveBeenCalledTimes(1);
   });
 });

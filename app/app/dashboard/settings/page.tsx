@@ -6,11 +6,15 @@ import { Badge } from "@/components/dashboard/ui/badge";
 import { Skeleton } from "@/components/dashboard/ui/skeleton";
 import { Field, Input } from "@/components/dashboard/ui/field";
 import { useToast } from "@/components/dashboard/ui/toast";
+import { Btn } from "@/components/dashboard/ui/btn";
+import { Drawer } from "@/components/dashboard/ui/drawer";
 import { LogoutButton } from "@/app/dashboard/logout-button";
 import { PriceListSettings } from "@/components/dashboard/settings/price-list-settings";
 import type { MeResponse } from "@/types/api/me";
 import type { ClinicSettings } from "@/types/domain/clinic";
 import { MAX_BUSINESS_HOURS_ROWS, MAX_VISIT_PRICE_ROWS } from "@/lib/validators/clinic-settings";
+import type { SmsTemplateKey } from "@tomer/shared";
+import { DEFAULT_SMS_TEMPLATE_TEXT, SMS_TEMPLATE_REQUIRED_FIELDS } from "@tomer/shared";
 
 const ROLE_LABELS: Record<string, string> = {
   owner: "בעלים",
@@ -19,13 +23,31 @@ const ROLE_LABELS: Record<string, string> = {
   staff: "צוות",
 };
 
-const CLIENT_SMS: Array<{ label: string; when: string }> = [
-  { label: "אישור קביעת תור", when: "מיד עם הקביעה" },
-  { label: "תזכורת בוקר", when: "08:00 ביום התור" },
-  { label: "אישור הגעה", when: "שעתיים לפני התור" },
-  { label: "מעקב אחרי ביקור", when: "יממה לאחר הביקור" },
-  { label: "עדכון ביטול/שינוי", when: "כשנועה משנה תור" },
+const CLIENT_SMS: Array<{ key: SmsTemplateKey; label: string; when: string }> = [
+  { key: "booking_confirmation", label: "אישור קביעת תור", when: "מיד עם הקביעה" },
+  { key: "morning_reminder", label: "תזכורת בוקר", when: "08:00 ביום התור" },
+  { key: "arrival_reminder", label: "אישור הגעה", when: "שעתיים לפני התור" },
+  { key: "post_visit_followup", label: "מעקב אחרי ביקור", when: "יממה לאחר הביקור" },
+  { key: "reschedule_update", label: "עדכון שינוי תור", when: "כשנועה משנה תור" },
+  { key: "cancellation_update", label: "עדכון ביטול (מהדשבורד)", when: "כשנועה מבטלת תור" },
+  { key: "client_cancellation_confirmation", label: "אישור ביטול (מהלקוח)", when: "כשהלקוח מבטל בטלפון" },
+  { key: "vaccination_reminder", label: "תזכורת חיסון", when: "14 יום לפני מועד" },
 ];
+
+const FIELD_LABELS: Record<string, string> = {
+  customerName: "שם הלקוח",
+  petName: "שם החיה",
+  dayName: "יום בשבוע",
+  date: "תאריך",
+  time: "שעה",
+  location: "מיקום",
+  visitType: "סוג ביקור",
+  price: "מחיר",
+  oldDate: "תאריך ישן",
+  newDate: "תאריך חדש",
+  newTime: "שעה חדשה",
+  vaccineName: "שם החיסון",
+};
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -126,6 +148,9 @@ export default function SettingsPage() {
   const [settingsLoadFailed, setSettingsLoadFailed] = useState(false);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [editingTemplateKey, setEditingTemplateKey] = useState<SmsTemplateKey | null>(null);
+  const [templateDraftText, setTemplateDraftText] = useState("");
+  const [savingTemplate, setSavingTemplate] = useState(false);
 
   useEffect(() => {
     let ignore = false;
@@ -194,6 +219,63 @@ export default function SettingsPage() {
       toast("ההגדרות נשמרו", "success");
     } finally {
       setSaving(false);
+    }
+  }
+
+  function openTemplateEditor(key: SmsTemplateKey) {
+    setEditingTemplateKey(key);
+    setTemplateDraftText(settings?.smsTemplates?.[key] ?? DEFAULT_SMS_TEMPLATE_TEXT[key]);
+  }
+
+  function closeTemplateEditor() {
+    setEditingTemplateKey(null);
+  }
+
+  async function saveTemplate() {
+    if (!editingTemplateKey) return;
+    setSavingTemplate(true);
+    try {
+      const nextSmsTemplates = { ...(settings?.smsTemplates ?? {}), [editingTemplateKey]: templateDraftText };
+      const res = await fetch("/api/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ smsTemplates: nextSmsTemplates }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
+        toast(body?.error?.message ?? "שמירת הניסוח נכשלה", "error");
+        return;
+      }
+      const payload = (await res.json()) as { data: ClinicSettings };
+      setSettings(payload.data);
+      toast("הניסוח נשמר", "success");
+      setEditingTemplateKey(null);
+    } finally {
+      setSavingTemplate(false);
+    }
+  }
+
+  async function resetTemplateToDefault(key: SmsTemplateKey) {
+    setSavingTemplate(true);
+    try {
+      const nextSmsTemplates = { ...(settings?.smsTemplates ?? {}) };
+      delete nextSmsTemplates[key];
+      const res = await fetch("/api/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ smsTemplates: nextSmsTemplates }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
+        toast(body?.error?.message ?? "איפוס הניסוח נכשל", "error");
+        return;
+      }
+      const payload = (await res.json()) as { data: ClinicSettings };
+      setSettings(payload.data);
+      toast("אופס לברירת המחדל", "success");
+      setEditingTemplateKey(null);
+    } finally {
+      setSavingTemplate(false);
     }
   }
 
@@ -413,12 +495,26 @@ export default function SettingsPage() {
           </Card>
         ) : null}
 
-        {/* Client SMS — informational only, not backed by an API */}
+        {/* Client SMS — 8 templates, wording editable per-clinic via the drawer below */}
         <Card style={{ background: "var(--surface-sunken)" }}>
-          <SectionTitle hint="הודעות שנשלחות אוטומטית ללקוחות" readOnly>התראות SMS ללקוחות</SectionTitle>
+          <SectionTitle hint="הודעות שנשלחות אוטומטית ללקוחות" readOnly={!canEdit}>התראות SMS ללקוחות</SectionTitle>
           <div>
-            {CLIENT_SMS.map((s) => (
-              <Row key={s.label} label={s.label} value={s.when} />
+            {CLIENT_SMS.map((sms) => (
+              <div
+                key={sms.key}
+                className="flex items-center justify-between gap-3 py-2.5 last:border-0"
+                style={{ borderBottom: "var(--rule)" }}
+              >
+                <div>
+                  <p className="text-sm" style={{ color: "var(--text-secondary)" }}>{sms.label}</p>
+                  <p className="text-xs" style={{ color: "var(--text-faint)" }}>{sms.when}</p>
+                </div>
+                {canEdit ? (
+                  <Btn variant="ghost" size="sm" onClick={() => openTemplateEditor(sms.key)}>
+                    ערוך
+                  </Btn>
+                ) : null}
+              </div>
             ))}
           </div>
         </Card>
@@ -460,6 +556,58 @@ export default function SettingsPage() {
           )}
         </Card>
       </div>
+
+      {editingTemplateKey ? (
+        <Drawer
+          open
+          onClose={closeTemplateEditor}
+          title={CLIENT_SMS.find((s) => s.key === editingTemplateKey)?.label ?? ""}
+          subtitle="נוסח הודעת ה-SMS שנשלחת ללקוח"
+          footer={
+            <>
+              <Btn variant="primary" size="sm" loading={savingTemplate} onClick={() => void saveTemplate()}>
+                שמור
+              </Btn>
+              <Btn
+                variant="soft"
+                size="sm"
+                loading={savingTemplate}
+                onClick={() => void resetTemplateToDefault(editingTemplateKey)}
+              >
+                אפס לברירת מחדל
+              </Btn>
+            </>
+          }
+        >
+          <div className="space-y-3 p-5">
+            <Field label="נוסח ההודעה" htmlFor="sms-template-draft">
+              <textarea
+                id="sms-template-draft"
+                value={templateDraftText}
+                onChange={(e) => setTemplateDraftText(e.target.value)}
+                rows={8}
+                dir="rtl"
+                className="w-full text-sm p-3"
+                style={{
+                  border: "var(--rule)",
+                  borderRadius: "var(--radius-2)",
+                  background: "var(--surface-sunken)",
+                }}
+              />
+            </Field>
+            <div>
+              <p className="text-xs font-semibold mb-1" style={{ color: "var(--text-muted)" }}>
+                משתנים זמינים:
+              </p>
+              <p className="text-xs" style={{ color: "var(--text-faint)" }}>
+                {Array.from(new Set(["customerName", "petName", ...SMS_TEMPLATE_REQUIRED_FIELDS[editingTemplateKey]]))
+                  .map((field) => `{{${field}}} (${FIELD_LABELS[field] ?? field})`)
+                  .join(" · ")}
+              </p>
+            </div>
+          </div>
+        </Drawer>
+      ) : null}
     </div>
   );
 }
