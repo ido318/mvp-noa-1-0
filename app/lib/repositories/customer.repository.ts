@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { AppError, err, ok, type Result } from "@/lib/errors/app-error";
 import { phonesMatch } from "@/lib/integrations/twilio/phone";
 import { mapCustomerRow } from "@/lib/repositories/mappers";
+import { postgrestOrIlikeValue } from "@/lib/search/escape-postgrest";
 import type {
   CreateCustomerInput,
   Customer,
@@ -28,7 +29,7 @@ export class CustomerRepository {
       .range(from, to);
 
     if (filters.query) {
-      const value = `%${filters.query}%`;
+      const value = postgrestOrIlikeValue(filters.query);
       query = query.or(`full_name.ilike.${value},phone.ilike.${value},email.ilike.${value}`);
     }
 

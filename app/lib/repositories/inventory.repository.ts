@@ -46,39 +46,29 @@ export class InventoryRepository {
     itemId: string,
     input: InventoryAdjustmentInput & { clinicId: string; createdByUserId: string },
   ): Promise<Result<InventoryItem>> {
-    const { data: existing, error: loadError } = await this.client
-      .from("inventory_items")
-      .select("*")
-      .eq("id", itemId)
-      .eq("clinic_id", input.clinicId)
-      .is("deleted_at", null)
-      .single();
-    if (loadError) return err(AppError.externalProvider("Failed to load inventory item", loadError));
-
-    const current = Number(existing.quantity_on_hand);
-    const next = current + input.quantityDelta;
-    if (next < 0) return err(AppError.validation("Inventory adjustment cannot make stock negative"));
-
-    const { data, error } = await this.client
-      .from("inventory_items")
-      .update({ quantity_on_hand: next, version: Number(existing.version) + 1 })
-      .eq("id", itemId)
-      .select("*")
-      .single();
-    if (error) return err(AppError.externalProvider("Failed to adjust inventory item", error));
-
-    const { error: txError } = await this.client.from("inventory_transactions").insert({
-      clinic_id: input.clinicId,
-      item_id: itemId,
-      transaction_type: input.transactionType ?? "adjustment",
-      quantity_delta: input.quantityDelta,
-      reason: input.reason,
-      source_type: input.sourceType ?? "manual",
-      source_id: input.sourceId ?? null,
-      created_by_user_id: input.createdByUserId,
+    const { data, error } = await this.client.rpc("adjust_inventory_item", {
+      p_item_id: itemId,
+      p_clinic_id: input.clinicId,
+      p_quantity_delta: input.quantityDelta,
+      p_reason: input.reason,
+      p_transaction_type: input.transactionType ?? "adjustment",
+      p_source_type: input.sourceType ?? "manual",
+      p_source_id: input.sourceId ?? null,
+      p_created_by_user_id: input.createdByUserId,
     });
-    if (txError) return err(AppError.externalProvider("Failed to record inventory transaction", txError));
-
-    return ok(mapInventoryItemRow(data));
+    if (error) {
+      const message = error.message ?? "";
+      if (message.includes("cannot make stock negative")) {
+        return err(AppError.validation("Inventory adjustment cannot make stock negative"));
+      }
+      if (message.includes("quantity delta must not be zero") || message.includes("reason is required")) {
+        return err(AppError.validation(message));
+      }
+      if (message.includes("inventory item not found")) {
+        return err(AppError.notFound("Inventory item not found"));
+      }
+      return err(AppError.externalProvider("Failed to adjust inventory item", error));
+    }
+    return ok(mapInventoryItemRow(data as Record<string, unknown>));
   }
 }
