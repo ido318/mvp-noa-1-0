@@ -141,7 +141,7 @@ export class DashboardNotificationsService {
     };
   }
 
-  /** Enqueue booking_confirmation + morning_reminder + post_visit_followup for an approved appointment. */
+  /** Enqueue booking_confirmation + morning_reminder + arrival_reminder + post_visit_followup. */
   async enqueueApprovalNotifications(p: ApproveNotificationParams): Promise<Result<void>> {
     const overrides = await this.getSmsTemplateOverrides(p.clinicId);
     const now = new Date();
@@ -176,6 +176,16 @@ export class DashboardNotificationsService {
         type:          "morning_reminder",
         body:          resolveSmsTemplate("morning_reminder", overrides.morning_reminder, { customerName: p.customerName, petName: p.petName, time, location, visitType: visitTypeLabel }),
         scheduled_for: morning.toISOString(),
+      });
+    }
+
+    const arrivalReminderTime = new Date(new Date(p.scheduledAt).getTime() - 2 * 60 * 60_000);
+    if (arrivalReminderTime > now) {
+      rows.push({
+        ...shared,
+        type:          "arrival_reminder",
+        body:          resolveSmsTemplate("arrival_reminder", overrides.arrival_reminder, { customerName: p.customerName, petName: p.petName, time, location, visitType: visitTypeLabel }),
+        scheduled_for: arrivalReminderTime.toISOString(),
       });
     }
 

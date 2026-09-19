@@ -144,6 +144,38 @@ describe("SMS template parity: app vs. agent (frozen wording)", () => {
     );
   });
 
+  it("arrival_reminder matches verbatim and is scheduled 2 hours before the appointment", async () => {
+    const { client, insert } = buildClient();
+    const service = new DashboardNotificationsService(client as never);
+    const scheduledAt = "2027-01-15T10:00:00.000Z";
+
+    await service.enqueueApprovalNotifications({
+      appointmentId: "appt-1",
+      scheduledAt,
+      durationMinutes: 30,
+      visitType: "checkup",
+      clinicId: "clinic-1",
+      customerId: "cust-1",
+      phone: "+972500000000",
+      customerName: "דנה כהן",
+      petName: "מיקה",
+    });
+
+    const [rows] = insert.mock.calls[0] as [{ type: string; body: string; scheduled_for: string }[]];
+    const arrival = rows.find((r) => r.type === "arrival_reminder");
+    expect(arrival).toBeDefined();
+    expect(arrival!.scheduled_for).toBe(new Date(new Date(scheduledAt).getTime() - 2 * 60 * 60_000).toISOString());
+    expect(arrival!.body).toBe(
+      smsTemplates.arrival_reminder({
+        customerName: "דנה כהן",
+        petName: "מיקה",
+        time: arrival!.body.match(/בשעה (\d{2}:\d{2}) \|/)![1]!,
+        location: 'הקליניקה, גרציאני 6 ת"א',
+        visitType: "בדיקה",
+      }),
+    );
+  });
+
   it("cancellation_update matches verbatim", async () => {
     const { client, insert } = buildClient();
     const service = new DashboardNotificationsService(client as never);

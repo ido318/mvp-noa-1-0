@@ -429,24 +429,17 @@ export class AppointmentService {
     });
     if (!record.ok) return err(record.error);
 
-    const createdVisit = await this.visitRepository.create(
-      {
-        clinicId: existing.value.clinicId,
-        customerId: existing.value.customerId,
-        petId: existing.value.petId,
-        appointmentId: existing.value.id,
-        medicalRecordId: record.value.id,
-        chiefComplaint: existing.value.reason,
-      },
-      actor.userId,
-    );
+    const createdVisit = await this.visitRepository.openFromAppointment({
+      appointmentId: existing.value.id,
+      expectedVersion: version,
+      medicalRecordId: record.value.id,
+      chiefComplaint: existing.value.reason,
+      createdByUserId: actor.userId,
+    });
     if (!createdVisit.ok) return createdVisit;
 
-    const updatedAppointment = await this.appointmentRepository.updateVersioned(appointmentId, {
-      expectedVersion: version,
-      data: { status: "in_visit", changed_via: "dashboard" },
-    });
-    if (!updatedAppointment.ok) return err(updatedAppointment.error);
+    const updatedAppointment = await this.appointmentRepository.findById(appointmentId);
+    const afterPayload = updatedAppointment.ok ? updatedAppointment.value : createdVisit.value;
 
     await this.auditService.logAction({
       clinicId: existing.value.clinicId,
@@ -456,7 +449,7 @@ export class AppointmentService {
       entityType: "appointment",
       entityId: existing.value.id,
       beforePayload: existing.value,
-      afterPayload: updatedAppointment.value,
+      afterPayload,
       metadata: { visitId: createdVisit.value.id },
     });
 

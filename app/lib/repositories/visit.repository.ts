@@ -91,7 +91,61 @@ export class VisitRepository {
       })
       .select("*")
       .single();
-    if (error) return err(AppError.externalProvider("Failed to create visit", error));
+    if (error) {
+      if ((error as { code?: string }).code === "23505" && input.appointmentId) {
+        const existing = await this.findByAppointment(input.appointmentId);
+        if (existing.ok && existing.value) return ok(existing.value);
+        return err(AppError.conflict("A visit already exists for this appointment", error));
+      }
+      return err(AppError.externalProvider("Failed to create visit", error));
+    }
+    return ok(mapVisitRow(data));
+  }
+
+  /**
+   * Atomically insert a visit and mark the appointment in_visit
+   * (open_visit_from_appointment RPC). Concurrent callers get the same visit.
+   */
+  async openFromAppointment(input: {
+    appointmentId: string;
+    expectedVersion: number;
+    medicalRecordId: string;
+    chiefComplaint: string | null;
+    createdByUserId: string;
+  }): Promise<Result<Visit>> {
+    const { data, error } = await this.client.rpc("open_visit_from_appointment", {
+      p_appointment_id: input.appointmentId,
+      p_expected_version: input.expectedVersion,
+      p_medical_record_id: input.medicalRecordId,
+      p_chief_complaint: input.chiefComplaint,
+      p_created_by_user_id: input.createdByUserId,
+    });
+
+    if (error) {
+      const code = (error as { code?: string }).code;
+      const message = error.message ?? "";
+      if (code === "23505") {
+        const existing = await this.findByAppointment(input.appointmentId);
+        if (existing.ok && existing.value) return ok(existing.value);
+        return err(AppError.conflict("A visit already exists for this appointment", error));
+      }
+      if (message.includes("appointment_not_found") || code === "P0002") {
+        return err(AppError.notFound("Appointment not found"));
+      }
+      if (message.includes("stale_version")) {
+        return err(
+          AppError.conflict("Appointment update conflict: stale version", {
+            appointmentId: input.appointmentId,
+            expectedVersion: input.expectedVersion,
+          }),
+        );
+      }
+      if (message.includes("invalid_status")) {
+        return err(AppError.validation("Only checked_in appointments can be opened as visits"));
+      }
+      return err(AppError.externalProvider("Failed to open visit from appointment", error));
+    }
+
     return ok(mapVisitRow(data));
   }
 
