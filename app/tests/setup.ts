@@ -3,6 +3,25 @@ import { resolve } from "node:path";
 // Extends `expect` with DOM matchers (toBeInTheDocument, etc.) for React
 // Testing Library component tests. A no-op for plain (non-DOM) unit tests.
 import "@testing-library/jest-dom/vitest";
+import { afterEach } from "vitest";
+
+// vitest.config.ts sets globals: false, which also switches OFF Testing
+// Library's automatic cleanup — so a component test that forgets its own
+// afterEach(cleanup) leaves a React tree mounted. React 19's scheduler then
+// fires deferred work through setImmediate after the jsdom environment has
+// been torn down, and throws "ReferenceError: window is not defined" as an
+// unhandled error. Vitest fails the run on that even when every test passed,
+// which is exactly what happened once enough component tests existed to shift
+// the timing.
+//
+// Guarded on `window` so the node-env project skips it and never loads
+// react-dom.
+if (typeof window !== "undefined") {
+  const { cleanup } = await import("@testing-library/react");
+  afterEach(() => {
+    cleanup();
+  });
+}
 
 function loadEnvFile(filename: string) {
   const path = resolve(process.cwd(), filename);
