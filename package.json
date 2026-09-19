@@ -14,7 +14,9 @@
     "test:all": "npm run test:agent && npm run test:app",
     "typecheck:agent": "npm run typecheck --workspace=agent",
     "typecheck:app": "npm run typecheck --workspace=app",
-    "typecheck:all": "npm run typecheck:agent && npm run typecheck:app"
+    "typecheck:all": "npm run typecheck:agent && npm run typecheck:app",
+    "lint:all": "npm run lint --workspace=agent && npm run lint --workspace=app",
+    "build:all": "npm run build --workspace=agent && npm run build --workspace=app"
   },
   "engines": {
     "node": ">=20.0.0"

@@ -29,7 +29,8 @@ supabase/.branches/
 .DS_Store
 
 # Editor
-.cursor/
+.cursor/*
+!.cursor/install.sh
 .idea/
 .vscode/
 *.code-workspace

@@ -1,4 +1,4 @@
-import { AppError, err, ok, type Result } from "@/lib/errors/app-error";
+import { AppError, err, type Result } from "@/lib/errors/app-error";
 import type { PriceListItemRepository } from "@/lib/repositories/price-list-item.repository";
 import type { ServiceActor } from "@/lib/services/service-context";
 import type {

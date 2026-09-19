@@ -6,9 +6,10 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 
 **Tomer** — a Hebrew-speaking voice AI agent for Dr. Noa Cabasheny's veterinary clinic (Get A Vet). Tomer answers inbound calls via Twilio + ElevenLabs Conversational AI when the vet is unavailable.
 
-Two packages, one Supabase project:
+Three npm workspaces, one Supabase project:
 - `agent/` — Hono server (Node.js 20, ESM) that bridges Twilio → ElevenLabs and exposes tool endpoints
 - `app/` — Next.js 16 dashboard for the clinic staff to view calls, customers, and visits
+- `packages/shared/` — `@tomer/shared`: Jerusalem-timezone math, frozen SMS wording (8 templates), visit-type durations/labels, phone normalisation, and price-list SMS segments. Both `agent/` and `app/` import it — never reimplement it.
 
 ## Commands
 
@@ -16,6 +17,8 @@ Two packages, one Supabase project:
 ```bash
 npm run test:all          # run all tests (agent + app)
 npm run typecheck:all     # typecheck both packages
+npm run lint:all          # lint agent + app
+npm run build:all         # build agent + app
 ```
 
 ### Agent (`cd agent`)
@@ -38,7 +41,7 @@ npm run seed:all          # seed dev user + demo data (requires local Supabase)
 ### Single test file
 ```bash
 # Agent
-cd agent && npx vitest run src/tests/foo.test.ts
+cd agent && npx vitest run tests/unit/foo.test.ts
 
 # App
 cd app && npx vitest run tests/unit/foo.test.ts
@@ -80,10 +83,10 @@ supabase db reset         # re-run all migrations + seed
 - `server/routes/hooks.ts` — `/hooks/call-ended` webhook from ElevenLabs; upserts to `voice_calls`
 - `server/routes/jobs.ts` — `POST /jobs/process-notifications` (Bearer token auth); triggers SMS processor
 - `lib/store.ts` — all Supabase data access for the agent
-- `lib/appointments.ts` — slot logic: `VISIT_TYPE_CONFIG`, `generateSlotsForVisitType`, `isWithin14Days`, `isTooLateToCancel`
+- `lib/appointments.ts` — slot logic: re-exports `VISIT_TYPE_CONFIG` from `@tomer/shared`, plus `generateSlotsForVisitType`, `isWithin14Days`, `isTooLateToCancel`
 - `lib/notifications.ts` — enqueue/cancel/reschedule SMS notifications; DST-correct Jerusalem time helpers
 - `lib/env.ts` — typed env validation (throws on startup if vars are missing)
-- `services/sms.templates.ts` — 6 approved Hebrew SMS templates (wording frozen — do not change)
+- `services/sms.templates.ts` — thin re-export of `@tomer/shared`'s `smsTemplates` (8 approved Hebrew templates, wording frozen — do not change)
 - `services/sms.service.ts` — Twilio SMS wrapper: `sendSms(to, body)`
 - `services/notification.processor.ts` — atomic-claim processor: UPDATE WHERE status='pending' RETURNING *; 5-min stuck-row recovery
 - `services/triage.service.ts` — `decideTriage({ text, now })` → 4 decisions + `isWithinBusinessHours`; 4 fixed Hebrew scripts (frozen)
@@ -95,7 +98,7 @@ Architecture is layered: `UI (page.tsx) → API route → Service → Repository
 - `lib/services/factory.ts` — creates all services from Supabase clients; call `createServices()` in each API route
 - `lib/api/auth-guard.ts` — `requireAuth()` used at the top of every protected API route
 - `lib/supabase/server.ts` / `admin.ts` — server-side Supabase clients (server uses user session cookies; admin uses service role key)
-- `app/middleware.ts` — redirects unauthenticated users away from `/dashboard/*`
+- `app/proxy.ts` — redirects unauthenticated users away from `/dashboard/*` (Next.js 16 proxy; not `middleware.ts`)
 - `lib/repositories/` — one file per entity, thin wrappers around Supabase queries
 - `lib/validators/` — Zod schemas for request validation
 - `types/domain/` — shared domain types; `types/api/` — request/response shapes
@@ -103,7 +106,7 @@ Architecture is layered: `UI (page.tsx) → API route → Service → Repository
 ### Supabase
 - **Cloud project:** `xpsuhtqfxqmnunppnyov` (account: voxly ai, region: eu-central-1, Frankfurt) — `https://xpsuhtqfxqmnunppnyov.supabase.co`
   Old projects (deleted): `ssfkximqwyzqlsgwfbye` (Seoul), `voxly-tomer` (`grbgkjjtyfohzulssuga`).
-- Migrations in `supabase/migrations/` — run in timestamp order; 51 total. Applied versions can drift from local filenames, so check the applied list against the directory rather than assuming they match.
+- Migrations in `supabase/migrations/` — run in timestamp order; 50+ files. Applied versions can drift from local filenames, so check the applied list against the directory rather than assuming they match. This branch adds `20260919153000_increment_visit_share_view.sql`.
 - pg_cron **not yet active** — see "הפעלת cron" below; activate manually after Vercel deploy
 - RLS is enabled on all tables; the app uses the anon key + user session for data access, the service role key only for admin operations (audit logs, AI events, health checks)
 - Multi-tenant by `clinic_id` — every data table has a `clinic_id` column

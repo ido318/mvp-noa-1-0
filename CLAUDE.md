@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Three npm workspaces, one Supabase project:
 - `agent/` — Hono server (Node.js 20, ESM) that bridges Twilio → ElevenLabs and exposes tool endpoints
 - `app/` — Next.js 16 dashboard for the clinic staff to view calls, customers, and visits
-- `packages/shared/` — `@tomer/shared`: the only source of Jerusalem-timezone math and the frozen SMS wording; both `agent/` and `app/` import it, never reimplement it (see "packages/shared" below)
+- `packages/shared/` — `@tomer/shared`: Jerusalem-timezone math, frozen SMS wording, visit-type durations/labels, phone normalisation, and price-list SMS segments; both `agent/` and `app/` import it, never reimplement it (see "packages/shared" below)
 
 ## Commands
 
@@ -17,6 +17,8 @@ Three npm workspaces, one Supabase project:
 ```bash
 npm run test:all          # run all tests (agent + app)
 npm run typecheck:all     # typecheck both packages
+npm run lint:all          # lint agent + app
+npm run build:all         # build agent + app
 ```
 
 ### Agent (`cd agent`)
@@ -79,7 +81,7 @@ supabase db reset         # re-run all migrations + seed
 - `server/routes/hooks.ts` — `/hooks/call-ended` webhook from ElevenLabs; upserts to `voice_calls`
 - `server/routes/jobs.ts` — `POST /jobs/process-notifications` (Bearer token auth); triggers SMS processor
 - `lib/store.ts` — all Supabase data access for the agent
-- `lib/appointments.ts` — slot logic: `VISIT_TYPE_CONFIG`, `generateSlotsForVisitType`, `isWithin14Days`, `isTooLateToCancel`
+- `lib/appointments.ts` — slot logic: re-exports `VISIT_TYPE_CONFIG` from `@tomer/shared`, plus `generateSlotsForVisitType`, `isWithin14Days`, `isTooLateToCancel`
 - `lib/notifications.ts` — enqueue/cancel/reschedule SMS notifications; Jerusalem time math comes from `@tomer/shared`
 - `lib/env.ts` — typed env validation (throws on startup if vars are missing)
 - `services/sms.templates.ts` — thin re-export of `@tomer/shared`'s `smsTemplates` (8 approved Hebrew templates, wording frozen — do not change); kept as a shim so existing `../services/sms.templates.js` imports don't need to change
@@ -92,6 +94,9 @@ supabase db reset         # re-run all migrations + seed
 Single source of truth for the two things that were independently reimplemented in both `agent/` and `app/` until 2026-09 (see the 2026-09-02 audit — that drift caused a real bug: the dashboard's vaccination-reminder SMS briefly diverged from the frozen wording before both sides were unified here):
 - `src/israel-time.ts` — all Jerusalem-timezone math: `israelDateIso`, `israelDayOfWeek`, `israelLocalToUtcIso`, `israelDateAtHour`, `israelDayHourMinute`, `formatAppointmentDateTime`, plus the app-facing `formatIsraelDate`/`formatIsraelTime`/`formatIsraelDateTime`/`israelDayUtcRange`.
 - `src/sms-templates.ts` — the 8 frozen Hebrew SMS templates (`smsTemplates`) + `CLINIC_LOCATION`/`HOME_VISIT_LOCATION`.
+- `src/visit-types.ts` — `VISIT_TYPE_CONFIG` (durations, buffers, labels, approval flag).
+- `src/pricing.ts` — booking-SMS `price` segments from clinic `price_list_items` (`agentQuotable`, no invented 150₪ fallback).
+- `src/phone.ts` — Israeli E.164 normalisation shared by agent and app.
 
 Ships compiled (`dist/`, built via `tsc`) — both `agent/` and `app/` depend on it as a normal package (`@tomer/shared`). `agent/lib/notifications.ts`, `agent/lib/appointments.ts`, `agent/services/triage.service.ts`, `agent/services/sms.templates.ts` (shim), `app/lib/israel-date.ts` (shim), `app/lib/appointment-rules.ts`, `app/lib/services/dashboard-notifications.service.ts`, and `app/app/api/calendar/availability/route.ts` all import from it — **never re-add a local Jerusalem-time or SMS-template implementation in either workspace.**
 
@@ -103,7 +108,7 @@ Architecture is layered: `UI (page.tsx) → API route → Service → Repository
 - `lib/services/factory.ts` — creates all services from Supabase clients; call `createServices()` in each API route
 - `lib/api/auth-guard.ts` — `requireAuth()` used at the top of every protected API route
 - `lib/supabase/server.ts` / `admin.ts` — server-side Supabase clients (server uses user session cookies; admin uses service role key)
-- `app/middleware.ts` — redirects unauthenticated users away from `/dashboard/*`
+- `app/proxy.ts` — redirects unauthenticated users away from `/dashboard/*` (Next.js 16 proxy; not `middleware.ts`)
 - `lib/repositories/` — one file per entity, thin wrappers around Supabase queries
 - `lib/validators/` — Zod schemas for request validation
 - `lib/israel-date.ts` — thin re-export of `@tomer/shared` (kept so the ~20 existing importers don't need to change)
@@ -112,7 +117,7 @@ Architecture is layered: `UI (page.tsx) → API route → Service → Repository
 ### Supabase
 - **Cloud project:** `xpsuhtqfxqmnunppnyov` (account: voxly ai, region: eu-central-1, Frankfurt) — `https://xpsuhtqfxqmnunppnyov.supabase.co`
   Old projects (deleted): `ssfkximqwyzqlsgwfbye` (Seoul), `voxly-tomer` (`grbgkjjtyfohzulssuga`).
-- Migrations in `supabase/migrations/` — run in timestamp order; 51 total. Applied versions can drift from local filenames (they are applied from here, which stamps its own timestamp), so check `list_migrations` against the directory rather than assuming they match.
+- Migrations in `supabase/migrations/` — run in timestamp order; 50+ files. Applied versions can drift from local filenames (they are applied from here, which stamps its own timestamp), so check `list_migrations` against the directory rather than assuming they match. This branch adds `20260919153000_increment_visit_share_view.sql`.
 - pg_cron **active** (verified 2026-08-29): `process-sms-notifications` (every 15 min) and `send-vaccination-reminders` (daily 06:00) are both scheduled and active in `cron.job`. The weekly `analyze-tomer-conversations` job (prompt learning loop) documented below has **not** been created yet.
 - RLS is enabled on all tables; the app uses the anon key + user session for data access, the service role key only for admin operations (audit logs, AI events, health checks)
 - Multi-tenant by `clinic_id` — every data table has a `clinic_id` column

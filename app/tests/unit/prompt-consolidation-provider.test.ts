@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockGenerateText = vi.hoisted(() => vi.fn());
 vi.mock("ai", () => ({ generateText: mockGenerateText }));
-vi.mock("@ai-sdk/openai", () => ({ createOpenAI: () => (_model: string) => ({}) }));
+vi.mock("@ai-sdk/openai", () => ({ createOpenAI: () => () => ({}) }));
 
 import {
   createOpenAiPromptConsolidationProvider,

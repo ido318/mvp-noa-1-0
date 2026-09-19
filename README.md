@@ -2,7 +2,7 @@
 
 **Tomer** — Voice AI Agent + Vet Clinic Dashboard for Dr. Noa Cabasheny (Get A Vet).
 
-Unified monorepo. Two packages, one Supabase project.
+Unified monorepo. Three npm workspaces, one Supabase project.
 
 ---
 
@@ -12,8 +12,13 @@ Unified monorepo. Two packages, one Supabase project.
 |---|---|---|---|
 | **agent** | `agent/` | Node.js 22 + Hono | Fly.io (`voxly-agent`) |
 | **app** | `app/` | Next.js 16 | Vercel (`get-a-vrt-d` / `voxly-app-chi`) |
+| **@tomer/shared** | `packages/shared/` | compiled TypeScript | imported by agent + app |
 
 Shared: `supabase/` migrations, `docs/`.
+
+Auth on tool endpoints is a **Bearer token** (`TOOLS_BEARER_TOKEN`), not ElevenLabs HMAC. HMAC is used on `/hooks/call-ended` only.
+
+Production Twilio `voice_url` is ElevenLabs native inbound (`https://api.elevenlabs.io/twilio/inbound-call`). Do not point the live number at `agent/` `/twilio/voice`.
 
 ---
 
@@ -21,7 +26,7 @@ Shared: `supabase/` migrations, `docs/`.
 
 ### Prerequisites
 - Node.js ≥ 20
-- Supabase CLI (`npm i -g supabase`)
+- Supabase CLI (`npm i -g supabase`, or run `.cursor/install.sh`)
 - Twilio account + Israeli phone number
 - ElevenLabs account + agent configured
 
@@ -60,6 +65,9 @@ npm run dev                    # http://localhost:3001
 npm run test:all       # both agent and app
 npm run test:agent     # agent only
 npm run test:app       # app unit tests
+npm run typecheck:all
+npm run lint:all
+npm run build:all
 ```
 
 ### Production Deployments
@@ -121,16 +129,17 @@ See `agent/.env.example` and `app/.env.example`.
 
 ## Database
 
-Migrations in `supabase/migrations/`. Run in order (filename = timestamp).
+Migrations in `supabase/migrations/` (50+ files; run in timestamp order).
 
-Latest: `20260828000031_vaccination_reminder_id_required.sql` — requires
-`vaccination_id` on vaccination reminder notification rows.
+#20 recorded 51 applied migrations; this branch adds `20260919153000_increment_visit_share_view.sql`. Frozen SMS wording is 8 Hebrew templates in `@tomer/shared`. Booking SMS prices come from clinic `price_list_items` via `@tomer/shared` `pricing.ts` — not a hardcoded 150₪ map.
+
+Dashboard session gating lives in `app/proxy.ts` (Next.js 16 proxy), not `middleware.ts`.
 
 ---
 
 ## Source of Truth
 
-See [docs/VOXLY_SOURCE_OF_TRUTH.md](docs/VOXLY_SOURCE_OF_TRUTH.md).
+See [docs/VOXLY_SOURCE_OF_TRUTH.md](docs/VOXLY_SOURCE_OF_TRUTH.md) (Notion page `36f1354b584881b587c5c6f42a6bf6c7`).
 
 ## Original Repos (read-only archive)
 - `noa-new` → veterinary CRM (phases 1–6)

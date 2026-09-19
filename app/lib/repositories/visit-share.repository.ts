@@ -78,11 +78,14 @@ export class VisitShareRepository {
     return ok(share);
   }
 
-  async recordView(shareId: string, currentCount: number): Promise<void> {
-    await this.client
-      .from("visit_shares")
-      .update({ view_count: currentCount + 1, last_viewed_at: new Date().toISOString() })
-      .eq("id", shareId);
+  /**
+   * Atomically increment view_count in SQL (`view_count + 1`) so concurrent
+   * public views cannot undercount. A previously-read count argument is ignored
+   * (kept optional so existing callers still typecheck).
+   */
+  async recordView(shareId: string, previousCount?: number): Promise<void> {
+    void previousCount;
+    await this.client.rpc("increment_visit_share_view", { p_share_id: shareId });
   }
 
   async revoke(shareId: string): Promise<Result<VisitShare>> {

@@ -42,7 +42,7 @@ function buildFindByIdQuery(result: { data: unknown; error: unknown }) {
 
 describe("PromptSuggestionRepository read mapping (mapPromptSuggestionRow via findById)", () => {
   it("defaults category to 'prompt' when the column is undefined (row predates the category migration)", async () => {
-    const { category: _omit, ...rowWithoutCategory } = suggestionRow;
+    const rowWithoutCategory = { ...suggestionRow, category: undefined };
     const query = buildFindByIdQuery({ data: rowWithoutCategory, error: null });
     const client = { from: vi.fn().mockReturnValue(query) };
     const repo = new PromptSuggestionRepository(client as never);
