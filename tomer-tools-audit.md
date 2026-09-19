@@ -1,5 +1,7 @@
 # דוח בדיקת כלים — תומר, Get A Vet
 
+> **Historical tools audit (2026-09-15).** For the current engineering audit, see [`AUDIT.md`](AUDIT.md).
+
 תאריך: 15 בספטמבר 2026  
 מרפאה: Get A Vet של ד״ר נועה  
 סוכן: תומר  

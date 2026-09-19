@@ -53,10 +53,6 @@ export async function runRegressionTests(candidatePrompt: string): Promise<Regre
     throw new Error("ElevenLabs agent returned no platform settings");
   }
 
-  if (!current.platformSettings) {
-    throw new Error("ElevenLabs agent returned no platform settings");
-  }
-
   const invocation = await client.conversationalAi.agents.runTests(agentId, {
     tests: testIds.map((testId) => ({ testId })),
     agentConfigOverride: {

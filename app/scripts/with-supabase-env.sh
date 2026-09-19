@@ -8,6 +8,12 @@ set -euo pipefail
 
 if ! command -v supabase >/dev/null 2>&1; then
   echo "Error: supabase CLI not found in PATH." >&2
+  echo "Install it, then retry. Examples:" >&2
+  echo "  npm i -g supabase" >&2
+  echo "  brew install supabase/tap/supabase" >&2
+  echo "  See https://supabase.com/docs/guides/local-development/cli/getting-started" >&2
+  echo "Cloud Agent / CI images should install the CLI in the environment install script" >&2
+  echo "(.cursor/install.sh or equivalent) so integration tests can run." >&2
   exit 1
 fi
 

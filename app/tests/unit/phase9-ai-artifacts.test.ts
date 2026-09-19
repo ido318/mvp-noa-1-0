@@ -221,6 +221,34 @@ describe("Phase 9 AI artifacts", () => {
       expect(aiEventService.logEvent).not.toHaveBeenCalled();
     });
 
+    it("returns 503 in production when OpenAI is missing and no provider is injected", async () => {
+      const originalOpenAiKey = process.env.OPENAI_API_KEY;
+      const originalAppEnv = process.env.APP_ENV;
+      delete process.env.OPENAI_API_KEY;
+      process.env.APP_ENV = "production";
+
+      try {
+        const repository = {
+          create: vi.fn(),
+        };
+        const service = new AiArtifactService(repository as never, fakeAiEventService());
+
+        const result = await service.generateArtifact(vetActor, "draft_soap", generateInput);
+
+        expect(result.ok).toBe(false);
+        if (!result.ok) {
+          expect(result.error.status).toBe(503);
+          expect(result.error.message).toMatch(/OPENAI_API_KEY/);
+        }
+        expect(repository.create).not.toHaveBeenCalled();
+      } finally {
+        if (originalOpenAiKey === undefined) delete process.env.OPENAI_API_KEY;
+        else process.env.OPENAI_API_KEY = originalOpenAiKey;
+        if (originalAppEnv === undefined) delete process.env.APP_ENV;
+        else process.env.APP_ENV = originalAppEnv;
+      }
+    });
+
     it("rejects the 6th generation within an hour for the same source", async () => {
       const repository = {
         create: vi.fn(),
@@ -293,6 +321,29 @@ describe("Phase 9 AI artifacts", () => {
         modelName: "deterministic-draft",
         structuredPayload: expect.objectContaining({ tasks: expect.any(Array) }),
       }));
+    });
+
+    it("returns 503 for stub-only artifact types in production", async () => {
+      const originalAppEnv = process.env.APP_ENV;
+      process.env.APP_ENV = "production";
+
+      try {
+        const repository = { create: vi.fn() };
+        const service = new AiArtifactService(repository as never, fakeAiEventService());
+        const result = await service.generateArtifact(vetActor, "patient_summary", {
+          clinicId: "clinic1",
+          sourceType: "pet",
+          sourceId: "pet1",
+          sourceText: "חתול בריא, ביקורת שנתית.",
+        });
+
+        expect(result.ok).toBe(false);
+        if (!result.ok) expect(result.error.status).toBe(503);
+        expect(repository.create).not.toHaveBeenCalled();
+      } finally {
+        if (originalAppEnv === undefined) delete process.env.APP_ENV;
+        else process.env.APP_ENV = originalAppEnv;
+      }
     });
   });
 });
