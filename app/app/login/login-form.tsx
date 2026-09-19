@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { safeNextPath } from "@/lib/safe-next-path";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 type LoginFormProps = {
@@ -34,7 +35,7 @@ export function LoginForm({ nextPath }: LoginFormProps) {
       return;
     }
 
-    router.push(nextPath);
+    router.push(safeNextPath(nextPath));
     router.refresh();
   }
 

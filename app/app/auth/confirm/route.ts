@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { safeNextPath } from "@/lib/safe-next-path";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const VALID_OTP_TYPES = [
@@ -20,11 +21,7 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const tokenHash = searchParams.get("token_hash");
   const type = searchParams.get("type");
-  const requestedNext = searchParams.get("next");
-  const next =
-    requestedNext && requestedNext.startsWith("/") && !requestedNext.startsWith("//")
-      ? requestedNext
-      : "/login/reset-password";
+  const next = safeNextPath(searchParams.get("next"), "/login/reset-password");
 
   if (tokenHash && isOtpType(type)) {
     const supabase = await createSupabaseServerClient();

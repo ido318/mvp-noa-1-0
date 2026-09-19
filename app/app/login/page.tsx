@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { LoginForm } from "@/app/login/login-form";
+import { safeNextPath } from "@/lib/safe-next-path";
 
 type LoginPageProps = {
   searchParams: Promise<{ next?: string }>;
@@ -11,7 +12,7 @@ async function LoginContent({
   searchParams: Promise<{ next?: string }>;
 }) {
   const params = await searchParams;
-  const nextPath = params.next ?? "/dashboard";
+  const nextPath = safeNextPath(params.next);
 
   return <LoginForm nextPath={nextPath} />;
 }
