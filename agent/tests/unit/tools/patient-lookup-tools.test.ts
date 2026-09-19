@@ -62,14 +62,16 @@ describe("patient lookup tools", () => {
     expect(vi.mocked(listCustomerPets)).toHaveBeenCalledWith(PHONE);
   });
 
-  it("POST /tools/list-customer-pets rejects a missing phone with 400", async () => {
+  it("POST /tools/list-customer-pets rejects a missing phone with HTTP 200 and a Hebrew result", async () => {
     const res = await makeApp().request("/tools/list-customer-pets", {
       method: "POST",
       headers: toolHeaders(),
       body: JSON.stringify({}),
     });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as { result: string };
+    expect(json.result).toContain("phone");
     expect(vi.mocked(listCustomerPets)).not.toHaveBeenCalled();
   });
 
@@ -99,14 +101,16 @@ describe("patient lookup tools", () => {
     expect(vi.mocked(getPatientReminders)).toHaveBeenCalledWith(PHONE, PET_ID);
   });
 
-  it("POST /tools/get-patient-reminders rejects a missing pet_id with 400", async () => {
+  it("POST /tools/get-patient-reminders rejects a missing pet_id with HTTP 200 and a Hebrew result", async () => {
     const res = await makeApp().request("/tools/get-patient-reminders", {
       method: "POST",
       headers: toolHeaders(),
       body: JSON.stringify({ phone: PHONE }),
     });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as { result: string };
+    expect(json.result).toContain("pet_id");
     expect(vi.mocked(getPatientReminders)).not.toHaveBeenCalled();
   });
 
@@ -136,14 +140,16 @@ describe("patient lookup tools", () => {
     expect(vi.mocked(getPatientChronicConditions)).toHaveBeenCalledWith(PHONE, PET_ID);
   });
 
-  it("POST /tools/get-patient-chronic-conditions rejects a missing phone with 400", async () => {
+  it("POST /tools/get-patient-chronic-conditions rejects a missing phone with HTTP 200 and a Hebrew result", async () => {
     const res = await makeApp().request("/tools/get-patient-chronic-conditions", {
       method: "POST",
       headers: toolHeaders(),
       body: JSON.stringify({ pet_id: PET_ID }),
     });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as { result: string };
+    expect(json.result).toContain("phone");
     expect(vi.mocked(getPatientChronicConditions)).not.toHaveBeenCalled();
   });
 
@@ -160,14 +166,16 @@ describe("patient lookup tools", () => {
     expect(vi.mocked(getLastVisitPlan)).toHaveBeenCalledWith(PHONE, PET_ID);
   });
 
-  it("POST /tools/get-last-visit-plan rejects a missing pet_id with 400", async () => {
+  it("POST /tools/get-last-visit-plan rejects a missing pet_id with HTTP 200 and a Hebrew result", async () => {
     const res = await makeApp().request("/tools/get-last-visit-plan", {
       method: "POST",
       headers: toolHeaders(),
       body: JSON.stringify({ phone: PHONE }),
     });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as { result: string };
+    expect(json.result).toContain("pet_id");
     expect(vi.mocked(getLastVisitPlan)).not.toHaveBeenCalled();
   });
 

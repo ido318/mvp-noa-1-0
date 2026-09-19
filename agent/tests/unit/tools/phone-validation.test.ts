@@ -63,7 +63,7 @@ describe("tool phone validation", () => {
       }),
     });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(200);
     // The booking never runs, so no customer row can be created.
     expect(vi.mocked(bookAppointment)).not.toHaveBeenCalled();
   });
@@ -81,7 +81,7 @@ describe("tool phone validation", () => {
       }),
     });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(200);
     expect(vi.mocked(joinWaitlist)).not.toHaveBeenCalled();
   });
 
@@ -92,7 +92,7 @@ describe("tool phone validation", () => {
       body: JSON.stringify({ phone }),
     });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(200);
     expect(vi.mocked(findCustomerByPhone)).not.toHaveBeenCalled();
   });
 

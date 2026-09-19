@@ -72,7 +72,7 @@ toolsRoutes.post("/tools/conversation-policy", async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const parsed = conversationPolicySchema.safeParse(body);
   if (!parsed.success) {
-    return c.json({ result: "פרמטר חסר: user_utterance_he." }, 400);
+    return c.json({ result: "פרמטר חסר: user_utterance_he." });
   }
 
   const policy = decideConversationPolicy(parsed.data);
@@ -100,7 +100,7 @@ toolsRoutes.post("/tools/lookup-customer", async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const parsed = lookupSchema.safeParse(body);
   if (!parsed.success) {
-    return c.json({ result: "פרמטר phone חסר או שגוי." }, 400);
+    return c.json({ result: "פרמטר phone חסר או שגוי." });
   }
 
   logger.info({ phone: maskPhone(parsed.data.phone) }, "tool: lookup-customer");
@@ -149,7 +149,7 @@ toolsRoutes.post("/tools/escalate-to-noa", async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const parsed = escalateSchema.safeParse(body);
   if (!parsed.success) {
-    return c.json({ result: "פרמטרים חסרים: reason, urgency (1-10)." }, 400);
+    return c.json({ result: "פרמטרים חסרים: reason, urgency (1-10)." });
   }
 
   const { reason, urgency, phone } = parsed.data;
@@ -249,7 +249,7 @@ toolsRoutes.post("/tools/triage-pet-case", async (c) => {
   const parsed = triageSchema.safeParse(body);
   if (!parsed.success) {
     logger.warn({ errors: parsed.error.issues }, "tool: triage-pet-case — validation failed");
-    return c.json({ result: "פרמטרים חסרים: symptoms_he, pet_type." }, 400);
+    return c.json({ result: "פרמטרים חסרים: symptoms_he, pet_type." });
   }
 
   const input = parsed.data;
@@ -368,7 +368,7 @@ toolsRoutes.post("/tools/check-availability", async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const parsed = availabilitySchema.safeParse(body);
   if (!parsed.success) {
-    return c.json({ result: "נדרש תאריך בפורמט YYYY-MM-DD וסוג ביקור (visit_type)." }, 400);
+    return c.json({ result: "נדרש תאריך בפורמט YYYY-MM-DD וסוג ביקור (visit_type)." });
   }
 
   try {
@@ -404,7 +404,7 @@ toolsRoutes.post("/tools/book-appointment", async (c) => {
   if (!parsed.success) {
     return c.json({
       result: "פרמטרים חסרים: phone, customer_name, pet_name, pet_species, scheduled_at (ISO8601), visit_type.",
-    }, 400);
+    });
   }
 
   try {
@@ -433,7 +433,7 @@ toolsRoutes.post("/tools/cancel-or-reschedule", async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const parsed = cancelRescheduleSchema.safeParse(body);
   if (!parsed.success) {
-    return c.json({ result: "פרמטרים חסרים: phone, action, current_scheduled_at (ISO8601)." }, 400);
+    return c.json({ result: "פרמטרים חסרים: phone, action, current_scheduled_at (ISO8601)." });
   }
 
   const { phone, action, current_scheduled_at, new_scheduled_at, visit_type } = parsed.data;
@@ -446,7 +446,7 @@ toolsRoutes.post("/tools/cancel-or-reschedule", async (c) => {
     }
 
     if (!new_scheduled_at) {
-      return c.json({ result: "לביצוע הזזה נדרש גם new_scheduled_at." }, 400);
+      return c.json({ result: "לביצוע הזזה נדרש גם new_scheduled_at." });
     }
 
     const result = await rescheduleAppointment(phone, current_scheduled_at, new_scheduled_at, visit_type);
@@ -479,7 +479,7 @@ toolsRoutes.post("/tools/join-waitlist", async (c) => {
   if (!parsed.success) {
     return c.json({
       result: "פרמטרים חסרים: phone, customer_name, pet_name, pet_species, visit_type.",
-    }, 400);
+    });
   }
 
   try {
@@ -502,7 +502,7 @@ toolsRoutes.post("/tools/list-customer-appointments", async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const parsed = listCustomerAppointmentsSchema.safeParse(body);
   if (!parsed.success) {
-    return c.json({ result: "פרמטר phone חסר או שגוי." }, 400);
+    return c.json({ result: "פרמטר phone חסר או שגוי." });
   }
 
   logger.info({ phone: maskPhone(parsed.data.phone) }, "tool: list-customer-appointments");
@@ -526,7 +526,7 @@ toolsRoutes.post("/tools/list-customer-pets", async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const parsed = listCustomerPetsSchema.safeParse(body);
   if (!parsed.success) {
-    return c.json({ result: "פרמטר phone חסר או שגוי." }, 400);
+    return c.json({ result: "פרמטר phone חסר או שגוי." });
   }
 
   logger.info({ phone: maskPhone(parsed.data.phone) }, "tool: list-customer-pets");
@@ -563,7 +563,7 @@ toolsRoutes.post("/tools/get-patient-reminders", async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const parsed = petLookupSchema.safeParse(body);
   if (!parsed.success) {
-    return c.json({ result: "פרמטרים חסרים: phone, pet_id." }, 400);
+    return c.json({ result: "פרמטרים חסרים: phone, pet_id." });
   }
 
   logger.info(
@@ -584,7 +584,7 @@ toolsRoutes.post("/tools/get-patient-chronic-conditions", async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const parsed = petLookupSchema.safeParse(body);
   if (!parsed.success) {
-    return c.json({ result: "פרמטרים חסרים: phone, pet_id." }, 400);
+    return c.json({ result: "פרמטרים חסרים: phone, pet_id." });
   }
 
   logger.info(
@@ -605,7 +605,7 @@ toolsRoutes.post("/tools/get-last-visit-plan", async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const parsed = petLookupSchema.safeParse(body);
   if (!parsed.success) {
-    return c.json({ result: "פרמטרים חסרים: phone, pet_id." }, 400);
+    return c.json({ result: "פרמטרים חסרים: phone, pet_id." });
   }
 
   logger.info(

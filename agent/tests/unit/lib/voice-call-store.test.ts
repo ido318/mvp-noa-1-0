@@ -30,7 +30,7 @@ vi.mock("../../../src/lib/supabase.js", () => ({
   })),
 }));
 
-import { saveVoiceCall } from "../../../src/lib/store.js";
+import { extractCallerPhone, saveVoiceCall } from "../../../src/lib/store.js";
 
 describe("saveVoiceCall", () => {
   beforeEach(() => {
@@ -119,5 +119,53 @@ describe("saveVoiceCall", () => {
       call_category: "information",
     });
     expect(mockUpsert.mock.calls[0]?.[0]).toHaveProperty("ended_at");
+  });
+});
+
+describe("extractCallerPhone", () => {
+  it("reads caller_number from a native ElevenLabs inbound payload (dynamic_variables)", () => {
+    const payload = {
+      type: "post_call_transcription",
+      conversation_id: "conv_native_el",
+      metadata: {
+        call_duration_secs: 42,
+      },
+      conversation_initiation_client_data: {
+        dynamic_variables: {
+          system__caller_id: "+972509876543",
+          system__called_number: "+972500000000",
+          system__call_sid: "CAnativeinbound",
+        },
+      },
+    };
+
+    expect(extractCallerPhone(payload)).toBe("+972509876543");
+  });
+});
+
+describe("saveVoiceCall native ElevenLabs inbound fixture", () => {
+  it("stores from_number from system__caller_id when caller_number is absent", async () => {
+    await saveVoiceCall(
+      "conv_native_el",
+      42,
+      true,
+      {
+        conversation_initiation_client_data: {
+          dynamic_variables: {
+            system__caller_id: "+972509876543",
+            twilio_call_sid: "CAnativeinbound",
+          },
+        },
+      },
+      {},
+    );
+
+    expect(mockUpdate).toHaveBeenCalledOnce();
+    expect(mockUpdate.mock.calls[0]?.[0]).toMatchObject({
+      elevenlabs_conversation_id: "conv_native_el",
+      from_number: "+972509876543",
+      status: "completed",
+    });
+    expect(mockEq).toHaveBeenCalledWith("twilio_call_sid", "CAnativeinbound");
   });
 });

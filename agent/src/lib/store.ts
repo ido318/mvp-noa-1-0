@@ -226,26 +226,42 @@ function extractNestedString(row: unknown, parent: string, key: string): string 
   return null;
 }
 
-function extractTwilioCallSid(payload: Record<string, unknown>): string | null {
-  const direct = payload["twilio_call_sid"];
-  if (typeof direct === "string" && direct.trim()) return direct;
-
-  const metadata = payload["metadata"];
-  if (metadata !== null && typeof metadata === "object") {
-    const value = (metadata as Record<string, unknown>)["twilio_call_sid"];
-    if (typeof value === "string" && value.trim()) return value;
+function firstTrimmedString(row: unknown, keys: string[]): string | null {
+  if (row === null || typeof row !== "object") return null;
+  const rec = row as Record<string, unknown>;
+  for (const key of keys) {
+    const val = rec[key];
+    if (typeof val === "string" && val.trim()) return val.trim();
   }
+  return null;
+}
+
+function extractFromWebhookPayload(payload: Record<string, unknown>, keys: string[]): string | null {
+  const direct = firstTrimmedString(payload, keys);
+  if (direct) return direct;
+
+  const fromMetadata = firstTrimmedString(payload["metadata"], keys);
+  if (fromMetadata) return fromMetadata;
 
   const initiation = payload["conversation_initiation_client_data"];
   if (initiation !== null && typeof initiation === "object") {
-    const dynamicVariables = (initiation as Record<string, unknown>)["dynamic_variables"];
-    if (dynamicVariables !== null && typeof dynamicVariables === "object") {
-      const value = (dynamicVariables as Record<string, unknown>)["twilio_call_sid"];
-      if (typeof value === "string" && value.trim()) return value;
-    }
+    const fromVars = firstTrimmedString(
+      (initiation as Record<string, unknown>)["dynamic_variables"],
+      keys,
+    );
+    if (fromVars) return fromVars;
   }
 
   return null;
+}
+
+function extractTwilioCallSid(payload: Record<string, unknown>): string | null {
+  return extractFromWebhookPayload(payload, ["twilio_call_sid"]);
+}
+
+/** Native ElevenLabs inbound uses system__caller_id in dynamic_variables; our TwiML path uses caller_number. */
+export function extractCallerPhone(payload: Record<string, unknown>): string | null {
+  return extractFromWebhookPayload(payload, ["caller_number", "system__caller_id", "caller_id"]);
 }
 
 async function findCustomerIdByPhone(phone: string): Promise<string | null> {
@@ -1079,10 +1095,7 @@ export async function saveVoiceCall(
   enrichment: SaveVoiceCallEnrichment = {},
 ): Promise<void> {
   const env = getEnv();
-  const callerNumber =
-    typeof payload["caller_number"] === "string"
-      ? payload["caller_number"]
-      : "unknown";
+  const callerNumber = extractCallerPhone(payload) ?? "unknown";
   const normalisedCaller = callerNumber !== "unknown" ? normalisePhone(callerNumber) : null;
   const customerId = normalisedCaller
     ? await safeFindCustomerIdByPhone(normalisedCaller)
