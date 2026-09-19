@@ -169,6 +169,85 @@ describe("DashboardNotificationsService — clinic template overrides", () => {
     expect(booking!.body).not.toContain("{{");
   });
 
+  it("enqueueApprovalNotifications also queues arrival_reminder two hours before the appointment", async () => {
+    const single = vi.fn().mockResolvedValue({ data: { settings: { smsTemplates: {} } }, error: null });
+    const insert = vi.fn().mockResolvedValue({ error: null });
+    const client = {
+      from: vi.fn((table: string) => {
+        if (table === "clinics") return { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), single };
+        if (table === "price_list_items") return priceListChain();
+        return { insert };
+      }),
+    };
+    const service = new DashboardNotificationsService(client as never);
+    const scheduledAt = "2027-01-15T10:00:00.000Z";
+
+    await service.enqueueApprovalNotifications({
+      appointmentId: "appt-1", scheduledAt, durationMinutes: 30,
+      visitType: "checkup", clinicId: "clinic-1", customerId: "cust-1", phone: "+972500000000",
+      customerName: "דנה", petName: "מיקה",
+    });
+
+    const [rows] = insert.mock.calls[0] as [{ type: string; scheduled_for: string; body: string }[]];
+    const arrival = rows.find((r) => r.type === "arrival_reminder");
+    expect(arrival).toBeDefined();
+    expect(arrival!.scheduled_for).toBe(
+      new Date(new Date(scheduledAt).getTime() - 2 * 60 * 60_000).toISOString(),
+    );
+    expect(arrival!.body).not.toContain("{{");
+  });
+
+  it("enqueueApprovalNotifications skips arrival_reminder when the appointment is already within two hours", async () => {
+    const single = vi.fn().mockResolvedValue({ data: { settings: { smsTemplates: {} } }, error: null });
+    const insert = vi.fn().mockResolvedValue({ error: null });
+    const client = {
+      from: vi.fn((table: string) => {
+        if (table === "clinics") return { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), single };
+        if (table === "price_list_items") return priceListChain();
+        return { insert };
+      }),
+    };
+    const service = new DashboardNotificationsService(client as never);
+
+    await service.enqueueApprovalNotifications({
+      appointmentId: "appt-1",
+      scheduledAt: new Date(Date.now() + 30 * 60_000).toISOString(),
+      durationMinutes: 30,
+      visitType: "checkup", clinicId: "clinic-1", customerId: "cust-1", phone: "+972500000000",
+      customerName: "דנה", petName: "מיקה",
+    });
+
+    const [rows] = insert.mock.calls[0] as [{ type: string }[]];
+    expect(rows.some((r) => r.type === "arrival_reminder")).toBe(false);
+  });
+
+  it("enqueueApprovalNotifications uses the clinic's arrival_reminder override when present", async () => {
+    const single = vi.fn().mockResolvedValue({
+      data: { settings: { smsTemplates: { arrival_reminder: "מגיעים בעוד שעתיים ל-{{location}}" } } },
+      error: null,
+    });
+    const insert = vi.fn().mockResolvedValue({ error: null });
+    const client = {
+      from: vi.fn((table: string) => {
+        if (table === "clinics") return { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), single };
+        if (table === "price_list_items") return priceListChain();
+        return { insert };
+      }),
+    };
+    const service = new DashboardNotificationsService(client as never);
+
+    await service.enqueueApprovalNotifications({
+      appointmentId: "appt-1", scheduledAt: "2027-01-15T10:00:00.000Z", durationMinutes: 30,
+      visitType: "checkup", clinicId: "clinic-1", customerId: "cust-1", phone: "+972500000000",
+      customerName: "דנה", petName: "מיקה",
+    });
+
+    const [rows] = insert.mock.calls[0] as [{ type: string; body: string }[]];
+    const arrival = rows.find((r) => r.type === "arrival_reminder");
+    expect(arrival!.body).toContain("מגיעים בעוד שעתיים");
+    expect(arrival!.body).not.toContain("{{");
+  });
+
   it("enqueueRejectionNotification uses the clinic's cancellation_update override when present", async () => {
     const single = vi.fn().mockResolvedValue({
       data: { settings: { smsTemplates: { cancellation_update: "בוטל תור {{petName}} מ-{{oldDate}}" } } },

@@ -95,6 +95,7 @@ function buildService(existing = appointment()) {
   const visitRepository = {
     findByAppointment: vi.fn().mockResolvedValue(ok(null)),
     create: vi.fn().mockResolvedValue(ok(visit())),
+    openFromAppointment: vi.fn().mockResolvedValue(ok(visit())),
   };
   const medicalRecordService = {
     ensureRecordForPet: vi.fn().mockResolvedValue(ok(medicalRecord())),
@@ -139,21 +140,15 @@ describe("AppointmentService visit workflow", () => {
 
     expect(result.ok).toBe(true);
     expect(medicalRecordService.ensureRecordForPet).toHaveBeenCalledWith(actor, { clinicId, petId });
-    expect(visitRepository.create).toHaveBeenCalledWith(
-      {
-        clinicId,
-        customerId,
-        petId,
-        appointmentId: checkedIn.id,
-        medicalRecordId: "60000000-0000-4000-8000-000000000001",
-        chiefComplaint: "בדיקה כללית",
-      },
-      actor.userId,
-    );
-    expect(appointmentRepository.updateVersioned).toHaveBeenCalledWith(checkedIn.id, {
+    expect(visitRepository.openFromAppointment).toHaveBeenCalledWith({
+      appointmentId: checkedIn.id,
       expectedVersion: checkedIn.version,
-      data: { status: "in_visit", changed_via: "dashboard" },
+      medicalRecordId: "60000000-0000-4000-8000-000000000001",
+      chiefComplaint: "בדיקה כללית",
+      createdByUserId: actor.userId,
     });
+    expect(visitRepository.create).not.toHaveBeenCalled();
+    expect(appointmentRepository.updateVersioned).not.toHaveBeenCalled();
   });
 
   it("does not create a second visit for the same appointment", async () => {
@@ -165,6 +160,21 @@ describe("AppointmentService visit workflow", () => {
 
     expect(result.ok).toBe(true);
     expect(visitRepository.create).not.toHaveBeenCalled();
+    expect(visitRepository.openFromAppointment).not.toHaveBeenCalled();
     expect(appointmentRepository.updateVersioned).not.toHaveBeenCalled();
+  });
+
+  it("returns the visit from the RPC when a concurrent open already created it", async () => {
+    const checkedIn = appointment({ status: "checked_in" });
+    const { service, visitRepository } = buildService(checkedIn);
+    const existingVisit = visit();
+    visitRepository.openFromAppointment.mockResolvedValueOnce(ok(existingVisit));
+
+    const result = await service.openVisitFromAppointment(actor, checkedIn.id, checkedIn.version);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.id).toBe(existingVisit.id);
+    expect(visitRepository.openFromAppointment).toHaveBeenCalled();
   });
 });

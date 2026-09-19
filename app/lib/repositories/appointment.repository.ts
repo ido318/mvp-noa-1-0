@@ -8,6 +8,13 @@ import type {
   CreateAppointmentInput,
 } from "@/types/domain/appointment";
 
+function isExclusionConstraintError(error: { code?: string; message?: string }): boolean {
+  return (
+    error.code === "23P01" ||
+    (error.message?.includes("appointments_no_active_overlap") ?? false)
+  );
+}
+
 type VersionedUpdatePayload = {
   expectedVersion: number;
   data: Partial<{
@@ -85,7 +92,12 @@ export class AppointmentRepository {
       })
       .select("*")
       .single();
-    if (error) return err(AppError.externalProvider("Failed to create appointment", error));
+    if (error) {
+      if (isExclusionConstraintError(error)) {
+        return err(AppError.conflict("Appointment overlaps with an active appointment", error));
+      }
+      return err(AppError.externalProvider("Failed to create appointment", error));
+    }
     return ok(mapAppointmentRow(data));
   }
 
@@ -117,6 +129,9 @@ export class AppointmentRepository {
             expectedVersion: payload.expectedVersion,
           }),
         );
+      }
+      if (isExclusionConstraintError(error)) {
+        return err(AppError.conflict("Appointment overlaps with an active appointment", error));
       }
       return err(AppError.externalProvider("Failed to update appointment", error));
     }
