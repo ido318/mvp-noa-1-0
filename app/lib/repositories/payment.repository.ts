@@ -6,7 +6,7 @@ import type { Payment, RecordPaymentInput } from "@/types/domain/payment";
 export class PaymentRepository {
   constructor(private readonly client: SupabaseClient) {}
 
-  async record(input: RecordPaymentInput & { recordedByUserId: string }): Promise<Result<Payment>> {
+  async record(input: Omit<RecordPaymentInput, "clinicId"> & { clinicId: string; recordedByUserId: string }): Promise<Result<Payment>> {
     const { data, error } = await this.client
       .from("payments")
       .insert({

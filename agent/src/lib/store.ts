@@ -12,6 +12,7 @@ import {
   formatSlotOptionForTool,
   formatDateHe,
   isWithin14Days,
+  bookingWindowRejection,
   isTooLateToCancel,
   maxBookingDateIso,
   toIso,
@@ -394,6 +395,9 @@ export type BookAppointmentParams = {
 };
 
 export async function bookAppointment(params: BookAppointmentParams): Promise<string> {
+  const windowRejection = bookingWindowRejection(params.scheduled_at, params.visit_type);
+  if (windowRejection) return windowRejection;
+
   const env = getEnv();
   const phone = normalisePhone(params.phone);
   if (!phone) return INVALID_PHONE_RESULT;
@@ -582,6 +586,9 @@ export async function rescheduleAppointment(
   // Resolve effective duration: prefer explicit visitType, fallback to stored type
   const resolvedType = (visitType ?? oldAppt.appointment_type) as VisitType;
   const durMin = effectiveDuration(resolvedType);
+
+  const windowRejection = bookingWindowRejection(newScheduledAt, resolvedType);
+  if (windowRejection) return windowRejection;
 
   if (isSameAppointmentSlot(oldAppt.scheduled_at, newScheduledAt)) {
     const nextStatus = getVisitConfig(resolvedType).requiresApproval ? "pending_approval" : "scheduled";

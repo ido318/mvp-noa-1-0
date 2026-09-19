@@ -37,15 +37,31 @@ const VISIT_LABELS: Record<string, string> = {
   other: "ביקור",
 };
 
-// The price used to be this hardcoded map, whose keys did not even match the
+// The price used to be a hardcoded map here, whose keys did not even match the
 // agent's: it had `vaccine`, `followup` and `surgery`, which are not
 // appointment types, and lacked `urgent` and `consultation`, which are. So
-// `urgent` was quoted 200 ₪ by the agent and fell through to the old
-// `?? "150 ₪"` here — the same appointment, two prices, depending on which
-// side enqueued the SMS. That fallback also invented a number nobody had
+// `urgent` was quoted 200 ₪ by the agent and fell through to a `?? "150 ₪"`
+// fallback here — the same appointment, two prices, depending on which side
+// enqueued the SMS. That fallback also invented a number nobody had
 // configured and texted it to a client as a commitment.
 //
-// The clinic's editable price_list_items is the source now.
+// The clinic's editable price_list_items is the source now; see getPriceEntry
+// below and resolvePriceSegment in @tomer/shared.
+
+/** 14-day lead, 08:00 Asia/Jerusalem — matches the agent daily scan window. */
+const VACCINATION_REMINDER_LEAD_DAYS = 14;
+const VACCINATION_REMINDER_LOCAL_HOUR = 8;
+
+export function vaccinationReminderScheduledFor(nextDueAt: string, now = new Date()): string {
+  const dueIso = nextDueAt.slice(0, 10);
+  const [year, month, day] = dueIso.split("-").map(Number);
+  if (!year || !month || !day) return now.toISOString();
+
+  const reminderDate = new Date(Date.UTC(year, month - 1, day - VACCINATION_REMINDER_LEAD_DAYS));
+  const reminderIso = reminderDate.toISOString().slice(0, 10);
+  const scheduled = israelDateAtHour(reminderIso, VACCINATION_REMINDER_LOCAL_HOUR);
+  return scheduled.getTime() < now.getTime() ? now.toISOString() : scheduled.toISOString();
+}
 
 export interface ApproveNotificationParams {
   appointmentId: string;
@@ -253,7 +269,7 @@ export class DashboardNotificationsService {
         status: "pending",
         type: "vaccination_reminder",
         body: resolveSmsTemplate("vaccination_reminder", overrides.vaccination_reminder, { customerName: p.customerName, petName: p.petName, vaccineName: p.vaccineName }),
-        scheduled_for: `${p.nextDueAt}T06:00:00.000Z`,
+        scheduled_for: vaccinationReminderScheduledFor(p.nextDueAt),
       },
       { onConflict: "vaccination_id,type", ignoreDuplicates: true },
     );

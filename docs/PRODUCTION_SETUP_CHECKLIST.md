@@ -90,7 +90,7 @@ flyctl auth login
 
 ## חלק 5 — הגדרות חיצוניות (לא env — פעולות בקונסולות)
 
-- [ ] **Twilio:** להפנות את ה-Voice webhook של המספר אל `<AGENT_FLY_URL>/twilio/voice`
+- [ ] **Twilio:** `voice_url` של המספר → `https://api.elevenlabs.io/twilio/inbound-call` (אינטגרציית ElevenLabs הנייטיבית). **לא** להפנות ל-`<AGENT_FLY_URL>/twilio/voice` — זה שבר שיחות בעבר.
 - [ ] **ElevenLabs:** post-call webhook → `<AGENT_FLY_URL>/hooks/call-ended` (עם `ELEVENLABS_WEBHOOK_SECRET`)
 - [ ] **ElevenLabs:** הגדרת transfer-to-number לפיצ׳ר ההעברה לאדם (הכלי החדש `request-human-handoff` יסונכרן ע״י סקריפט הסנכרון)
 - [ ] **Fly.io:** להוסיף כרטיס אשראי אם החשבון עדיין במסלול Trial

@@ -32,15 +32,17 @@ export function SendPaymentLinkButton({ invoice }: { invoice: Invoice }) {
   }
 
   if (invoice.status !== "sent") return null;
+  if (sentAt) {
+    return (
+      <span className="text-xs text-[var(--muted)]">קישור תשלום נשלח ב-{fmtTime(sentAt)}</span>
+    );
+  }
 
   return (
     <div className="flex items-center gap-2">
       <Btn type="button" size="sm" variant="soft" loading={loading} onClick={() => void send()}>
         שלח קישור תשלום ב-SMS
       </Btn>
-      {sentAt ? (
-        <span className="text-xs text-[var(--muted)]">נשלח ב-{fmtTime(sentAt)}</span>
-      ) : null}
       {error ? <span className="text-xs text-[var(--red-600)]">{error}</span> : null}
     </div>
   );

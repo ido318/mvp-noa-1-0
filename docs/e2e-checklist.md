@@ -18,7 +18,7 @@
 - [x] `voxly-app` deployed to Vercel — latest preview is READY
 - [x] Supabase migration history aligned with local migrations
 - [ ] Verify or activate pg_cron jobs after final production decision
-- [ ] Confirm Twilio Voice webhook → `https://voxly-agent.fly.dev/twilio/voice`
+- [ ] Confirm Twilio Voice `voice_url` → `https://api.elevenlabs.io/twilio/inbound-call` (not `/twilio/voice`)
 - [ ] Confirm ElevenLabs post-call webhook → `https://voxly-agent.fly.dev/hooks/call-ended`
 - [ ] **Fly.io billing** — add credit card to prevent 5-min trial shutdowns
 

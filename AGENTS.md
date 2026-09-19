@@ -55,8 +55,8 @@ supabase db reset         # re-run all migrations + seed
 ### Call flow
 ```
 [Caller] → [Twilio Israeli number]
-         → POST /twilio/voice        (agent/)
-         → ElevenLabs signed URL
+         → Twilio voice_url = https://api.elevenlabs.io/twilio/inbound-call
+           (ElevenLabs native inbound — not our /twilio/voice)
          → ElevenLabs "Tomer" agent (Hebrew conversation)
               ├── POST /tools/lookup-customer  → customers + pets (Supabase)
               └── POST /tools/escalate-to-noa → escalations table (Supabase)
@@ -64,9 +64,11 @@ supabase db reset         # re-run all migrations + seed
          → upsert to voice_calls table
 ```
 
+`agent/src/server/routes/twilio.ts` (`/twilio/voice`, `/twilio/status`) is dead code in production, kept as a possible fallback. If Tomer goes silent, check the Twilio number's `voice_url` first.
+
 ### Agent (`agent/src/`)
 - `server/app.ts` — Hono app factory, mounts all route groups
-- `server/routes/twilio.ts` — Twilio webhook, validates signature, returns ElevenLabs signed URL via TwiML `<Stream>`
+- `server/routes/twilio.ts` — Twilio webhook fallback (TwiML `<Stream>`); **not** the live production `voice_url`
 - `server/routes/tools.ts` — ElevenLabs tool endpoints (all behind a Bearer check on `TOOLS_BEARER_TOKEN`, not HMAC — see Key Patterns):
   - `/tools/lookup-customer` — find customer + pets by phone
   - `/tools/escalate-to-noa` — create escalation record
