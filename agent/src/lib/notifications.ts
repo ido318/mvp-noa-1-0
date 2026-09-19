@@ -1,4 +1,5 @@
 import { getSupabase } from "./supabase.js";
+import { logger } from "./logger.js";
 import {
   resolveSmsTemplate,
   formatAppointmentDateTime,
@@ -10,6 +11,9 @@ import {
   type BookingConfirmationData,
   type MorningReminderData,
   type SmsTemplateKey,
+  NO_QUOTABLE_PRICE_TEXT,
+  resolvePriceSegment,
+  type PriceListEntry,
 } from "@tomer/shared";
 import { getVisitConfig, type VisitType } from "./appointments.js";
 
@@ -27,22 +31,48 @@ export type NotificationType =
   | "client_cancellation_confirmation";
 
 // Price per visit type (displayed in booking_confirmation SMS). Whole segment,
-// not just a number — neutering has no fixed price (it depends on species,
-// weight, age and medical state, and only Dr. Noa quotes it), so the SMS must
-// not name one either. Kept in sync with knowledge/kb/pricing_and_visits.md.
-export const NO_FIXED_PRICE_TEXT = 'המחיר יימסר על ידי ד"ר נועה';
+// not just a number — so a visit whose price the agent may not quote can say
+// so in the same slot instead of naming one.
+//
+// This used to be a hardcoded map here, with a near-copy in the dashboard
+// that disagreed with it (urgent: 200 ₪ here, a `?? "150 ₪"` fallback there).
+// The clinic's editable price_list_items is the source now; the wording for a
+// price Tomer may not read out lives in @tomer/shared.
+export const NO_FIXED_PRICE_TEXT = NO_QUOTABLE_PRICE_TEXT;
 
-const VISIT_PRICE: Record<VisitType, string> = {
-  checkup:            "150 ₪",
-  home_visit:         "300 ₪",
-  vaccination:        "150 ₪",
-  phone_consultation: "200 ₪",
-  neutering:          NO_FIXED_PRICE_TEXT,
-  consultation:       "150 ₪",
-  urgent:             "200 ₪",
-  follow_up:          "150 ₪",
-  other:              "150 ₪",
-};
+/**
+ * The clinic's price for a visit type, or undefined when it has no row.
+ *
+ * agent_quotable is false for neutering: the 350 ₪ is real and Noa bills by
+ * it, but the price depends on the individual animal, so she quotes it
+ * herself. The column carries that reason so the SMS path does not need a
+ * hardcoded exception.
+ */
+async function getPriceEntry(
+  clinicId: string,
+  visitType: VisitType,
+): Promise<PriceListEntry | undefined> {
+  const { data, error } = await getSupabase()
+    .from("price_list_items")
+    .select("default_price, agent_quotable")
+    .eq("clinic_id", clinicId)
+    .eq("visit_type", visitType)
+    .eq("active", true)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (error) {
+    // Falling back to a number here would be inventing one. resolvePriceSegment
+    // says the price will come from Noa instead, which is always true.
+    logger.error({ err: error, visitType }, "price lookup failed — SMS will not quote a price");
+    return undefined;
+  }
+  if (!data) return undefined;
+  return {
+    defaultPrice: Number(data.default_price),
+    agentQuotable: data.agent_quotable !== false,
+  };
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Jerusalem timezone helpers — Intl-based math lives in @tomer/shared; the
@@ -82,12 +112,13 @@ export function nextSendableTime(now: Date): Date {
 // SMS body builders
 // ─────────────────────────────────────────────────────────────────────────────
 
-function buildBaseParams(
+async function buildBaseParams(
+  clinicId: string,
   scheduledAt: string,
   visitType: VisitType,
   customerName: string,
   petName: string,
-): BookingConfirmationData & MorningReminderData {
+): Promise<BookingConfirmationData & MorningReminderData> {
   const { dayName, date, time } = formatAppointmentDateTime(scheduledAt);
   const config = getVisitConfig(visitType);
   return {
@@ -98,7 +129,7 @@ function buildBaseParams(
     time,
     location: visitType === "home_visit" ? HOME_VISIT_LOCATION : CLINIC_LOCATION,
     visitType: config.labelHe,
-    price: VISIT_PRICE[visitType],
+    price: resolvePriceSegment(await getPriceEntry(clinicId, visitType)),
   };
 }
 
@@ -167,7 +198,7 @@ export type BookingNotificationParams = {
 export async function scheduleBookingNotifications(p: BookingNotificationParams): Promise<void> {
   const now = new Date();
   const overrides = await getSmsTemplateOverrides(p.clinicId);
-  const base = buildBaseParams(p.scheduledAt, p.visitType, p.customerName, p.petName);
+  const base = await buildBaseParams(p.clinicId, p.scheduledAt, p.visitType, p.customerName, p.petName);
   const shared = {
     clinicId:      p.clinicId,
     customerId:    p.customerId,

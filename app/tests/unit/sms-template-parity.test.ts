@@ -25,11 +25,28 @@ function buildClient() {
   const upsert = vi.fn().mockResolvedValue({ error: null });
   const single = vi.fn().mockResolvedValue({ data: { settings: { smsTemplates: {} } }, error: null });
   const client = {
-    from: vi.fn((table: string) =>
-      table === "clinics"
-        ? { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), single }
-        : { insert, upsert },
-    ),
+    from: vi.fn((table: string) => {
+      if (table === "clinics") {
+        return { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), single };
+      }
+      if (table === "price_list_items") {
+        // The booking SMS price comes from the clinic's price list now.
+        let visitType = "";
+        const chain: Record<string, unknown> = {};
+        chain["select"] = vi.fn().mockReturnValue(chain);
+        chain["eq"] = vi.fn((column: string, value: unknown) => {
+          if (column === "visit_type") visitType = String(value);
+          return chain;
+        });
+        chain["is"] = vi.fn().mockReturnValue(chain);
+        chain["maybeSingle"] = vi.fn(async () => ({
+          data: visitType === "checkup" ? { default_price: 150, agent_quotable: true } : null,
+          error: null,
+        }));
+        return chain;
+      }
+      return { insert, upsert };
+    }),
   };
   return { client, insert, upsert };
 }

@@ -20,6 +20,7 @@ const mockUpdate = vi.fn().mockResolvedValue({ error: null });
 const mockEq = vi.fn();
 const mockIn = vi.fn().mockResolvedValue({ error: null });
 const mockFrom = vi.fn();
+const mockPriceRow = vi.fn();
 const mockSingle = vi.fn().mockResolvedValue({ data: { settings: { smsTemplates: {} } }, error: null });
 
 vi.mock("../../../src/lib/supabase.js", () => ({
@@ -38,14 +39,31 @@ beforeEach(() => {
   mockUpsert.mockResolvedValue({ error: null });
   mockSingle.mockResolvedValue({ data: { settings: { smsTemplates: {} } }, error: null });
 
+  // The booking SMS price now comes from the clinic's editable price list
+  // rather than a hardcoded map, so this is the third table read here.
+  mockPriceRow.mockResolvedValue({
+    data: { default_price: 150, agent_quotable: true },
+    error: null,
+  });
+
   // Branch by table: "clinics" is read for SMS template overrides via
-  // .select().eq().single(); every other table keeps the existing
+  // .select().eq().single(); "price_list_items" for the price segment via
+  // .select().eq()…maybeSingle(); every other table keeps the existing
   // upsert/update chain used by notifications_log.
-  mockFrom.mockImplementation((table: string) =>
-    table === "clinics"
-      ? { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), single: mockSingle }
-      : { upsert: mockUpsert, update: mockUpdate },
-  );
+  mockFrom.mockImplementation((table: string) => {
+    if (table === "clinics") {
+      return { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), single: mockSingle };
+    }
+    if (table === "price_list_items") {
+      const chain: Record<string, unknown> = {};
+      chain["select"] = vi.fn().mockReturnValue(chain);
+      chain["eq"] = vi.fn().mockReturnValue(chain);
+      chain["is"] = vi.fn().mockReturnValue(chain);
+      chain["maybeSingle"] = mockPriceRow;
+      return chain;
+    }
+    return { upsert: mockUpsert, update: mockUpdate };
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

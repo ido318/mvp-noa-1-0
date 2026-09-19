@@ -21,6 +21,8 @@ import {
   CLINIC_LOCATION,
   HOME_VISIT_LOCATION,
   type SmsTemplateKey,
+  resolvePriceSegment,
+  type PriceListEntry,
 } from "@tomer/shared";
 
 const VISIT_LABELS: Record<string, string> = {
@@ -35,22 +37,15 @@ const VISIT_LABELS: Record<string, string> = {
   other: "ביקור",
 };
 
-// Whole segment, not just a number. Neutering has no fixed price — it depends on
-// species, weight, age and medical state, and only Dr. Noa quotes it — so the
-// approval SMS must not name one. Mirrors agent/src/lib/notifications.ts.
-const NO_FIXED_PRICE_TEXT = 'המחיר יימסר על ידי ד"ר נועה';
-
-const VISIT_PRICES: Record<string, string> = {
-  checkup: "150 ₪",
-  vaccination: "150 ₪",
-  vaccine: "150 ₪",
-  neutering: NO_FIXED_PRICE_TEXT,
-  home_visit: "300 ₪",
-  phone_consultation: "200 ₪",
-  followup: "150 ₪",
-  surgery: NO_FIXED_PRICE_TEXT,
-  other: "150 ₪",
-};
+// The price used to be this hardcoded map, whose keys did not even match the
+// agent's: it had `vaccine`, `followup` and `surgery`, which are not
+// appointment types, and lacked `urgent` and `consultation`, which are. So
+// `urgent` was quoted 200 ₪ by the agent and fell through to the old
+// `?? "150 ₪"` here — the same appointment, two prices, depending on which
+// side enqueued the SMS. That fallback also invented a number nobody had
+// configured and texted it to a client as a commitment.
+//
+// The clinic's editable price_list_items is the source now.
 
 export interface ApproveNotificationParams {
   appointmentId: string;
@@ -101,6 +96,35 @@ export interface VaccinationReminderParams {
 export class DashboardNotificationsService {
   constructor(private readonly client: SupabaseClient) {}
 
+  /**
+   * The clinic's price for a visit type, or undefined when it has no row.
+   *
+   * agent_quotable is false for neutering: the 350 ₪ is real and Noa bills by
+   * it, but the price depends on the individual animal, so she quotes it
+   * herself. Reading the reason from the row means neither this service nor
+   * the agent needs a hardcoded exception.
+   */
+  private async getPriceEntry(
+    clinicId: string,
+    visitType: string,
+  ): Promise<PriceListEntry | undefined> {
+    const { data, error } = await this.client
+      .from("price_list_items")
+      .select("default_price, agent_quotable")
+      .eq("clinic_id", clinicId)
+      .eq("visit_type", visitType)
+      .eq("active", true)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    // On error, say the price will come from Noa rather than guess one.
+    if (error || !data) return undefined;
+    return {
+      defaultPrice: Number(data.default_price),
+      agentQuotable: data.agent_quotable !== false,
+    };
+  }
+
   /** Enqueue booking_confirmation + morning_reminder + post_visit_followup for an approved appointment. */
   async enqueueApprovalNotifications(p: ApproveNotificationParams): Promise<Result<void>> {
     const overrides = await this.getSmsTemplateOverrides(p.clinicId);
@@ -109,7 +133,7 @@ export class DashboardNotificationsService {
     const isHome = p.visitType === "home_visit";
     const location = isHome ? HOME_VISIT_LOCATION : CLINIC_LOCATION;
     const visitTypeLabel = VISIT_LABELS[p.visitType] ?? p.visitType;
-    const price = VISIT_PRICES[p.visitType] ?? "150 ₪";
+    const price = resolvePriceSegment(await this.getPriceEntry(p.clinicId, p.visitType));
 
     const shared = {
       clinic_id:      p.clinicId,

@@ -1,6 +1,28 @@
 import { describe, expect, it, vi } from "vitest";
 import { DashboardNotificationsService } from "@/lib/services/dashboard-notifications.service";
 
+/**
+ * The booking SMS price now comes from the clinic's editable price_list_items
+ * rather than a hardcoded map, so every client mock here needs that table.
+ * Only `checkup` has a row, which is what these tests enqueue.
+ */
+function priceListChain() {
+  let visitType = "";
+  const chain: Record<string, unknown> = {};
+  chain["select"] = vi.fn().mockReturnValue(chain);
+  chain["eq"] = vi.fn((column: string, value: unknown) => {
+    if (column === "visit_type") visitType = String(value);
+    return chain;
+  });
+  chain["is"] = vi.fn().mockReturnValue(chain);
+  chain["maybeSingle"] = vi.fn(async () => ({
+    data: visitType === "checkup" ? { default_price: 150, agent_quotable: true } : null,
+    error: null,
+  }));
+  return chain;
+}
+
+
 describe("DashboardNotificationsService — clinic template overrides", () => {
   it("getSmsTemplateOverrides fetches clinics.settings.smsTemplates for the given clinic", async () => {
     const single = vi.fn().mockResolvedValue({
@@ -40,11 +62,11 @@ describe("DashboardNotificationsService — clinic template overrides", () => {
     });
     const insert = vi.fn().mockResolvedValue({ error: null });
     const client = {
-      from: vi.fn((table: string) =>
-        table === "clinics"
-          ? { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), single }
-          : { insert },
-      ),
+      from: vi.fn((table: string) => {
+        if (table === "clinics") return { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), single };
+        if (table === "price_list_items") return priceListChain();
+        return { insert };
+      }),
     };
     const service = new DashboardNotificationsService(client as never);
 
@@ -72,11 +94,11 @@ describe("DashboardNotificationsService — clinic template overrides", () => {
     const single = vi.fn().mockResolvedValue({ data: { settings: { smsTemplates: {} } }, error: null });
     const insert = vi.fn().mockResolvedValue({ error: null });
     const client = {
-      from: vi.fn((table: string) =>
-        table === "clinics"
-          ? { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), single }
-          : { insert },
-      ),
+      from: vi.fn((table: string) => {
+        if (table === "clinics") return { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), single };
+        if (table === "price_list_items") return priceListChain();
+        return { insert };
+      }),
     };
     const service = new DashboardNotificationsService(client as never);
 
@@ -104,11 +126,11 @@ describe("DashboardNotificationsService — clinic template overrides", () => {
     });
     const insert = vi.fn().mockResolvedValue({ error: null });
     const client = {
-      from: vi.fn((table: string) =>
-        table === "clinics"
-          ? { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), single }
-          : { insert },
-      ),
+      from: vi.fn((table: string) => {
+        if (table === "clinics") return { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), single };
+        if (table === "price_list_items") return priceListChain();
+        return { insert };
+      }),
     };
     const service = new DashboardNotificationsService(client as never);
 
@@ -127,11 +149,11 @@ describe("DashboardNotificationsService — clinic template overrides", () => {
     const single = vi.fn().mockResolvedValue({ data: { settings: { smsTemplates: {} } }, error: null });
     const insert = vi.fn().mockResolvedValue({ error: null });
     const client = {
-      from: vi.fn((table: string) =>
-        table === "clinics"
-          ? { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), single }
-          : { insert },
-      ),
+      from: vi.fn((table: string) => {
+        if (table === "clinics") return { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), single };
+        if (table === "price_list_items") return priceListChain();
+        return { insert };
+      }),
     };
     const service = new DashboardNotificationsService(client as never);
 
@@ -154,11 +176,11 @@ describe("DashboardNotificationsService — clinic template overrides", () => {
     });
     const insert = vi.fn().mockResolvedValue({ error: null });
     const client = {
-      from: vi.fn((table: string) =>
-        table === "clinics"
-          ? { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), single }
-          : { insert },
-      ),
+      from: vi.fn((table: string) => {
+        if (table === "clinics") return { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), single };
+        if (table === "price_list_items") return priceListChain();
+        return { insert };
+      }),
     };
     const service = new DashboardNotificationsService(client as never);
 
@@ -177,11 +199,11 @@ describe("DashboardNotificationsService — clinic template overrides", () => {
     const single = vi.fn().mockResolvedValue({ data: { settings: { smsTemplates: {} } }, error: null });
     const insert = vi.fn().mockResolvedValue({ error: null });
     const client = {
-      from: vi.fn((table: string) =>
-        table === "clinics"
-          ? { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), single }
-          : { insert },
-      ),
+      from: vi.fn((table: string) => {
+        if (table === "clinics") return { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), single };
+        if (table === "price_list_items") return priceListChain();
+        return { insert };
+      }),
     };
     const service = new DashboardNotificationsService(client as never);
 
@@ -202,11 +224,11 @@ describe("DashboardNotificationsService — clinic template overrides", () => {
     });
     const upsert = vi.fn().mockResolvedValue({ error: null });
     const client = {
-      from: vi.fn((table: string) =>
-        table === "clinics"
-          ? { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), single }
-          : { upsert },
-      ),
+      from: vi.fn((table: string) => {
+        if (table === "clinics") return { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), single };
+        if (table === "price_list_items") return priceListChain();
+        return { upsert };
+      }),
     };
     const service = new DashboardNotificationsService(client as never);
 
@@ -223,11 +245,11 @@ describe("DashboardNotificationsService — clinic template overrides", () => {
     const single = vi.fn().mockResolvedValue({ data: { settings: { smsTemplates: {} } }, error: null });
     const upsert = vi.fn().mockResolvedValue({ error: null });
     const client = {
-      from: vi.fn((table: string) =>
-        table === "clinics"
-          ? { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), single }
-          : { upsert },
-      ),
+      from: vi.fn((table: string) => {
+        if (table === "clinics") return { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), single };
+        if (table === "price_list_items") return priceListChain();
+        return { upsert };
+      }),
     };
     const service = new DashboardNotificationsService(client as never);
 
