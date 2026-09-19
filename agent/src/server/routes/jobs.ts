@@ -89,7 +89,10 @@ jobsRoutes.post("/process-notifications", async (c) => {
 
   const body = await c.req.json().catch(() => ({}));
   const appointmentId = typeof body.appointmentId === "string" ? body.appointmentId : undefined;
-  const clinicId = typeof body.clinicId === "string" ? body.clinicId : undefined;
+  // Pinned, not read from the body: JOBS_BEARER_TOKEN is one shared secret, so
+  // a caller holding it could otherwise name any clinic and have this agent
+  // process another tenant's queue.
+  const clinicId = getEnv().AGENT_CLINIC_ID;
 
   try {
     const result = await processNotifications({ appointmentId, clinicId });
@@ -121,8 +124,9 @@ jobsRoutes.post("/analyze-conversations", async (c) => {
     return c.json({ error: "rate_limited" }, 429);
   }
 
-  const body = await c.req.json().catch(() => ({}));
-  const clinicId = typeof body.clinicId === "string" ? body.clinicId : env.AGENT_CLINIC_ID;
+  // Same reasoning as process-notifications: the clinic is this agent's, not
+  // the caller's to choose.
+  const clinicId = env.AGENT_CLINIC_ID;
 
   try {
     const result = await analyzeConversations(clinicId);

@@ -14,9 +14,15 @@
  * wrong order fails loudly rather than cascading silently, which is why it is
  * spelled out rather than looped over the table list.
  *
+ * SCOPED TO ONE CLINIC. It was not: every delete used
+ * `.not("id", "is", null)`, which is a filter that matches every row, with the
+ * service-role key — so RLS was bypassed and the script wiped every tenant in
+ * the database despite being called reset-CLINIC-data. The dry run did not
+ * protect against this; it counted globally too. --clinic-id is now required.
+ *
  * Usage:
- *   node scripts/reset-clinic-data.mjs                 # dry run — counts only
- *   node scripts/reset-clinic-data.mjs --confirm       # actually delete
+ *   node scripts/reset-clinic-data.mjs --clinic-id=<uuid>             # dry run
+ *   node scripts/reset-clinic-data.mjs --clinic-id=<uuid> --confirm   # delete
  *
  * Env (required, no defaults — this points at production if you point it there):
  *   SUPABASE_URL
@@ -28,8 +34,21 @@ const url = process.env.SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const confirmed = process.argv.includes("--confirm");
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const clinicId = process.argv
+  .find((arg) => arg.startsWith("--clinic-id="))
+  ?.slice("--clinic-id=".length);
+
 if (!url || !serviceRoleKey) {
   console.error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
+  process.exit(1);
+}
+
+// Required, and required to be a UUID: without it every query below would run
+// unscoped against every clinic in the database.
+if (!clinicId || !UUID_RE.test(clinicId)) {
+  console.error("Missing or malformed --clinic-id=<uuid>.");
+  console.error("This script deletes data. It will not run without knowing whose.");
   process.exit(1);
 }
 
@@ -63,11 +82,27 @@ const admin = createClient(url, serviceRoleKey, {
 });
 
 async function count(table) {
-  const { count: n, error } = await admin.from(table).select("*", { count: "exact", head: true });
+  const { count: n, error } = await admin
+    .from(table)
+    .select("*", { count: "exact", head: true })
+    .eq("clinic_id", clinicId);
   return error ? null : n;
 }
 
+async function clinicName() {
+  const { data } = await admin.from("clinics").select("name").eq("id", clinicId).maybeSingle();
+  return data?.name ?? null;
+}
+
+const name = await clinicName();
+if (!name) {
+  console.error(`No clinic with id ${clinicId} on ${url}.`);
+  console.error("Refusing to run: a typo here would look like an empty clinic, not an error.");
+  process.exit(1);
+}
+
 console.log(`Target: ${url}`);
+console.log(`Clinic: ${name} (${clinicId})`);
 console.log(confirmed ? "Mode:   DELETE\n" : "Mode:   dry run (pass --confirm to delete)\n");
 
 console.log("Will delete:");
@@ -83,7 +118,7 @@ for (const table of DELETE_ORDER) {
 }
 console.log(`  ${"".padEnd(20)} ${total} rows total\n`);
 
-console.log("Will keep:");
+console.log("Will keep (this clinic's rows):");
 for (const table of KEPT) {
   const n = await count(table);
   if (n !== null) console.log(`  ${table.padEnd(24)} ${n}`);
@@ -96,8 +131,7 @@ if (!confirmed) {
 
 console.log("\nDeleting…");
 for (const table of DELETE_ORDER) {
-  // .delete() needs a filter; this one matches every row.
-  const { error } = await admin.from(table).delete().not("id", "is", null);
+  const { error } = await admin.from(table).delete().eq("clinic_id", clinicId);
   if (error) {
     if (/does not exist/i.test(error.message)) {
       console.log(`  ${table.padEnd(20)} skipped (${error.message})`);

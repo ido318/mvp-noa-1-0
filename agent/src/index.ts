@@ -15,7 +15,6 @@ async function main(): Promise<void> {
           port: info.port,
           env: env.NODE_ENV,
           publicBaseUrl: env.PUBLIC_BASE_URL,
-          demoMode: env.DEMO_MODE,
         },
         "mvp-noa-1-0/agent started",
       );
