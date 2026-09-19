@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { processNotifications } from "../../../src/lib/notificationProcessor.js";
+import { NOTIFICATION_CLAIM_BATCH_SIZE, processNotifications } from "../../../src/lib/notificationProcessor.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Mocks
@@ -71,6 +71,8 @@ function chainOf(resolveValue: unknown = { error: null }) {
   chain["lt"]      = fn;
   chain["is"]      = fn;
   chain["not"]     = fn;
+  chain["order"]   = fn;
+  chain["limit"]   = fn;
   chain["select"]  = fn;
   chain["returns"] = vi.fn().mockResolvedValue(resolveValue);
   // Make chain awaitable for queries that don't call .returns()
@@ -102,7 +104,7 @@ describe("processNotifications", () => {
     mockFrom.mockReturnValueOnce(recovery).mockReturnValueOnce(unresolvedSweep()).mockReturnValueOnce(expirySweep()).mockReturnValueOnce(claim);
 
     const result = await processNotifications();
-    expect(result).toEqual({ processed: 0, sent: 0, failed: 0, deferred: 0, expired: 0 });
+    expect(result).toEqual({ processed: 0, sent: 0, failed: 0, deferred: 0, expired: 0, remainingDue: 0 });
     expect(sendSms).not.toHaveBeenCalled();
   });
 
@@ -251,6 +253,70 @@ describe("processNotifications", () => {
     expect(sendSms).not.toHaveBeenCalled();
     expect(result.processed).toBe(0);
   });
+
+  it("always scopes recovery/expiry/claim to clinic_id", async () => {
+    const recovery = chainOf({ error: null });
+    const unresolved = unresolvedSweep();
+    const expiry = expirySweep();
+    const claim = chainOf({ data: [], error: null });
+    mockFrom
+      .mockReturnValueOnce(recovery)
+      .mockReturnValueOnce(unresolved)
+      .mockReturnValueOnce(expiry)
+      .mockReturnValueOnce(claim);
+
+    await processNotifications({ clinicId: "clinic-scoped" });
+
+    expect(recovery.eq).toHaveBeenCalledWith("clinic_id", "clinic-scoped");
+    expect(unresolved.eq).toHaveBeenCalledWith("clinic_id", "clinic-scoped");
+    expect(expiry.eq).toHaveBeenCalledWith("clinic_id", "clinic-scoped");
+    expect(claim.eq).toHaveBeenCalledWith("clinic_id", "clinic-scoped");
+  });
+
+  it("defaults clinic filter to AGENT_CLINIC_ID when clinicId is omitted", async () => {
+    const recovery = chainOf({ error: null });
+    const expiry = expirySweep();
+    const claim = chainOf({ data: [], error: null });
+    mockFrom
+      .mockReturnValueOnce(recovery)
+      .mockReturnValueOnce(unresolvedSweep())
+      .mockReturnValueOnce(expiry)
+      .mockReturnValueOnce(claim);
+
+    await processNotifications();
+
+    expect(claim.eq).toHaveBeenCalledWith("clinic_id", "00000000-0000-4000-8000-000000000001");
+  });
+
+  it("caps the atomic claim at NOTIFICATION_CLAIM_BATCH_SIZE and records remaining due rows", async () => {
+    const rows = Array.from({ length: NOTIFICATION_CLAIM_BATCH_SIZE }, (_, i) =>
+      makeRow({ id: `n-${i}` }),
+    );
+    const recovery = chainOf({ error: null });
+    const claim = chainOf({ data: rows, error: null });
+    const sentUpdate = chainOf({ error: null });
+    const remaining = chainOf({ count: 17, error: null });
+
+    let fromCalls = 0;
+    mockFrom.mockImplementation(() => {
+      fromCalls += 1;
+      if (fromCalls === 1) return recovery;
+      if (fromCalls === 2) return unresolvedSweep();
+      if (fromCalls === 3) return expirySweep();
+      if (fromCalls === 4) return claim;
+      // claim + 50 attempt stamps + 50 sent updates + remaining count
+      if (fromCalls === 4 + NOTIFICATION_CLAIM_BATCH_SIZE * 2 + 1) return remaining;
+      return sentUpdate;
+    });
+
+    const result = await processNotifications({ clinicId: "clinic-1" });
+
+    expect(claim.limit).toHaveBeenCalledWith(NOTIFICATION_CLAIM_BATCH_SIZE);
+    expect(sendSms).toHaveBeenCalledTimes(NOTIFICATION_CLAIM_BATCH_SIZE);
+    expect(result.processed).toBe(NOTIFICATION_CLAIM_BATCH_SIZE);
+    expect(result.remainingDue).toBe(17);
+    expect(remaining.eq).toHaveBeenCalledWith("clinic_id", "clinic-1");
+  });
 });
 
 // ── DST correctness: quiet-hours deferral target is nextSendableTime() ──────
@@ -319,6 +385,10 @@ describe("stuck-row recovery", () => {
           return chainOf({ data: [], error: null });
         });
         b.lte    = vi.fn(self);
+        b.is     = vi.fn(self);
+        b.not    = vi.fn(self);
+        b.order  = vi.fn(self);
+        b.limit  = vi.fn(self);
         b.select = vi.fn(self);
         b.returns = vi.fn(() => Promise.resolve({ data: [], error: null }));
         (b as { then?: unknown }).then = (res: (v: unknown) => unknown) =>
@@ -354,6 +424,10 @@ describe("stuck-row recovery", () => {
           return chainOf({ data: [{ id: "stale-1" }, { id: "stale-2" }], error: null });
         });
         b.lte    = vi.fn(self);
+        b.is     = vi.fn(self);
+        b.not    = vi.fn(self);
+        b.order  = vi.fn(self);
+        b.limit  = vi.fn(self);
         b.select = vi.fn(self);
         b.returns = vi.fn(() => Promise.resolve({ data: [], error: null }));
         (b as { then?: unknown }).then = (res: (v: unknown) => unknown) =>

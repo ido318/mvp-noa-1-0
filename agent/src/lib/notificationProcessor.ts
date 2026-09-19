@@ -1,7 +1,10 @@
 import { getSupabase } from "./supabase.js";
+import { getEnv } from "./env.js";
 import { logger } from "./logger.js";
 import { sendSms } from "./sms.service.js";
 import { isQuietHours, nextSendableTime } from "./notifications.js";
+
+export const NOTIFICATION_CLAIM_BATCH_SIZE = 50;
 
 export type ProcessResult = {
   processed: number;
@@ -10,6 +13,8 @@ export type ProcessResult = {
   deferred: number;
   /** Rows whose moment has passed; marked 'skipped' rather than sent late. */
   expired: number;
+  /** Pending due rows left after this run's claim cap (0 when the batch was not full). */
+  remainingDue: number;
 };
 
 type ProcessOptions = {
@@ -37,10 +42,24 @@ const PROCESSING_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
 // overdue by more than this is closed out as 'skipped'.
 const EXPIRY_MS = 12 * 60 * 60 * 1000; // 12 hours
 
+function applyJobFilters(
+  // Supabase query builders are thenable and vary by method; keep this adapter untyped.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  query: any,
+  clinicId: string,
+  appointmentId: string | undefined,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+): any {
+  let next = query.eq("clinic_id", clinicId);
+  if (appointmentId) next = next.eq("appointment_id", appointmentId);
+  return next;
+}
+
 export async function processNotifications(opts: ProcessOptions = {}): Promise<ProcessResult> {
-  const result: ProcessResult = { processed: 0, sent: 0, failed: 0, deferred: 0, expired: 0 };
+  const result: ProcessResult = { processed: 0, sent: 0, failed: 0, deferred: 0, expired: 0, remainingDue: 0 };
   const now = new Date();
   const nowIso = now.toISOString();
+  const clinicId = opts.clinicId ?? getEnv().AGENT_CLINIC_ID;
 
   // ── Recovery: rows stuck in 'processing' (crashed processor) ───────────
   //
@@ -54,47 +73,57 @@ export async function processNotifications(opts: ProcessOptions = {}): Promise<P
   //               client, which is what the old blanket reset produced.
   const staleThreshold = new Date(now.getTime() - PROCESSING_TIMEOUT_MS).toISOString();
 
-  const { error: recoveryErr } = await getSupabase()
-    .from("notifications_log")
-    .update({ status: "pending", updated_at: nowIso })
-    .eq("status", "processing")
-    .lt("updated_at", staleThreshold)
-    .is("send_attempted_at", null);
+  const { error: recoveryErr } = await applyJobFilters(
+    getSupabase()
+      .from("notifications_log")
+      .update({ status: "pending", updated_at: nowIso })
+      .eq("status", "processing")
+      .lt("updated_at", staleThreshold)
+      .is("send_attempted_at", null),
+    clinicId,
+    opts.appointmentId,
+  );
   if (recoveryErr) {
     logger.error({ error: recoveryErr.message }, "Stuck-row recovery failed — processing rows may remain stuck");
   }
 
-  const { data: unresolved, error: unresolvedErr } = await getSupabase()
-    .from("notifications_log")
-    .update({
-      status: "failed",
-      error: "send outcome unknown: the processor stopped after handing the message to Twilio. Check Twilio before resending.",
-      updated_at: nowIso,
-    })
-    .eq("status", "processing")
-    .lt("updated_at", staleThreshold)
-    .not("send_attempted_at", "is", null)
-    .select("id");
+  const { data: unresolved, error: unresolvedErr } = await applyJobFilters(
+    getSupabase()
+      .from("notifications_log")
+      .update({
+        status: "failed",
+        error: "send outcome unknown: the processor stopped after handing the message to Twilio. Check Twilio before resending.",
+        updated_at: nowIso,
+      })
+      .eq("status", "processing")
+      .lt("updated_at", staleThreshold)
+      .not("send_attempted_at", "is", null)
+      .select("id"),
+    clinicId,
+    opts.appointmentId,
+  );
   if (unresolvedErr) {
     logger.error({ error: unresolvedErr.message }, "Unresolved-send sweep failed");
   } else if (unresolved && unresolved.length > 0) {
+    const unresolvedRows = unresolved as Array<{ id: string }>;
     logger.error(
-      { ids: unresolved.map((r) => (r as { id: string }).id) },
+      { ids: unresolvedRows.map((row) => row.id) },
       "Notifications with an unknown send outcome — not retried, needs a human to check Twilio",
     );
   }
 
   // ── Expiry: close out rows whose moment has passed ─────────────────────
   const expiryThreshold = new Date(now.getTime() - EXPIRY_MS).toISOString();
-  let expireQuery = getSupabase()
-    .from("notifications_log")
-    .update({ status: "skipped", error: "expired: scheduled_for passed by more than 12h", updated_at: nowIso })
-    .eq("status", "pending")
-    .lt("scheduled_for", expiryThreshold)
-    .select("id");
-
-  if (opts.appointmentId) expireQuery = expireQuery.eq("appointment_id", opts.appointmentId);
-  if (opts.clinicId)      expireQuery = expireQuery.eq("clinic_id", opts.clinicId);
+  const expireQuery = applyJobFilters(
+    getSupabase()
+      .from("notifications_log")
+      .update({ status: "skipped", error: "expired: scheduled_for passed by more than 12h", updated_at: nowIso })
+      .eq("status", "pending")
+      .lt("scheduled_for", expiryThreshold)
+      .select("id"),
+    clinicId,
+    opts.appointmentId,
+  );
 
   const { data: expired, error: expireErr } = await expireQuery;
   if (expireErr) {
@@ -107,15 +136,16 @@ export async function processNotifications(opts: ProcessOptions = {}): Promise<P
   // ── Quiet hours: bulk defer all pending rows ───────────────────────────
   if (isQuietHours(now)) {
     const deferUntil = nextSendableTime(now).toISOString();
-    let deferQuery = getSupabase()
-      .from("notifications_log")
-      .update({ scheduled_for: deferUntil, updated_at: nowIso })
-      .eq("status", "pending")
-      .lte("scheduled_for", nowIso)
-      .select("id");
-
-    if (opts.appointmentId) deferQuery = deferQuery.eq("appointment_id", opts.appointmentId);
-    if (opts.clinicId)      deferQuery = deferQuery.eq("clinic_id", opts.clinicId);
+    const deferQuery = applyJobFilters(
+      getSupabase()
+        .from("notifications_log")
+        .update({ scheduled_for: deferUntil, updated_at: nowIso })
+        .eq("status", "pending")
+        .lte("scheduled_for", nowIso)
+        .select("id"),
+      clinicId,
+      opts.appointmentId,
+    );
 
     const { data: deferred, error: deferErr } = await deferQuery;
     if (deferErr) {
@@ -128,20 +158,25 @@ export async function processNotifications(opts: ProcessOptions = {}): Promise<P
 
   // ── Atomic claim: UPDATE status='processing' RETURNING * ───────────────
   // PostgreSQL evaluates the WHERE and UPDATE atomically; two concurrent
-  // processors will each claim a disjoint set of rows.
-  let claimQuery = getSupabase()
-    .from("notifications_log")
-    .update({ status: "processing", updated_at: nowIso })
-    .eq("status", "pending")
-    .lte("scheduled_for", nowIso)
-    .select("id, clinic_id, phone, body, type, appointment_id");
+  // processors will each claim a disjoint set of rows. Cap the batch so a
+  // backlog cannot monopolise one cron tick / Twilio budget.
+  const claimQuery = applyJobFilters(
+    getSupabase()
+      .from("notifications_log")
+      .update({ status: "processing", updated_at: nowIso })
+      .eq("status", "pending")
+      .lte("scheduled_for", nowIso)
+      .order("scheduled_for", { ascending: true })
+      .limit(NOTIFICATION_CLAIM_BATCH_SIZE)
+      .select("id, clinic_id, phone, body, type, appointment_id"),
+    clinicId,
+    opts.appointmentId,
+  );
 
-  if (opts.appointmentId) claimQuery = claimQuery.eq("appointment_id", opts.appointmentId);
-  if (opts.clinicId)      claimQuery = claimQuery.eq("clinic_id", opts.clinicId);
-
-  const { data: rows, error: claimErr } = await claimQuery.returns<NotificationRow[]>();
+  const { data: claimed, error: claimErr } = await claimQuery;
   if (claimErr) throw new Error(`processNotifications claim failed: ${claimErr.message}`);
-  if (!rows || rows.length === 0) return result;
+  const rows = (claimed ?? []) as NotificationRow[];
+  if (rows.length === 0) return result;
 
   for (const row of rows) {
     result.processed++;
@@ -205,6 +240,30 @@ export async function processNotifications(opts: ProcessOptions = {}): Promise<P
         );
       }
       result.failed++;
+    }
+  }
+
+  if (rows.length >= NOTIFICATION_CLAIM_BATCH_SIZE) {
+    const remainingQuery = applyJobFilters(
+      getSupabase()
+        .from("notifications_log")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "pending")
+        .lte("scheduled_for", nowIso),
+      clinicId,
+      opts.appointmentId,
+    );
+    const { count, error: remainingErr } = await remainingQuery;
+    if (remainingErr) {
+      logger.error({ error: remainingErr.message }, "Failed to count remaining due notifications after batch cap");
+    } else {
+      result.remainingDue = count ?? 0;
+      if (result.remainingDue > 0) {
+        logger.warn(
+          { remainingDue: result.remainingDue, claimed: rows.length, clinicId },
+          "processNotifications: more due rows remain after batch cap",
+        );
+      }
     }
   }
 

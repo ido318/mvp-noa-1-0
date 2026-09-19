@@ -215,4 +215,17 @@ describe("appointment tools", () => {
     expect(json.appointments[0]?.scheduled_at).toBe("2026-06-14T09:10:00+03:00");
     expect(vi.mocked(listCustomerAppointments)).toHaveBeenCalledWith("+972541234567");
   });
+
+  it("POST /tools/book-appointment returns HTTP 200 with a Hebrew result on validation failure", async () => {
+    const res = await makeApp().request("/tools/book-appointment", {
+      method: "POST",
+      headers: toolHeaders(),
+      body: JSON.stringify({ phone: "+972541234567" }),
+    });
+
+    expect(res.status).toBe(200);
+    const json = await res.json() as { result: string };
+    expect(json.result).toContain("פרמטרים חסרים");
+    expect(vi.mocked(bookAppointment)).not.toHaveBeenCalled();
+  });
 });
