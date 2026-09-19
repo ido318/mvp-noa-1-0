@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { XIcon } from "@/components/dashboard/icons";
 import { useFocusTrap } from "@/components/dashboard/ui/use-focus-trap";
@@ -16,6 +16,9 @@ interface ModalProps {
 export function Modal({ open, onClose, title, subtitle, children, maxWidth }: ModalProps) {
   const [mounted, setMounted] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
+  // role="dialog" + aria-modal with no name announces as an unnamed dialog:
+  // a screen reader says "dialog" and nothing about what it is for.
+  const titleId = useId();
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -50,6 +53,7 @@ export function Modal({ open, onClose, title, subtitle, children, maxWidth }: Mo
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
+        aria-labelledby={title ? titleId : undefined}
         tabIndex={-1}
       >
         {(title || subtitle) && (
@@ -60,6 +64,7 @@ export function Modal({ open, onClose, title, subtitle, children, maxWidth }: Mo
             <div>
               {title && (
                 <h2
+                  id={titleId}
                   className="text-[15px]"
                   style={{ color: "var(--text-primary)", fontWeight: "var(--w-semibold)" }}
                 >

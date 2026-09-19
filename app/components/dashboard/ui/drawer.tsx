@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useId } from "react";
 import { createPortal } from "react-dom";
 import { XIcon } from "@/components/dashboard/icons";
 import { useFocusTrap } from "@/components/dashboard/ui/use-focus-trap";
@@ -17,6 +17,8 @@ interface DrawerProps {
 export function Drawer({ open, onClose, title, subtitle, children, width, footer }: DrawerProps) {
   const [mounted, setMounted] = useState(false);
   const panelRef = useRef<HTMLElement>(null);
+  // Same gap as Modal had: role="dialog" + aria-modal with no accessible name.
+  const titleId = useId();
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -55,6 +57,7 @@ export function Drawer({ open, onClose, title, subtitle, children, width, footer
         }}
         role="dialog"
         aria-modal="true"
+        aria-labelledby={title ? titleId : undefined}
         tabIndex={-1}
       >
         <header
@@ -63,12 +66,13 @@ export function Drawer({ open, onClose, title, subtitle, children, width, footer
         >
           <div className="min-w-0">
             {title && (
-              <p
+              <h2
+                id={titleId}
                 className="text-[14px] truncate"
                 style={{ color: "var(--text-primary)", fontWeight: "var(--w-semibold)" }}
               >
                 {title}
-              </p>
+              </h2>
             )}
             {subtitle && (
               <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>{subtitle}</p>

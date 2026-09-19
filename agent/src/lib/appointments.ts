@@ -35,17 +35,12 @@ export type VisitTypeConfig = {
 
 // effectiveDuration = durationMin + bufferMin; stored in duration_minutes so
 // the GIST constraint in the DB automatically enforces inter-appointment gaps.
-export const VISIT_TYPE_CONFIG: Record<VisitType, VisitTypeConfig> = {
-  checkup:            { durationMin: 30, bufferMin: 10, requiresApproval: false, labelHe: "בדיקה בקליניקה" },
-  home_visit:         { durationMin: 60, bufferMin: 30, requiresApproval: false, labelHe: "ביקור בית" },
-  vaccination:        { durationMin: 20, bufferMin: 10, requiresApproval: false, labelHe: "חיסונים" },
-  phone_consultation: { durationMin: 20, bufferMin:  0, requiresApproval: false, labelHe: "ייעוץ טלפוני" },
-  neutering:          { durationMin: 30, bufferMin: 10, requiresApproval: true,  labelHe: "עיקור/סירוס" },
-  consultation:       { durationMin: 20, bufferMin: 10, requiresApproval: false, labelHe: "ייעוץ" },
-  urgent:             { durationMin: 30, bufferMin:  0, requiresApproval: false, labelHe: "דחוף" },
-  follow_up:          { durationMin: 30, bufferMin:  0, requiresApproval: false, labelHe: "ביקור מעקב" },
-  other:              { durationMin: 30, bufferMin:  0, requiresApproval: false, labelHe: "אחר" },
-};
+// The table itself now lives in @tomer/shared; this workspace keeps the
+// re-export so the ~40 local importers are unchanged. Two hand-maintained
+// copies of the clinic's durations and Hebrew labels agreed only because
+// nobody had edited one of them yet.
+import { VISIT_TYPE_CONFIG } from "@tomer/shared";
+export { VISIT_TYPE_CONFIG };
 
 export function getVisitConfig(visitType: VisitType): VisitTypeConfig {
   return VISIT_TYPE_CONFIG[visitType] ?? VISIT_TYPE_CONFIG.other;

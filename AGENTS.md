@@ -67,7 +67,7 @@ supabase db reset         # re-run all migrations + seed
 ### Agent (`agent/src/`)
 - `server/app.ts` — Hono app factory, mounts all route groups
 - `server/routes/twilio.ts` — Twilio webhook, validates signature, returns ElevenLabs signed URL via TwiML `<Stream>`
-- `server/routes/tools.ts` — ElevenLabs tool endpoints (all protected by `verifyElevenLabsSignature`):
+- `server/routes/tools.ts` — ElevenLabs tool endpoints (all behind a Bearer check on `TOOLS_BEARER_TOKEN`, not HMAC — see Key Patterns):
   - `/tools/lookup-customer` — find customer + pets by phone
   - `/tools/escalate-to-noa` — create escalation record
   - `/tools/check-availability` — free slots by visit type + date (14-day window, calendar_blocks aware)
@@ -101,7 +101,7 @@ Architecture is layered: `UI (page.tsx) → API route → Service → Repository
 ### Supabase
 - **Cloud project:** `xpsuhtqfxqmnunppnyov` (account: voxly ai, region: eu-central-1, Frankfurt) — `https://xpsuhtqfxqmnunppnyov.supabase.co`
   Old projects (deleted): `ssfkximqwyzqlsgwfbye` (Seoul), `voxly-tomer` (`grbgkjjtyfohzulssuga`).
-- Migrations in `supabase/migrations/` — run in timestamp order; 15 migrations total (through `20260612000015_notifications.sql`)
+- Migrations in `supabase/migrations/` — run in timestamp order; 51 total. Applied versions can drift from local filenames, so check the applied list against the directory rather than assuming they match.
 - pg_cron **not yet active** — see "הפעלת cron" below; activate manually after Vercel deploy
 - RLS is enabled on all tables; the app uses the anon key + user session for data access, the service role key only for admin operations (audit logs, AI events, health checks)
 - Multi-tenant by `clinic_id` — every data table has a `clinic_id` column
@@ -116,7 +116,7 @@ const actor = await requireAuth(auth);
 // validate with zod, call service, return ok/error response
 ```
 
-**Tool endpoints** in `agent/` validate the ElevenLabs HMAC signature before handling (`/tools/*` middleware in `tools.ts`). Responses to ElevenLabs tools must be `{ result: string }`.
+**Tool endpoints** in `agent/` require a Bearer token (`TOOLS_BEARER_TOKEN`), sent by ElevenLabs as a static request header — ElevenLabs ConvAI tool calls are not HMAC-signed. HMAC (`verifyElevenLabsSignature`) guards `/hooks/call-ended` only. Configuring `/tools/*` for HMAC per the old wording here breaks every tool call. Responses to ElevenLabs tools must be `{ result: string }`.
 
 **Phone normalisation** — Israeli numbers are normalised to E.164 (`054...` → `+97254...`) in `agent/lib/store.ts:normalisePhone`.
 
