@@ -6,6 +6,8 @@ import type { NextConfig } from "next";
  * are server-side but listed so a future client call is not blocked.
  * next/font self-hosts Noto, so Google Fonts origins are omitted.
  */
+const isProd = process.env.NODE_ENV === "production";
+
 const contentSecurityPolicy = [
   "default-src 'self'",
   "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://vercel.live",
@@ -37,7 +39,8 @@ const contentSecurityPolicy = [
   "base-uri 'self'",
   "form-action 'self'",
   "object-src 'none'",
-  "upgrade-insecure-requests",
+  // Production only: this would rewrite local http://127.0.0.1:54321 to https.
+  ...(isProd ? ["upgrade-insecure-requests"] : []),
 ].join("; ");
 
 const securityHeaders = [
