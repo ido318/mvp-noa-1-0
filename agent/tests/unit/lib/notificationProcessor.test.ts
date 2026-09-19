@@ -53,6 +53,15 @@ function expirySweep(rows: unknown[] = []) {
 }
 
 // A chainable mock that ends with .select().returns() or just resolves via .then()
+/**
+ * The second half of recovery: the sweep that closes out stale 'processing'
+ * rows whose send was already attempted. It runs between the pending-reset and
+ * the expiry sweep, so every ordered mock below has to account for it.
+ */
+function unresolvedSweep() {
+  return chainOf({ data: [], error: null });
+}
+
 function chainOf(resolveValue: unknown = { error: null }) {
   const chain: Record<string, unknown> = {};
   const fn = vi.fn().mockReturnValue(chain);
@@ -60,6 +69,8 @@ function chainOf(resolveValue: unknown = { error: null }) {
   chain["eq"]      = fn;
   chain["lte"]     = fn;
   chain["lt"]      = fn;
+  chain["is"]      = fn;
+  chain["not"]     = fn;
   chain["select"]  = fn;
   chain["returns"] = vi.fn().mockResolvedValue(resolveValue);
   // Make chain awaitable for queries that don't call .returns()
@@ -88,7 +99,7 @@ describe("processNotifications", () => {
     // recovery call + claim call both succeed with no data
     const recovery = chainOf({ error: null });
     const claim    = chainOf({ data: [], error: null });
-    mockFrom.mockReturnValueOnce(recovery).mockReturnValueOnce(expirySweep()).mockReturnValueOnce(claim);
+    mockFrom.mockReturnValueOnce(recovery).mockReturnValueOnce(unresolvedSweep()).mockReturnValueOnce(expirySweep()).mockReturnValueOnce(claim);
 
     const result = await processNotifications();
     expect(result).toEqual({ processed: 0, sent: 0, failed: 0, deferred: 0, expired: 0 });
@@ -103,6 +114,7 @@ describe("processNotifications", () => {
     const sentUpdate = chainOf({ error: null });
     mockFrom
       .mockReturnValueOnce(recovery)
+      .mockReturnValueOnce(unresolvedSweep())
       .mockReturnValueOnce(expirySweep())
       .mockReturnValueOnce(claim)
       .mockReturnValue(sentUpdate);
@@ -125,7 +137,7 @@ describe("processNotifications", () => {
 
     const recovery   = chainOf({ error: null });
     const deferChain = chainOf({ data: [{ id: "n-1" }, { id: "n-2" }], error: null });
-    mockFrom.mockReturnValueOnce(recovery).mockReturnValueOnce(expirySweep()).mockReturnValueOnce(deferChain);
+    mockFrom.mockReturnValueOnce(recovery).mockReturnValueOnce(unresolvedSweep()).mockReturnValueOnce(expirySweep()).mockReturnValueOnce(deferChain);
 
     const result = await processNotifications();
     expect(sendSms).not.toHaveBeenCalled();
@@ -142,6 +154,7 @@ describe("processNotifications", () => {
     const failedUpdate = chainOf({ error: null });
     mockFrom
       .mockReturnValueOnce(recovery)
+      .mockReturnValueOnce(unresolvedSweep())
       .mockReturnValueOnce(expirySweep())
       .mockReturnValueOnce(claim)
       .mockReturnValue(failedUpdate);
@@ -154,13 +167,18 @@ describe("processNotifications", () => {
 
   it("logs error but still counts sent when post-send status update fails", async () => {
     const row = makeRow();
-    const recovery   = chainOf({ error: null });
-    const claim      = chainOf({ data: [row], error: null });
-    const failUpdate = chainOf({ error: { message: "DB error" } });
+    const recovery      = chainOf({ error: null });
+    const claim         = chainOf({ data: [row], error: null });
+    // The attempt marker must succeed here — otherwise the send is skipped and
+    // this stops being a test of the post-send path.
+    const attemptMarker = chainOf({ error: null });
+    const failUpdate    = chainOf({ error: { message: "DB error" } });
     mockFrom
       .mockReturnValueOnce(recovery)
+      .mockReturnValueOnce(unresolvedSweep())
       .mockReturnValueOnce(expirySweep())
       .mockReturnValueOnce(claim)
+      .mockReturnValueOnce(attemptMarker)
       .mockReturnValue(failUpdate);
 
     // Should not throw; SMS was delivered
@@ -169,11 +187,65 @@ describe("processNotifications", () => {
     expect(result.failed).toBe(0);
   });
 
+  // The duplicate-SMS window. Twilio's Messages API has no idempotency key, so
+  // a row whose send was already attempted cannot be retried safely.
+  it("stamps send_attempted_at before handing the row to Twilio", async () => {
+    const row = makeRow();
+    const recovery      = chainOf({ error: null });
+    const claim         = chainOf({ data: [row], error: null });
+    const attemptMarker = chainOf({ error: null });
+
+    let markedBeforeSend = false;
+    const markerUpdate = attemptMarker.update as ReturnType<typeof vi.fn>;
+    vi.mocked(sendSms).mockImplementation(async () => {
+      markedBeforeSend = markerUpdate.mock.calls.length > 0;
+      return { sid: "SM_test" };
+    });
+
+    mockFrom
+      .mockReturnValueOnce(recovery)
+      .mockReturnValueOnce(unresolvedSweep())
+      .mockReturnValueOnce(expirySweep())
+      .mockReturnValueOnce(claim)
+      .mockReturnValueOnce(attemptMarker)
+      .mockReturnValue(chainOf({ error: null }));
+
+    await processNotifications();
+
+    expect(markedBeforeSend).toBe(true);
+    expect(attemptMarker.update).toHaveBeenCalledWith(
+      expect.objectContaining({ send_attempted_at: expect.any(String) }),
+    );
+  });
+
+  it("does not send when the attempt marker cannot be written", async () => {
+    const row = makeRow();
+    const recovery      = chainOf({ error: null });
+    const claim         = chainOf({ data: [row], error: null });
+    const attemptMarker = chainOf({ error: { message: "DB error" } });
+
+    mockFrom
+      .mockReturnValueOnce(recovery)
+      .mockReturnValueOnce(unresolvedSweep())
+      .mockReturnValueOnce(expirySweep())
+      .mockReturnValueOnce(claim)
+      .mockReturnValueOnce(attemptMarker)
+      .mockReturnValue(chainOf({ error: null }));
+
+    const result = await processNotifications();
+
+    // Sending without the marker would make a later crash indistinguishable
+    // from a crash before the send, and the client would be texted twice.
+    expect(sendSms).not.toHaveBeenCalled();
+    expect(result.failed).toBe(1);
+    expect(result.sent).toBe(0);
+  });
+
   it("second concurrent processor claims 0 rows (atomic guarantee)", async () => {
     // Simulates a second concurrent processor run: claim returns empty
     const recovery = chainOf({ error: null });
     const claim    = chainOf({ data: [], error: null });
-    mockFrom.mockReturnValueOnce(recovery).mockReturnValueOnce(expirySweep()).mockReturnValueOnce(claim);
+    mockFrom.mockReturnValueOnce(recovery).mockReturnValueOnce(unresolvedSweep()).mockReturnValueOnce(expirySweep()).mockReturnValueOnce(claim);
 
     const result = await processNotifications();
     expect(sendSms).not.toHaveBeenCalled();

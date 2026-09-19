@@ -42,15 +42,46 @@ export async function processNotifications(opts: ProcessOptions = {}): Promise<P
   const now = new Date();
   const nowIso = now.toISOString();
 
-  // ── Recovery: reset rows stuck in 'processing' (crashed processor) ─────
+  // ── Recovery: rows stuck in 'processing' (crashed processor) ───────────
+  //
+  // Split by whether Twilio was already called. send_attempted_at is stamped
+  // immediately before the send, so:
+  //   - unset  -> we died before the send; nothing reached the client, retry.
+  //   - set    -> the SMS may already have been delivered. Twilio's Messages
+  //               API has no idempotency key, so a retry cannot be made a
+  //               no-op at the provider. Close the row for a human instead:
+  //               one row somebody checks beats a duplicate reminder to a
+  //               client, which is what the old blanket reset produced.
   const staleThreshold = new Date(now.getTime() - PROCESSING_TIMEOUT_MS).toISOString();
+
   const { error: recoveryErr } = await getSupabase()
     .from("notifications_log")
     .update({ status: "pending", updated_at: nowIso })
     .eq("status", "processing")
-    .lt("updated_at", staleThreshold);
+    .lt("updated_at", staleThreshold)
+    .is("send_attempted_at", null);
   if (recoveryErr) {
     logger.error({ error: recoveryErr.message }, "Stuck-row recovery failed — processing rows may remain stuck");
+  }
+
+  const { data: unresolved, error: unresolvedErr } = await getSupabase()
+    .from("notifications_log")
+    .update({
+      status: "failed",
+      error: "send outcome unknown: the processor stopped after handing the message to Twilio. Check Twilio before resending.",
+      updated_at: nowIso,
+    })
+    .eq("status", "processing")
+    .lt("updated_at", staleThreshold)
+    .not("send_attempted_at", "is", null)
+    .select("id");
+  if (unresolvedErr) {
+    logger.error({ error: unresolvedErr.message }, "Unresolved-send sweep failed");
+  } else if (unresolved && unresolved.length > 0) {
+    logger.error(
+      { ids: unresolved.map((r) => (r as { id: string }).id) },
+      "Notifications with an unknown send outcome — not retried, needs a human to check Twilio",
+    );
   }
 
   // ── Expiry: close out rows whose moment has passed ─────────────────────
@@ -115,6 +146,26 @@ export async function processNotifications(opts: ProcessOptions = {}): Promise<P
   for (const row of rows) {
     result.processed++;
     try {
+      // Record the attempt before making it. If the process dies during the
+      // send, this is the only evidence that the client may already have the
+      // message — recovery above reads exactly this.
+      const { error: attemptErr } = await getSupabase()
+        .from("notifications_log")
+        .update({ send_attempted_at: nowIso, updated_at: nowIso })
+        .eq("id", row.id)
+        .eq("status", "processing");
+      if (attemptErr) {
+        // Without the marker a crash mid-send would look like a crash before
+        // it, and the client would get the message twice. Skip rather than
+        // send blind; the row stays claimed and the sweep resolves it.
+        logger.error(
+          { id: row.id, error: attemptErr.message },
+          "Could not record send attempt — not sending, to avoid an untraceable duplicate",
+        );
+        result.failed++;
+        continue;
+      }
+
       const { sid } = await sendSms(row.phone, row.body);
 
       // Guarded on status='processing' (not just id) so a cancelFutureNotifications

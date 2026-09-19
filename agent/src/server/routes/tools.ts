@@ -105,20 +105,30 @@ toolsRoutes.post("/tools/lookup-customer", async (c) => {
 
   logger.info({ phone: maskPhone(parsed.data.phone) }, "tool: lookup-customer");
 
-  const customer = await findCustomerByPhone(parsed.data.phone);
+  // Same try/catch shape as book/cancel. Without it a Supabase error escaped
+  // as a raw 500 with no {result}, which the model cannot say out loud — the
+  // caller heard silence instead of "אסוף פרטים בעצמך".
+  try {
+    const customer = await findCustomerByPhone(parsed.data.phone);
 
-  if (!customer) {
+    if (!customer) {
+      return c.json({ result: "לקוח לא מוכר. אסוף פרטים בעצמך." });
+    }
+
+    const petList = customer.pets
+      .map((p) => [p.name, p.species, p.breed].filter(Boolean).join(" - "))
+      .join(", ");
+    return c.json({
+      result: `שם: ${customer.full_name}, חיות: ${petList}`,
+      customer_id: customer.id,
+      pets: customer.pets.map((p) => ({ id: p.id, name: p.name, species: p.species })),
+    });
+  } catch (err) {
+    logger.error({ err }, "tool: lookup-customer — internal error");
+    // Degrade to the unknown-customer script rather than to silence: Tomer can
+    // still take the details by hand.
     return c.json({ result: "לקוח לא מוכר. אסוף פרטים בעצמך." });
   }
-
-  const petList = customer.pets
-    .map((p) => [p.name, p.species, p.breed].filter(Boolean).join(" - "))
-    .join(", ");
-  return c.json({
-    result: `שם: ${customer.full_name}, חיות: ${petList}`,
-    customer_id: customer.id,
-    pets: customer.pets.map((p) => ({ id: p.id, name: p.name, species: p.species })),
-  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -150,11 +160,19 @@ toolsRoutes.post("/tools/escalate-to-noa", async (c) => {
     logger.info({ urgency, reason }, "tool: escalate-to-noa");
   }
 
-  await addEscalation({
-    reason,
-    urgency,
-    caller_phone: phone ?? null,
-  });
+  try {
+    await addEscalation({
+      reason,
+      urgency,
+      caller_phone: phone ?? null,
+    });
+  } catch (err) {
+    logger.error({ err, urgency }, "tool: escalate-to-noa — write failed");
+    // Never claim it reached Noa when it did not; tell the caller to phone in.
+    return c.json({
+      result: "לא הצלחתי לרשום את הפנייה. אנא התקשרו שוב מאוחר יותר או פנו ישירות למרפאה.",
+    });
+  }
 
   return c.json({ result: `הועברה לנועה (urgency: ${urgency}/10)` });
 });
